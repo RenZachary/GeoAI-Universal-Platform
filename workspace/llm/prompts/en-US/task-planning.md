@@ -18,11 +18,13 @@ CRITICAL REQUIREMENTS:
 2. The pluginId field must match the 'id' field from available plugins exactly (NOT the 'name' field)
 3. Do NOT invent, modify, or guess plugin IDs - use only what is listed
 4. If a required plugin is not available, report it as unavailable rather than using a similar name
+5. Pay close attention to the parameter schema for each plugin - all required parameters must be provided
+6. For statistics_calculator: fieldName is REQUIRED and statistics should specify which statistical measures to calculate
 
 Create a step-by-step execution plan. For each step specify:
-- pluginId: Which plugin to use (MUST be exact 'id' from available plugins, e.g., 'filter', 'buffer_analysis')
-- parameters: Parameters for the plugin
-- outputType: Expected output type
+- pluginId: Which plugin to use (MUST be exact 'id' from available plugins)
+- parameters: Parameters for the plugin (must match the plugin's inputSchema)
+- dependsOn: Step IDs that must complete before this step (if any)
 
 Considerations:
 - Choose appropriate plugins based on data source type

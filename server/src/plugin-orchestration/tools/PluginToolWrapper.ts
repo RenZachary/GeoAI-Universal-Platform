@@ -14,6 +14,12 @@ import type { MVTPublisherParams } from '../executor/visualization/MVTPublisherE
 import { MVTPublisherExecutor } from '../executor/visualization/MVTPublisherExecutor.js';
 import type { StatisticsCalculatorParams } from '../executor/analysis/StatisticsCalculatorExecutor.js';
 import { StatisticsCalculatorExecutor } from '../executor/analysis/StatisticsCalculatorExecutor.js';
+import type { FilterParams } from '../executor/analysis/FilterExecutor.js';
+import { FilterExecutor } from '../executor/analysis/FilterExecutor.js';
+import type { AggregationParams } from '../executor/analysis/AggregationExecutor.js';
+import { AggregationExecutor } from '../executor/analysis/AggregationExecutor.js';
+import type { ReportGeneratorParams } from '../executor/reporting/ReportGeneratorExecutor.js';
+import { ReportGeneratorExecutor } from '../executor/reporting/ReportGeneratorExecutor.js';
 import type Database from 'better-sqlite3';
 
 export class PluginToolWrapper {
@@ -67,6 +73,27 @@ export class PluginToolWrapper {
               {
                 const statsExecutor = new StatisticsCalculatorExecutor(this.db, this.workspaceBase);
                 result = await statsExecutor.execute(input as StatisticsCalculatorParams);
+                break;
+              }
+
+            case 'filter':
+              {
+                const filterExecutor = new FilterExecutor(this.db, this.workspaceBase);
+                result = await filterExecutor.execute(input as FilterParams);
+                break;
+              }
+
+            case 'aggregation':
+              {
+                const aggregationExecutor = new AggregationExecutor(this.db, this.workspaceBase);
+                result = await aggregationExecutor.execute(input as AggregationParams);
+                break;
+              }
+
+            case 'report_generator':
+              {
+                const reportExecutor = new ReportGeneratorExecutor(this.db, this.workspaceBase);
+                result = await reportExecutor.execute(input as ReportGeneratorParams);
                 break;
               }
 
@@ -211,6 +238,16 @@ export class PluginToolWrapper {
   ): z.ZodType {
     let validated = zodType;
 
+    // Handle enum validation for array elements
+    if (validation.enum && Array.isArray(validation.enum) && zodType instanceof z.ZodArray) {
+      const enumType = z.enum(validation.enum as [string, ...string[]]);
+      validated = z.array(enumType);
+    }
+    // Handle enum validation for non-array types
+    else if (validation.enum && Array.isArray(validation.enum)) {
+      validated = z.enum(validation.enum as [string, ...string[]]);
+    }
+
     if (validation.min !== undefined && typeof validation.min === 'number') {
       validated = (validated as any).min(validation.min);
     }
@@ -225,10 +262,6 @@ export class PluginToolWrapper {
       } catch (e) {
         console.warn(`Invalid regex pattern: ${validation.pattern}`);
       }
-    }
-
-    if (validation.enum && Array.isArray(validation.enum)) {
-      validated = z.enum(validation.enum as [string, ...string[]]);
     }
 
     return validated;

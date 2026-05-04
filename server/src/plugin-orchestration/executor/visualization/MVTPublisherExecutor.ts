@@ -46,6 +46,7 @@ export class MVTPublisherExecutor {
       }
       
       console.log(`[MVTPublisherExecutor] Data source type: ${dataSource.type}`);
+      console.log(`[MVTPublisherExecutor] Data source reference: ${dataSource.reference}`);
       
       // Step 2: Read data source using DataAccessorFactory
       const factory = new DataAccessorFactory();
@@ -53,8 +54,8 @@ export class MVTPublisherExecutor {
       
       console.log(`[MVTPublisherExecutor] Using accessor type: ${dataSource.type}`);
       
-      // Read the NativeData (metadata reference)
-      const nativeData = await accessor.read(dataSourceId);
+      // Read the NativeData using the file path (reference), not the UUID
+      const nativeData = await accessor.read(dataSource.reference);
       console.log(`[MVTPublisherExecutor] Loaded NativeData: id=${nativeData.id}, type=${nativeData.type}`);
       
       // Step 3: Generate MVT tiles using MVTPublisher with strategy pattern

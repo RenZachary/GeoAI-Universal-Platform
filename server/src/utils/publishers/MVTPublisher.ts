@@ -267,32 +267,42 @@ class ShapefileMVTTStrategy implements MVTTileGenerationStrategy {
     // Use DataAccessor to read Shapefile and convert to GeoJSON
     const factory = new DataAccessorFactory();
     const accessor = factory.createAccessor('shapefile');
-    const nativeData = await accessor.read(sourceReference);
     
-    console.log(`[Shapefile MVT Strategy] Shapefile loaded: ${nativeData.id}`);
-    console.log(`[Shapefile MVT Strategy] Reference: ${nativeData.reference}`);
+    // Read the shapefile using the accessor's loadGeoJSON method
+    // ShapefileAccessor extends GeoJSONBasedAccessor which has loadGeoJSON
+    const geojson = await (accessor as any).loadGeoJSON(sourceReference);
     
-    // The ShapefileAccessor should return a NativeData with reference to the .shp file
-    // We need to convert it to GeoJSON format for MVT generation
-    // For now, delegate to GeoJSON strategy after conversion
+    console.log(`[Shapefile MVT Strategy] Converted to GeoJSON with ${geojson.features?.length || 0} features`);
     
-    // Check if the reference is a valid file path
-    if (!nativeData.reference || !fs.existsSync(nativeData.reference)) {
-      throw new Error(`Shapefile not found at: ${nativeData.reference}`);
-    }
+    // Now delegate to GeoJSON strategy
+    const geojsonStrategy = new GeoJSONMVTTStrategy(this.mvtOutputDir);
     
-    // TODO: Implement proper Shapefile to GeoJSON conversion in ShapefileAccessor
-    // For now, we'll use a simple approach: assume there's a corresponding .geojson file
-    // or use an external library like shapefile-js (if available)
+    // Create a temporary NativeData-like object for the GeoJSON strategy
+    const tempNativeData = {
+      id: `temp_${Date.now()}`,
+      type: 'geojson' as DataSourceType,
+      reference: '', // Not needed since we're passing geojson directly
+      metadata: {},
+      createdAt: new Date()
+    };
     
-    // Alternative: Use ogr2ogr or similar tool if available
-    // This is a placeholder - in production, implement proper conversion
-    
-    throw new Error(
-      'Shapefile to MVT conversion requires GeoJSON conversion. ' +
-      'Please ensure ShapefileAccessor implements toGeoJSON() method, ' +
-      'or convert Shapefile to GeoJSON before calling MVT publisher.'
+    // Save the converted GeoJSON to a temporary file
+    const tempGeoJsonPath = path.join(
+      this.mvtOutputDir,
+      `temp_${Date.now()}.geojson`
     );
+    fs.writeFileSync(tempGeoJsonPath, JSON.stringify(geojson), 'utf-8');
+    
+    try {
+      // Generate tiles from the temporary GeoJSON file
+      return await geojsonStrategy.generateTiles(tempGeoJsonPath, 'geojson', options);
+    } finally {
+      // Clean up temporary file
+      if (fs.existsSync(tempGeoJsonPath)) {
+        fs.unlinkSync(tempGeoJsonPath);
+        console.log('[Shapefile MVT Strategy] Cleaned up temporary GeoJSON file');
+      }
+    }
   }
 }
 

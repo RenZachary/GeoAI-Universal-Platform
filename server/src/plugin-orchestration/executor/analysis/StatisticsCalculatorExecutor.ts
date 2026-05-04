@@ -4,9 +4,10 @@
  */
 
 import type { NativeData } from '../../../core/index';
+import { DataAccessorFactory } from '../../../data-access/factories/DataAccessorFactory.js';
+import { DataSourceRepository } from '../../../data-access/repositories';
 import type Database from 'better-sqlite3';
 import path from 'path';
-import fs from 'fs';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 
@@ -36,11 +37,13 @@ interface StatisticalResult {
 
 export class StatisticsCalculatorExecutor {
   private db: Database.Database;
-  private workspaceBase: string;
+  private dataSourceRepo: DataSourceRepository;
+  private accessorFactory: DataAccessorFactory;
 
   constructor(db: Database.Database, workspaceBase?: string) {
     this.db = db;
-    this.workspaceBase = workspaceBase || path.join(__dirname, '..', '..', '..', '..', 'workspace');
+    this.dataSourceRepo = new DataSourceRepository(db);
+    this.accessorFactory = new DataAccessorFactory(workspaceBase);
   }
 
   async execute(params: StatisticsCalculatorParams): Promise<NativeData> {
@@ -48,8 +51,26 @@ export class StatisticsCalculatorExecutor {
     console.log('[StatisticsCalculatorExecutor] Params:', params);
 
     try {
-      // Step 1: Load numeric values from data source
-      const values = await this.extractFieldValues(params.dataSourceId, params.fieldName);
+      // Step 1: Query database for data source metadata
+      const dataSource = this.dataSourceRepo.getById(params.dataSourceId);
+      
+      if (!dataSource) {
+        throw new Error(`Data source not found: ${params.dataSourceId}`);
+      }
+
+      console.log('[StatisticsCalculatorExecutor] Found data source:', {
+        id: dataSource.id,
+        name: dataSource.name,
+        type: dataSource.type,
+        reference: dataSource.reference
+      });
+
+      // Step 2: Create appropriate accessor
+      const accessor = this.accessorFactory.createAccessor(dataSource.type);
+      console.log('[StatisticsCalculatorExecutor] Created accessor for type:', dataSource.type);
+
+      // Step 3: Extract numeric values using accessor's filter/read capabilities
+      const values = await this.extractFieldValues(accessor, dataSource.reference, params.fieldName);
       
       if (values.length === 0) {
         throw new Error(`No valid numeric values found for field '${params.fieldName}'`);
@@ -57,19 +78,19 @@ export class StatisticsCalculatorExecutor {
 
       console.log(`[StatisticsCalculatorExecutor] Extracted ${values.length} values`);
 
-      // Step 2: Calculate requested statistics
+      // Step 4: Calculate requested statistics
       const statsToCalculate = params.statistics || ['mean', 'median', 'std_dev', 'min', 'max'];
       const statistics = this.calculateStatistics(values, statsToCalculate);
 
       console.log('[StatisticsCalculatorExecutor] Statistics calculated:', statistics);
 
-      // Step 3: Generate result metadata
+      // Step 5: Generate result metadata
       const statsId = `stats_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
 
       return {
         id: statsId,
-        type: 'geojson',  // Using geojson as generic type for statistics results
-        reference: '',  // Statistics are in-memory, no file reference needed
+        type: 'geojson',
+        reference: '',
         metadata: {
           pluginId: 'statistics_calculator',
           dataSourceId: params.dataSourceId,
@@ -93,31 +114,32 @@ export class StatisticsCalculatorExecutor {
   }
 
   /**
-   * Extract numeric values from a field in the data source
+   * Extract numeric values from a field using the data accessor
    */
-  private async extractFieldValues(dataSourceId: string, fieldName: string): Promise<number[]> {
-    console.log('[StatisticsCalculatorExecutor] Loading data from:', dataSourceId);
+  private async extractFieldValues(
+    accessor: any,
+    reference: string,
+    fieldName: string
+  ): Promise<number[]> {
+    console.log('[StatisticsCalculatorExecutor] Loading data from:', reference);
     
-    // Check if data source exists in workspace
-    const dataSourcePath = path.join(this.workspaceBase, 'data', 'local', dataSourceId);
-    
-    if (fs.existsSync(dataSourcePath)) {
-      // Try to parse as GeoJSON
-      try {
-        const content = fs.readFileSync(dataSourcePath, 'utf-8');
-        const geojson = JSON.parse(content);
-        
-        if (geojson.type === 'FeatureCollection') {
-          return this.extractFromGeoJSON(geojson, fieldName);
-        }
-      } catch (e) {
-        console.warn('[StatisticsCalculatorExecutor] Failed to parse as GeoJSON:', e);
-      }
+    // Check if accessor has loadGeoJSON method (GeoJSON-based accessors)
+    // This includes GeoJSONAccessor, ShapefileAccessor, etc.
+    if (typeof accessor.loadGeoJSON === 'function') {
+      console.log('[StatisticsCalculatorExecutor] Using loadGeoJSON method');
+      const geojson = await accessor.loadGeoJSON(reference);
+      return this.extractFromGeoJSON(geojson, fieldName);
     }
-
-    // Fallback: Generate sample data for testing
-    console.log('[StatisticsCalculatorExecutor] Using sample data for demonstration');
-    return this.generateSampleData(fieldName);
+    
+    // For PostGIS and other database accessors, use different approach
+    if (accessor.type === 'postgis') {
+      console.log('[StatisticsCalculatorExecutor] PostGIS accessor detected');
+      // TODO: Implement PostGIS field extraction using SQL queries
+      throw new Error('PostGIS field extraction not yet implemented');
+    }
+    
+    // For other accessor types
+    throw new Error(`Field extraction not yet implemented for accessor type: ${accessor.type}`);
   }
 
   /**
@@ -133,80 +155,6 @@ export class StatisticsCalculatorExecutor {
           values.push(value);
         }
       }
-    }
-    
-    return values;
-  }
-
-  /**
-   * Generate sample data for testing when real data unavailable
-   */
-  private generateSampleData(fieldName: string): number[] {
-    console.log(`[StatisticsCalculatorExecutor] Generating sample data for field: ${fieldName}`);
-    
-    // Create realistic sample distributions based on common geographic fields
-    const samples: { [key: string]: () => number[] } = {
-      population: () => this.generateNormalDistribution(100, 50000, 20000),  // Population counts
-      elevation: () => this.generateNormalDistribution(200, 500, 150),       // Elevation in meters
-      temperature: () => this.generateNormalDistribution(150, 20, 8),        // Temperature in Celsius
-      area: () => this.generateLogNormalDistribution(100, 1000, 2),          // Area in km²
-      distance: () => this.generateExponentialDistribution(150, 50),         // Distance in km
-      default: () => this.generateNormalDistribution(100, 50, 15)            // Generic distribution
-    };
-    
-    const generator = samples[fieldName.toLowerCase()] || samples.default;
-    return generator();
-  }
-
-  /**
-   * Generate normally distributed sample data
-   */
-  private generateNormalDistribution(count: number, mean: number, stdDev: number): number[] {
-    const values: number[] = [];
-    
-    for (let i = 0; i < count; i++) {
-      // Box-Muller transform for normal distribution
-      const u1 = Math.random();
-      const u2 = Math.random();
-      const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-      const value = mean + z * stdDev;
-      
-      if (value >= 0) {  // Ensure non-negative for most geographic fields
-        values.push(value);
-      }
-    }
-    
-    return values;
-  }
-
-  /**
-   * Generate log-normally distributed sample data (for areas, populations)
-   */
-  private generateLogNormalDistribution(count: number, median: number, shape: number): number[] {
-    const values: number[] = [];
-    const logMedian = Math.log(median);
-    
-    for (let i = 0; i < count; i++) {
-      const u1 = Math.random();
-      const u2 = Math.random();
-      const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-      const value = Math.exp(logMedian + z * shape);
-      values.push(value);
-    }
-    
-    return values;
-  }
-
-  /**
-   * Generate exponentially distributed sample data (for distances, waiting times)
-   */
-  private generateExponentialDistribution(count: number, rate: number): number[] {
-    const values: number[] = [];
-    
-    for (let i = 0; i < count; i++) {
-      const u = Math.random();
-      const value = -Math.log(1 - u) / rate;
-      values.push(value);
     }
     
     return values;

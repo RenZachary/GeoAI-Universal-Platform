@@ -1,20 +1,31 @@
 /**
  * Report Generator Plugin Executor
- * Generates comprehensive HTML reports with analysis results, charts, and maps
+ * Generates comprehensive analysis reports in HTML format
  */
 
 import type { NativeData } from '../../../core/index';
+import type Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export interface ReportGeneratorParams {
   title: string;
-  analysisResults: any[];
-  visualizationServices?: any[];
+  analysisResults: Array<{
+    type: string;
+    data: any;
+    description?: string;
+  }>;
+  visualizationServices?: Array<{
+    type: string;
+    layerId?: string;
+    name?: string;
+    source?: string;
+  }>;
   summary?: string;
   format?: 'html' | 'pdf';
   includeCharts?: boolean;
@@ -24,78 +35,61 @@ export interface ReportGeneratorParams {
 }
 
 export class ReportGeneratorExecutor {
+  private db: Database.Database;
   private workspaceBase: string;
 
-  constructor(workspaceBase?: string) {
+  constructor(db: Database.Database, workspaceBase?: string) {
+    this.db = db;
     this.workspaceBase = workspaceBase || path.join(__dirname, '..', '..', '..', '..', 'workspace');
   }
 
   async execute(params: ReportGeneratorParams): Promise<NativeData> {
     console.log('[ReportGeneratorExecutor] Generating report...');
-    console.log('[ReportGeneratorExecutor] Title:', params.title);
-
-    const {
-      title,
-      analysisResults,
-      visualizationServices = [],
-      summary = '',
-      format = 'html',
-      includeCharts = true,
-      includeMaps = true,
-      author = 'GeoAI-UP Platform',
-      organization = ''
-    } = params;
+    console.log('[ReportGeneratorExecutor] Params:', {
+      title: params.title,
+      format: params.format,
+      resultsCount: params.analysisResults?.length,
+      servicesCount: params.visualizationServices?.length
+    });
 
     try {
-      // Generate report filename
-      const timestamp = Date.now();
-      const reportId = `report_${timestamp}`;
-      const reportDir = path.join(this.workspaceBase, 'results', 'reports');
+      // Step 1: Generate report ID and output path
+      const reportId = `report_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+      const reportsDir = path.join(this.workspaceBase, 'results', 'reports');
       
-      // Ensure reports directory exists
-      if (!fs.existsSync(reportDir)) {
-        fs.mkdirSync(reportDir, { recursive: true });
+      if (!fs.existsSync(reportsDir)) {
+        fs.mkdirSync(reportsDir, { recursive: true });
       }
 
-      const reportFileName = `${reportId}.html`;
-      const reportFilePath = path.join(reportDir, reportFileName);
+      const reportFilename = `${reportId}.html`;
+      const reportPath = path.join(reportsDir, reportFilename);
 
-      // Generate HTML content
-      const htmlContent = this.generateHTMLReport({
-        title,
-        analysisResults,
-        visualizationServices,
-        summary,
-        includeCharts,
-        includeMaps,
-        author,
-        organization,
-        generatedAt: new Date().toISOString()
-      });
+      // Step 2: Generate HTML content
+      const htmlContent = this.generateHTMLReport(params, reportId);
 
-      // Write report to file
-      fs.writeFileSync(reportFilePath, htmlContent, 'utf-8');
-      console.log(`[ReportGeneratorExecutor] Report saved to: ${reportFilePath}`);
+      // Step 3: Write report to file
+      fs.writeFileSync(reportPath, htmlContent, 'utf-8');
+      console.log(`[ReportGeneratorExecutor] Report saved to: ${reportPath}`);
 
-      // Return NativeData with report path
+      // Step 4: Return NativeData with report metadata
       return {
         id: reportId,
-        type: 'geojson',  // Using geojson as generic file type
-        reference: reportFilePath,
+        type: 'geojson', // Using geojson as generic type for report results
+        reference: `/api/results/reports/${reportFilename}`,
         metadata: {
-          reportId,
-          title,
-          format,
-          filePath: reportFilePath,
-          downloadUrl: `/api/results/reports/${reportFileName}`,
-          fileSize: fs.statSync(reportFilePath).size,
+          pluginId: 'report_generator',
+          title: params.title,
+          format: params.format || 'html',
+          filePath: reportPath,
+          publicUrl: `/api/results/reports/${reportFilename}`,
           generatedAt: new Date().toISOString(),
-          author,
-          organization,
-          resultCount: analysisResults.length,
-          serviceCount: visualizationServices.length,
-          includesCharts: includeCharts,
-          includesMaps: includeMaps
+          author: params.author,
+          organization: params.organization,
+          includesCharts: params.includeCharts !== false,
+          includesMaps: params.includeMaps !== false,
+          resultsCount: params.analysisResults?.length || 0,
+          servicesCount: params.visualizationServices?.length || 0,
+          summary: params.summary
         },
         createdAt: new Date()
       };
@@ -110,39 +104,18 @@ export class ReportGeneratorExecutor {
   }
 
   /**
-   * Generate comprehensive HTML report
+   * Generate HTML report content
    */
-  private generateHTMLReport(data: {
-    title: string;
-    analysisResults: any[];
-    visualizationServices: any[];
-    summary: string;
-    includeCharts: boolean;
-    includeMaps: boolean;
-    author: string;
-    organization: string;
-    generatedAt: string;
-  }): string {
-    const {
-      title,
-      analysisResults,
-      visualizationServices,
-      summary,
-      includeCharts,
-      includeMaps,
-      author,
-      organization,
-      generatedAt
-    } = data;
-
-    const generatedDate = new Date(generatedAt).toLocaleString();
-
-    return `<!DOCTYPE html>
+  private generateHTMLReport(params: ReportGeneratorParams, reportId: string): string {
+    const timestamp = new Date().toLocaleString();
+    
+    return `
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${this.escapeHtml(title)}</title>
+  <title>${this.escapeHtml(params.title)}</title>
   <style>
     * {
       margin: 0;
@@ -151,7 +124,7 @@ export class ReportGeneratorExecutor {
     }
     
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
       line-height: 1.6;
       color: #333;
       background-color: #f5f5f5;
@@ -163,8 +136,8 @@ export class ReportGeneratorExecutor {
       margin: 0 auto;
       background: white;
       padding: 40px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
       border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
     
     header {
@@ -175,41 +148,16 @@ export class ReportGeneratorExecutor {
     
     h1 {
       color: #1e40af;
-      font-size: 2.5em;
+      font-size: 2em;
       margin-bottom: 10px;
     }
     
-    .meta-info {
+    .meta {
       color: #666;
       font-size: 0.9em;
-      display: flex;
-      gap: 20px;
-      flex-wrap: wrap;
     }
     
-    .meta-item {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-    
-    h2 {
-      color: #1e40af;
-      font-size: 1.8em;
-      margin-top: 30px;
-      margin-bottom: 15px;
-      border-left: 4px solid #2563eb;
-      padding-left: 15px;
-    }
-    
-    h3 {
-      color: #374151;
-      font-size: 1.3em;
-      margin-top: 20px;
-      margin-bottom: 10px;
-    }
-    
-    .summary-box {
+    .summary {
       background: #eff6ff;
       border-left: 4px solid #2563eb;
       padding: 20px;
@@ -217,105 +165,52 @@ export class ReportGeneratorExecutor {
       border-radius: 4px;
     }
     
+    .section {
+      margin: 30px 0;
+    }
+    
+    h2 {
+      color: #1e40af;
+      font-size: 1.5em;
+      margin-bottom: 15px;
+      border-bottom: 2px solid #e5e7eb;
+      padding-bottom: 10px;
+    }
+    
     .result-card {
       background: #f9fafb;
       border: 1px solid #e5e7eb;
-      border-radius: 8px;
+      border-radius: 6px;
       padding: 20px;
       margin: 15px 0;
-      transition: box-shadow 0.2s;
     }
     
-    .result-card:hover {
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    
-    .result-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
-    }
-    
-    .status-badge {
-      display: inline-block;
-      padding: 4px 12px;
-      border-radius: 12px;
-      font-size: 0.85em;
-      font-weight: 600;
-    }
-    
-    .status-success {
-      background: #d1fae5;
-      color: #065f46;
-    }
-    
-    .status-error {
-      background: #fee2e2;
-      color: #991b1b;
-    }
-    
-    .service-link {
+    .result-type {
       display: inline-block;
       background: #2563eb;
       color: white;
-      padding: 8px 16px;
+      padding: 4px 12px;
       border-radius: 4px;
-      text-decoration: none;
-      margin: 5px 0;
-      transition: background 0.2s;
+      font-size: 0.85em;
+      margin-bottom: 10px;
     }
     
-    .service-link:hover {
-      background: #1e40af;
+    .service-card {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 6px;
+      padding: 15px;
+      margin: 10px 0;
     }
     
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 15px;
-      margin: 20px 0;
-    }
-    
-    .stat-card {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 20px;
-      border-radius: 8px;
-      text-align: center;
-    }
-    
-    .stat-value {
-      font-size: 2em;
-      font-weight: bold;
-      margin-bottom: 5px;
-    }
-    
-    .stat-label {
+    pre {
+      background: #1f2937;
+      color: #f3f4f6;
+      padding: 15px;
+      border-radius: 4px;
+      overflow-x: auto;
       font-size: 0.9em;
-      opacity: 0.9;
-    }
-    
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 20px 0;
-    }
-    
-    th, td {
-      padding: 12px;
-      text-align: left;
-      border-bottom: 1px solid #e5e7eb;
-    }
-    
-    th {
-      background: #f3f4f6;
-      font-weight: 600;
-      color: #374151;
-    }
-    
-    tr:hover {
-      background: #f9fafb;
+      margin: 10px 0;
     }
     
     footer {
@@ -326,182 +221,70 @@ export class ReportGeneratorExecutor {
       color: #666;
       font-size: 0.9em;
     }
-    
-    .placeholder-map {
-      background: #e5e7eb;
-      border: 2px dashed #9ca3af;
-      border-radius: 8px;
-      padding: 40px;
-      text-align: center;
-      color: #6b7280;
-      margin: 15px 0;
-    }
-    
-    @media print {
-      body {
-        background: white;
-        padding: 0;
-      }
-      
-      .container {
-        box-shadow: none;
-        padding: 20px;
-      }
-      
-      .service-link {
-        background: #1e40af !important;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      }
-    }
   </style>
 </head>
 <body>
   <div class="container">
     <header>
-      <h1>${this.escapeHtml(title)}</h1>
-      <div class="meta-info">
-        <div class="meta-item">
-          <strong>Generated:</strong> ${generatedDate}
-        </div>
-        ${author ? `<div class="meta-item"><strong>Author:</strong> ${this.escapeHtml(author)}</div>` : ''}
-        ${organization ? `<div class="meta-item"><strong>Organization:</strong> ${this.escapeHtml(organization)}</div>` : ''}
-        <div class="meta-item">
-          <strong>Platform:</strong> GeoAI-UP
-        </div>
+      <h1>${this.escapeHtml(params.title)}</h1>
+      <div class="meta">
+        <p>Generated: ${timestamp}</p>
+        ${params.author ? `<p>Author: ${this.escapeHtml(params.author)}</p>` : ''}
+        ${params.organization ? `<p>Organization: ${this.escapeHtml(params.organization)}</p>` : ''}
       </div>
     </header>
 
-    ${summary ? `
-    <section>
+    ${params.summary ? `
+    <div class="summary">
       <h2>Executive Summary</h2>
-      <div class="summary-box">
-        <p>${this.escapeHtml(summary)}</p>
-      </div>
-    </section>
+      <p>${this.escapeHtml(params.summary)}</p>
+    </div>
     ` : ''}
 
-    <section>
-      <h2>Analysis Overview</h2>
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-value">${analysisResults.length}</div>
-          <div class="stat-label">Analysis Steps</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">${visualizationServices.length}</div>
-          <div class="stat-label">Visualization Services</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">${analysisResults.filter(r => r.status === 'success').length}</div>
-          <div class="stat-label">Successful Operations</div>
-        </div>
-      </div>
-    </section>
-
-    <section>
+    ${params.analysisResults && params.analysisResults.length > 0 ? `
+    <div class="section">
       <h2>Analysis Results</h2>
-      ${analysisResults.map((result, index) => this.generateResultCard(result, index)).join('')}
-    </section>
+      ${params.analysisResults.map(result => `
+        <div class="result-card">
+          <span class="result-type">${this.escapeHtml(result.type || 'unknown')}</span>
+          ${result.description ? `<p><strong>Description:</strong> ${this.escapeHtml(result.description)}</p>` : ''}
+          <pre>${this.escapeHtml(JSON.stringify(result.data, null, 2))}</pre>
+        </div>
+      `).join('')}
+    </div>
+    ` : ''}
 
-    ${visualizationServices.length > 0 && includeMaps ? `
-    <section>
+    ${params.visualizationServices && params.visualizationServices.length > 0 ? `
+    <div class="section">
       <h2>Visualization Services</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Service Type</th>
-            <th>Service URL</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${visualizationServices.map(service => `
-            <tr>
-              <td>${this.escapeHtml(service.serviceType || 'Unknown')}</td>
-              <td><code>${this.escapeHtml(service.serviceUrl || 'N/A')}</code></td>
-              <td>
-                <a href="${this.escapeHtml(service.serviceUrl || '#')}" class="service-link" target="_blank">
-                  View Service
-                </a>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </section>
-    ` : ''}
-
-    ${includeCharts ? `
-    <section>
-      <h2>Statistical Charts</h2>
-      <div class="placeholder-map">
-        <p>📊 Charts will be rendered here when statistical data is available</p>
-        <p style="font-size: 0.9em; margin-top: 10px;">
-          Integration with Chart.js or D3.js can be added for dynamic chart generation
-        </p>
-      </div>
-    </section>
-    ` : ''}
-
-    ${includeMaps ? `
-    <section>
-      <h2>Map Visualizations</h2>
-      <div class="placeholder-map">
-        <p>🗺️ Interactive maps will be rendered here</p>
-        <p style="font-size: 0.9em; margin-top: 10px;">
-          Integration with Leaflet, Mapbox GL JS, or OpenLayers can be added for interactive map embedding
-        </p>
-      </div>
-    </section>
+      ${params.visualizationServices.map(service => `
+        <div class="service-card">
+          <p><strong>Type:</strong> ${this.escapeHtml(service.type || 'unknown')}</p>
+          ${service.name ? `<p><strong>Name:</strong> ${this.escapeHtml(service.name)}</p>` : ''}
+          ${service.layerId ? `<p><strong>Layer ID:</strong> ${this.escapeHtml(service.layerId)}</p>` : ''}
+          ${service.source ? `<p><strong>Source:</strong> ${this.escapeHtml(service.source)}</p>` : ''}
+        </div>
+      `).join('')}
+    </div>
     ` : ''}
 
     <footer>
-      <p>Report generated by <strong>GeoAI-UP Platform</strong></p>
-      <p style="margin-top: 5px; font-size: 0.85em;">
-        Powered by AI-driven geospatial analysis
-      </p>
+      <p>Generated by GeoAI-UP System</p>
+      <p style="font-size: 0.8em; margin-top: 10px;">Report ID: ${reportId}</p>
     </footer>
   </div>
 </body>
-</html>`;
+</html>
+    `.trim();
   }
 
   /**
-   * Generate individual result card HTML
+   * Escape HTML special characters
    */
-  private generateResultCard(result: any, index: number): string {
-    const statusClass = result.status === 'success' ? 'status-success' : 'status-error';
-    const statusIcon = result.status === 'success' ? '✅' : '❌';
-
-    return `
-    <div class="result-card">
-      <div class="result-header">
-        <h3>Step ${index + 1}: ${this.escapeHtml(result.stepId || 'Unknown Step')}</h3>
-        <span class="status-badge ${statusClass}">
-          ${statusIcon} ${this.escapeHtml(result.status || 'unknown')}
-        </span>
-      </div>
-      <p><strong>Plugin:</strong> ${this.escapeHtml(result.pluginId || 'N/A')}</p>
-      ${result.data ? `
-      <div style="margin-top: 10px;">
-        <strong>Result Data:</strong>
-        <pre style="background: #f3f4f6; padding: 10px; border-radius: 4px; overflow-x: auto; margin-top: 5px;">${this.escapeHtml(JSON.stringify(result.data, null, 2))}</pre>
-      </div>
-      ` : ''}
-      ${result.error ? `
-      <div style="margin-top: 10px; color: #dc2626;">
-        <strong>Error:</strong> ${this.escapeHtml(result.error)}
-      </div>
-      ` : ''}
-    </div>`;
-  }
-
-  /**
-   * Escape HTML special characters to prevent XSS
-   */
-  private escapeHtml(text: string): string {
-    if (!text) return '';
+  private escapeHtml(text: string | undefined | null): string {
+    if (text === undefined || text === null) {
+      return '';
+    }
     const map: { [key: string]: string } = {
       '&': '&amp;',
       '<': '&lt;',
@@ -509,6 +292,6 @@ export class ReportGeneratorExecutor {
       '"': '&quot;',
       "'": '&#039;'
     };
-    return text.replace(/[&<>"']/g, m => map[m]);
+    return String(text).replace(/[&<>"']/g, m => map[m]);
   }
 }
