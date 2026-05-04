@@ -31,27 +31,27 @@
         @click="showLayerPanel = !showLayerPanel"
       >
         <el-icon><List /></el-icon>
-        Layers ({{ mapStore.visibleLayers.length }})
+        {{ t('map.layers') }} ({{ mapStore.visibleLayers.length }})
       </el-button>
     </div>
     
     <!-- Layer Panel -->
     <el-drawer
       v-model="showLayerPanel"
-      title="Layer Management"
+      :title="t('map.layerManagement')"
       direction="rtl"
       size="400px"
     >
       <div class="layer-panel">
         <!-- Summary Stats -->
         <div class="layer-stats">
-          <el-statistic title="Total Layers" :value="mapStore.layers.length" />
-          <el-statistic title="Visible" :value="mapStore.visibleLayers.length" style="margin-left: 20px" />
+          <el-statistic :title="t('map.totalLayers')" :value="mapStore.layers.length" />
+          <el-statistic :title="t('map.visible')" :value="mapStore.visibleLayers.length" style="margin-left: 20px" />
         </div>
         
         <el-empty 
           v-if="mapStore.layers.length === 0"
-          description="No layers added. Data sources will appear here automatically."
+          :description="t('map.noLayers')"
           :image-size="80"
         />
         
@@ -61,7 +61,7 @@
           <div v-if="postgisLayers.length > 0" class="layer-group">
             <div class="group-header">
               <el-icon><Connection /></el-icon>
-              <span>PostGIS ({{ postgisLayers.length }})</span>
+              <span>{{ t('map.postgisGroup') }} ({{ postgisLayers.length }})</span>
             </div>
             <div 
               v-for="layer in postgisLayers" 
@@ -82,7 +82,7 @@
           <div v-if="geojsonLayers.length > 0" class="layer-group">
             <div class="group-header">
               <el-icon><Document /></el-icon>
-              <span>Local Files ({{ geojsonLayers.length }})</span>
+              <span>{{ t('map.localFilesGroup') }} ({{ geojsonLayers.length }})</span>
             </div>
             <div 
               v-for="layer in geojsonLayers" 
@@ -103,7 +103,7 @@
           <div v-if="wmsLayers.length > 0" class="layer-group">
             <div class="group-header">
               <el-icon><Picture /></el-icon>
-              <span>Raster/WMS ({{ wmsLayers.length }})</span>
+              <span>{{ t('map.rasterWmsGroup') }} ({{ wmsLayers.length }})</span>
             </div>
             <div 
               v-for="layer in wmsLayers" 
@@ -127,6 +127,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useMapStore } from '@/stores/map'
 import { useDataSourceStore } from '@/stores/dataSources'
 import { MapLocation, List, Delete, Connection, Document, Picture } from '@element-plus/icons-vue'
@@ -134,19 +135,20 @@ import type { DataSource } from '@/types'
 import LayerItemCard from '@/components/map/LayerItemCard.vue'
 import { getDataSourceServiceUrl } from '@/services/dataSource'
 
+const { t } = useI18n()
 const mapStore = useMapStore()
 const dataSourceStore = useDataSourceStore()
 const mapContainerRef = ref<HTMLElement>()
 const showLayerPanel = ref(false)
 
-const basemapLabels: Record<string, string> = {
-  cartoDark: 'CARTO Dark',
-  cartoLight: 'CARTO Light',
-  esriStreet: 'Esri Streets',
-  esriSatellite: 'Esri Satellite',
-  osmStandard: 'OpenStreetMap',
-  stamenTerrain: 'Stamen Terrain'
-}
+const basemapLabels = computed(() => ({
+  cartoDark: t('map.basemap.cartoDark'),
+  cartoLight: t('map.basemap.cartoLight'),
+  esriStreet: t('map.basemap.esriStreet'),
+  esriSatellite: t('map.basemap.esriSatellite'),
+  osmStandard: t('map.basemap.osmStandard'),
+  stamenTerrain: t('map.basemap.stamenTerrain')
+}))
 
 // Computed properties for layer grouping
 const postgisLayers = computed(() => 

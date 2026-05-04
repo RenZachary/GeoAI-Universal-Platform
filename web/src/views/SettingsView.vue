@@ -6,18 +6,18 @@
     
     <el-tabs v-model="activeTab" class="settings-tabs">
       <!-- LLM Configuration -->
-      <el-tab-pane label="LLM Configuration" name="llm">
+      <el-tab-pane :label="$t('settings.llm')" name="llm">
         <el-form :model="llmConfig" label-width="150px" style="max-width: 600px">
-          <el-form-item label="Provider" required>
-            <el-select v-model="llmConfig.provider" placeholder="Select provider" style="width: 100%">
-              <el-option label="OpenAI" value="openai" />
-              <el-option label="Anthropic (Claude)" value="anthropic" />
-              <el-option label="Ollama (Local)" value="ollama" />
-              <el-option label="Qwen (Alibaba)" value="qwen" />
+          <el-form-item :label="$t('settings.provider')" required>
+            <el-select v-model="llmConfig.provider" :placeholder="$t('settings.selectProvider')" style="width: 100%">
+              <el-option :label="$t('settings.providers.openai')" value="openai" />
+              <el-option :label="$t('settings.providers.anthropic')" value="anthropic" />
+              <el-option :label="$t('settings.providers.ollama')" value="ollama" />
+              <el-option :label="$t('settings.providers.qwen')" value="qwen" />
             </el-select>
           </el-form-item>
           
-          <el-form-item label="API Base URL" required>
+          <el-form-item :label="$t('settings.apiUrl')" required>
             <el-input 
               v-model="llmConfig.apiUrl" 
               :placeholder="getApiUrlPlaceholder(llmConfig.provider)"
@@ -25,7 +25,7 @@
             <div class="form-help">{{ getApiUrlHelp(llmConfig.provider) }}</div>
           </el-form-item>
           
-          <el-form-item label="API Key" v-if="llmConfig.provider !== 'ollama'">
+          <el-form-item :label="$t('settings.apiKey')" v-if="llmConfig.provider !== 'ollama'">
             <el-input 
               v-model="llmConfig.apiKey" 
               type="password"
@@ -34,41 +34,41 @@
             />
           </el-form-item>
           
-          <el-form-item label="Model" required>
-            <el-select v-model="llmConfig.model" placeholder="Select model" style="width: 100%">
+          <el-form-item :label="$t('settings.model')" required>
+            <el-select v-model="llmConfig.model" :placeholder="$t('settings.model')" style="width: 100%">
               <!-- OpenAI Models -->
               <template v-if="llmConfig.provider === 'openai'">
-                <el-option label="GPT-4o" value="gpt-4o" />
-                <el-option label="GPT-4 Turbo" value="gpt-4-turbo" />
-                <el-option label="GPT-3.5 Turbo" value="gpt-3.5-turbo" />
+                <el-option :label="$t('settings.models.gpt4o')" value="gpt-4o" />
+                <el-option :label="$t('settings.models.gpt4Turbo')" value="gpt-4-turbo" />
+                <el-option :label="$t('settings.models.gpt35Turbo')" value="gpt-3.5-turbo" />
               </template>
               
               <!-- Anthropic Models -->
               <template v-else-if="llmConfig.provider === 'anthropic'">
-                <el-option label="Claude 3.5 Sonnet" value="claude-3-5-sonnet-20241022" />
-                <el-option label="Claude 3.5 Haiku" value="claude-3-5-haiku-20241022" />
-                <el-option label="Claude 3 Opus" value="claude-3-opus-20240229" />
+                <el-option :label="$t('settings.models.claude35Sonnet')" value="claude-3-5-sonnet-20241022" />
+                <el-option :label="$t('settings.models.claude35Haiku')" value="claude-3-5-haiku-20241022" />
+                <el-option :label="$t('settings.models.claude3Opus')" value="claude-3-opus-20240229" />
               </template>
               
               <!-- Ollama Models -->
               <template v-else-if="llmConfig.provider === 'ollama'">
-                <el-option label="Llama 3.1" value="llama3.1" />
-                <el-option label="Mistral" value="mistral" />
-                <el-option label="Qwen 2.5" value="qwen2.5" />
-                <el-option label="Custom" value="custom" />
+                <el-option :label="$t('settings.models.llama31')" value="llama3.1" />
+                <el-option :label="$t('settings.models.mistral')" value="mistral" />
+                <el-option :label="$t('settings.models.qwen25')" value="qwen2.5" />
+                <el-option :label="$t('settings.models.custom')" value="custom" />
               </template>
               
               <!-- Qwen Models -->
               <template v-else-if="llmConfig.provider === 'qwen'">
-                <el-option label="Qwen-Max" value="qwen-max" />
-                <el-option label="Qwen-Plus" value="qwen-plus" />
-                <el-option label="Qwen-Turbo" value="qwen-turbo" />
-                <el-option label="Qwen-Long" value="qwen-long" />
+                <el-option :label="$t('settings.models.qwenMax')" value="qwen-max" />
+                <el-option :label="$t('settings.models.qwenPlus')" value="qwen-plus" />
+                <el-option :label="$t('settings.models.qwenTurbo')" value="qwen-turbo" />
+                <el-option :label="$t('settings.models.qwenLong')" value="qwen-long" />
               </template>
             </el-select>
           </el-form-item>
           
-          <el-form-item label="Temperature">
+          <el-form-item :label="$t('settings.temperature')">
             <el-slider 
               v-model="llmConfig.temperature" 
               :min="0" 
@@ -78,7 +78,7 @@
             />
           </el-form-item>
           
-          <el-form-item label="Max Tokens">
+          <el-form-item :label="$t('settings.maxTokens')">
             <el-input-number 
               v-model="llmConfig.maxTokens" 
               :min="100" 
@@ -90,27 +90,27 @@
           
           <el-form-item>
             <el-button type="primary" @click="handleSaveLLMConfig" :loading="loading">
-              Save Configuration
+              {{ $t('settings.saveConfiguration') }}
             </el-button>
             <el-button @click="handleTestLLMConnection" :loading="loading" style="margin-left: 10px">
-              Test Connection
+              {{ $t('settings.testConnection') }}
             </el-button>
           </el-form-item>
         </el-form>
       </el-tab-pane>
       
       <!-- Appearance -->
-      <el-tab-pane label="Appearance" name="appearance">
+      <el-tab-pane :label="$t('settings.appearance')" name="appearance">
         <el-form label-width="150px" style="max-width: 600px">
-          <el-form-item label="Theme">
+          <el-form-item :label="$t('settings.theme')">
             <el-radio-group :model-value="uiStore.theme" @change="handleThemeChange">
-              <el-radio-button label="light">Light</el-radio-button>
-              <el-radio-button label="dark">Dark</el-radio-button>
-              <el-radio-button label="auto">Auto</el-radio-button>
+              <el-radio-button label="light">{{ $t('settings.light') }}</el-radio-button>
+              <el-radio-button label="dark">{{ $t('settings.dark') }}</el-radio-button>
+              <el-radio-button label="auto">{{ $t('settings.auto') }}</el-radio-button>
             </el-radio-group>
           </el-form-item>
           
-          <el-form-item label="Language">
+          <el-form-item :label="$t('settings.language')">
             <el-select 
               v-model="configStore.language" 
               @change="handleLanguageChange"
@@ -121,39 +121,39 @@
             </el-select>
           </el-form-item>
           
-          <el-form-item label="Sidebar">
+          <el-form-item :label="$t('settings.sidebar')">
             <el-switch 
               :model-value="uiStore.sidebarCollapsed"
               @change="handleSidebarChange"
-              active-text="Collapsed"
-              inactive-text="Expanded"
+              :active-text="$t('settings.collapsed')"
+              :inactive-text="$t('settings.expanded')"
             />
           </el-form-item>
         </el-form>
       </el-tab-pane>
       
       <!-- Map Defaults -->
-      <el-tab-pane label="Map Defaults" name="map">
+      <el-tab-pane :label="$t('settings.mapDefaults')" name="map">
         <el-form label-width="150px" style="max-width: 600px">
-          <el-form-item label="Default Basemap">
+          <el-form-item :label="$t('settings.defaultBasemap')">
             <el-select v-model="mapDefaults.basemap" style="width: 100%">
-              <el-option label="CARTO Dark" value="cartoDark" />
-              <el-option label="CARTO Light" value="cartoLight" />
-              <el-option label="Esri Streets" value="esriStreet" />
-              <el-option label="Esri Satellite" value="esriSatellite" />
-              <el-option label="OpenStreetMap" value="osmStandard" />
-              <el-option label="Stamen Terrain" value="stamenTerrain" />
+              <el-option :label="$t('settings.basemaps.cartoDark')" value="cartoDark" />
+              <el-option :label="$t('settings.basemaps.cartoLight')" value="cartoLight" />
+              <el-option :label="$t('settings.basemaps.esriStreet')" value="esriStreet" />
+              <el-option :label="$t('settings.basemaps.esriSatellite')" value="esriSatellite" />
+              <el-option :label="$t('settings.basemaps.osmStandard')" value="osmStandard" />
+              <el-option :label="$t('settings.basemaps.stamenTerrain')" value="stamenTerrain" />
             </el-select>
           </el-form-item>
           
-          <el-form-item label="Default Center">
+          <el-form-item :label="$t('settings.defaultCenter')">
             <el-row :gutter="10">
               <el-col :span="12">
                 <el-input-number 
                   v-model="mapDefaults.center[0]" 
                   :precision="4"
                   :step="0.1"
-                  placeholder="Longitude"
+                  :placeholder="$t('settings.longitude')"
                   style="width: 100%"
                 />
               </el-col>
@@ -162,14 +162,14 @@
                   v-model="mapDefaults.center[1]" 
                   :precision="4"
                   :step="0.1"
-                  placeholder="Latitude"
+                  :placeholder="$t('settings.latitude')"
                   style="width: 100%"
                 />
               </el-col>
             </el-row>
           </el-form-item>
           
-          <el-form-item label="Default Zoom">
+          <el-form-item :label="$t('settings.defaultZoom')">
             <el-slider 
               v-model="mapDefaults.zoom" 
               :min="0" 
@@ -180,39 +180,39 @@
           
           <el-form-item>
             <el-button type="primary" @click="handleSaveMapDefaults" :loading="loading">
-              Save Map Defaults
+              {{ $t('settings.saveMapDefaults') }}
             </el-button>
           </el-form-item>
         </el-form>
       </el-tab-pane>
       
       <!-- About -->
-      <el-tab-pane label="About" name="about">
+      <el-tab-pane :label="$t('settings.about')" name="about">
         <div class="about-section">
           <h3>GeoAI-UP Geographic AI Assistant</h3>
-          <p class="version">Version {{ appVersion }}</p>
+          <p class="version">{{ $t('settings.version') }} {{ appVersion }}</p>
           
           <el-descriptions :column="1" border>
-            <el-descriptions-item label="Frontend Framework">
+            <el-descriptions-item :label="$t('settings.frontendFramework')">
               Vue 3.5 + TypeScript
             </el-descriptions-item>
-            <el-descriptions-item label="UI Library">
+            <el-descriptions-item :label="$t('settings.uiLibrary')">
               Element Plus 2.13
             </el-descriptions-item>
-            <el-descriptions-item label="Map Engine">
+            <el-descriptions-item :label="$t('settings.mapEngine')">
               MapLibre GL 4.7
             </el-descriptions-item>
-            <el-descriptions-item label="State Management">
+            <el-descriptions-item :label="$t('settings.stateManagement')">
               Pinia 3.0
             </el-descriptions-item>
-            <el-descriptions-item label="Build Tool">
+            <el-descriptions-item :label="$t('settings.buildTool')">
               Vite 6.0
             </el-descriptions-item>
           </el-descriptions>
           
           <div class="credits">
-            <h4>Credits</h4>
-            <p>Built with modern web technologies for geographic information analysis and visualization.</p>
+            <h4>{{ $t('settings.credits') }}</h4>
+            <p>{{ $t('settings.creditsText') }}</p>
           </div>
         </div>
       </el-tab-pane>
@@ -230,7 +230,7 @@ import { settingsService, type LLMConfig, type MapDefaults } from '@/services/se
 
 const configStore = useConfigStore()
 const uiStore = useUIStore()
-const { locale } = useI18n()
+const { locale, t } = useI18n()
 
 const activeTab = ref('llm')
 const appVersion = import.meta.env.VITE_APP_VERSION || '1.0.0'
@@ -319,13 +319,13 @@ async function handleSaveLLMConfig() {
   try {
     const success = await settingsService.saveLLMConfig(llmConfig)
     if (success) {
-      ElMessage.success('LLM configuration saved successfully')
+      ElMessage.success(t('settings.llmConfigSaved'))
     } else {
-      ElMessage.error('Failed to save LLM configuration')
+      ElMessage.error(t('settings.llmConfigSaveFailed'))
     }
   } catch (error) {
     console.error('Failed to save LLM config:', error)
-    ElMessage.error('Failed to save LLM configuration')
+    ElMessage.error(t('settings.llmConfigSaveFailed'))
   } finally {
     loading.value = false
   }
@@ -336,13 +336,13 @@ async function handleTestLLMConnection() {
   try {
     const result = await settingsService.testLLMConnection(llmConfig)
     if (result.connected) {
-      ElMessage.success(`Connection successful: ${result.message}`)
+      ElMessage.success(`${t('settings.connectionSuccess')}: ${result.message}`)
     } else {
-      ElMessage.warning(`Connection failed: ${result.message}`)
+      ElMessage.warning(`${t('settings.connectionFailed')}: ${result.message}`)
     }
   } catch (error) {
     console.error('Failed to test connection:', error)
-    ElMessage.error('Connection test failed')
+    ElMessage.error(t('settings.connectionTestFailed'))
   } finally {
     loading.value = false
   }
@@ -352,13 +352,13 @@ function handleLanguageChange(lang: string) {
   configStore.setLanguage(lang as any)
   locale.value = lang
   settingsService.saveUIPreferences({ language: lang })
-  ElMessage.success('Language changed')
+  ElMessage.success(t('settings.languageChanged'))
 }
 
 function handleThemeChange(theme: string) {
   uiStore.setTheme(theme as any)
   settingsService.saveUIPreferences({ theme })
-  ElMessage.success('Theme changed')
+  ElMessage.success(t('settings.themeChanged'))
 }
 
 function handleSidebarChange(collapsed: boolean) {
@@ -371,7 +371,7 @@ function handleSidebarChange(collapsed: boolean) {
 
 function handleSaveMapDefaults() {
   settingsService.saveMapDefaults(mapDefaults)
-  ElMessage.success('Map defaults saved')
+  ElMessage.success(t('settings.mapDefaultsSaved'))
 }
 </script>
 

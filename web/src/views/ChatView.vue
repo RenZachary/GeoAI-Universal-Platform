@@ -17,13 +17,13 @@
           style="width: 100%; justify-content: flex-start"
         >
           <el-icon><Folder /></el-icon>
-          {{ showDataSources ? 'Hide' : 'Show' }} Data Sources ({{ dataSourceStore.dataSources.length }})
+          {{ showDataSources ? t('chat.hideDataSources') : t('chat.showDataSources') }} ({{ dataSourceStore.dataSources.length }})
         </el-button>
       </div>
       
       <!-- Data Sources List -->
       <div v-if="showDataSources" class="data-sources-section">
-        <div class="section-title">Available Data</div>
+        <div class="section-title">{{ t('chat.availableData') }}</div>
         <div 
           v-for="ds in dataSourceStore.dataSources" 
           :key="ds.id"
@@ -35,16 +35,16 @@
             <el-tag size="small" type="info">{{ ds.type }}</el-tag>
           </div>
           <div class="ds-meta">
-            <span>{{ (ds.metadata as any)?.featureCount || 'N/A' }} records</span>
+            <span>{{ (ds.metadata as any)?.featureCount || 'N/A' }} {{ t('chat.records') }}</span>
           </div>
         </div>
         <el-empty 
           v-if="dataSourceStore.dataSources.length === 0"
-          description="No data sources"
+          :description="t('chat.noDataSources')"
           :image-size="60"
         >
           <el-button size="small" type="primary" @click="$router.push('/data')">
-            Upload Data
+            {{ t('chat.uploadData') }}
           </el-button>
         </el-empty>
       </div>
@@ -128,10 +128,12 @@
 import { ref, nextTick } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { useDataSourceStore } from '@/stores/dataSources'
+import { useI18n } from 'vue-i18n'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
 import { Plus, Delete, ChatDotRound, Promotion, Folder } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 
+const { t } = useI18n()
 const chatStore = useChatStore()
 const dataSourceStore = useDataSourceStore()
 const inputMessage = ref('')
@@ -168,11 +170,11 @@ function handleSelectConversation(conversationId: string) {
 async function handleDeleteConversation(conversationId: string) {
   try {
     await ElMessageBox.confirm(
-      'Are you sure you want to delete this conversation?',
-      'Confirm Delete',
+      t('chat.deleteConfirm'),
+      t('chat.confirmDelete'),
       {
-        confirmButtonText: 'Delete',
-        cancelButtonText: 'Cancel',
+        confirmButtonText: t('chat.delete'),
+        cancelButtonText: t('chat.cancel'),
         type: 'warning'
       }
     )

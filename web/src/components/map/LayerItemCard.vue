@@ -15,7 +15,7 @@
           text 
           size="small"
           @click="handleShowInfo"
-          title="Show Info"
+          :title="t('map.showInfo')"
         >
           <el-icon><InfoFilled /></el-icon>
         </el-button>
@@ -29,19 +29,19 @@
           {{ getDisplayType(dataSource?.type) }}
         </el-tag>
         <span v-if="dataSource" class="record-count">
-          {{ (dataSource.metadata as any)?.featureCount || 'N/A' }} features
+          {{ featuresLabel }}
         </span>
       </div>
       
       <div v-if="dataSource" class="source-info">
         <el-icon><Folder /></el-icon>
-        <span>{{ dataSource.type === 'postgis' ? 'PostGIS Database' : 'Local File' }}</span>
+        <span>{{ sourceLabel }}</span>
       </div>
     </div>
     
     <!-- Opacity Control -->
     <div v-if="layer.visible" class="opacity-control">
-      <span class="opacity-label">Opacity: {{ Math.round((layer.opacity || 1) * 100) }}%</span>
+      <span class="opacity-label">{{ t('map.opacity') }}: {{ Math.round((layer.opacity || 1) * 100) }}%</span>
       <el-slider 
         :model-value="layer.opacity || 1"
         :min="0"
@@ -55,25 +55,25 @@
     <!-- Info Dialog -->
     <el-dialog
       v-model="showInfoDialog"
-      :title="dataSource?.name || 'Layer Information'"
+      :title="dataSource?.name || t('map.layerInformation')"
     >
       <el-descriptions :column="1" border>
-        <el-descriptions-item label="Layer ID">
+        <el-descriptions-item :label="t('map.layerId')">
           {{ layer.id }}
         </el-descriptions-item>
-        <el-descriptions-item label="Type">
+        <el-descriptions-item :label="t('map.type')">
           <el-tag size="small">{{ getDisplayType(dataSource?.type) }}</el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="Source" v-if="dataSource">
-          {{ dataSource.type === 'postgis' ? 'PostGIS Database' : 'Local File' }}
+        <el-descriptions-item :label="t('map.source')" v-if="dataSource">
+          {{ sourceLabel }}
         </el-descriptions-item>
-        <el-descriptions-item label="Features" v-if="dataSource">
-          {{ (dataSource.metadata as any)?.featureCount || 'N/A' }}
+        <el-descriptions-item :label="t('data.features')" v-if="dataSource">
+          {{ featuresLabel }}
         </el-descriptions-item>
-        <el-descriptions-item label="Created">
+        <el-descriptions-item :label="t('map.created')">
           {{ formatDate(layer.createdAt) }}
         </el-descriptions-item>
-        <el-descriptions-item label="URL" v-if="layer.url">
+        <el-descriptions-item :label="t('map.url')" v-if="layer.url">
           <el-text truncated>{{ layer.url }}</el-text>
         </el-descriptions-item>
       </el-descriptions>
@@ -82,9 +82,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { InfoFilled, Folder } from '@element-plus/icons-vue'
 import type { MapLayer, DataSource } from '@/types'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   layer: MapLayer
@@ -115,13 +118,13 @@ function getTypeColor(type?: string): string {
 
 function getDisplayType(type?: string): string {
   const types: Record<string, string> = {
-    postgis: 'PostGIS',
-    geojson: 'GeoJSON',
-    shapefile: 'Shapefile',
-    csv: 'CSV',
-    geotiff: 'GeoTIFF'
+    postgis: t('map.dataSourceTypes.postgis'),
+    geojson: t('map.dataSourceTypes.geojson'),
+    shapefile: t('map.dataSourceTypes.shapefile'),
+    csv: t('map.dataSourceTypes.csv'),
+    geotiff: t('map.dataSourceTypes.geotiff')
   }
-  return types[type || ''] || type || 'Unknown'
+  return types[type || ''] || t('map.dataSourceTypes.unknown')
 }
 
 function formatDate(dateString: string): string {
@@ -129,6 +132,16 @@ function formatDate(dateString: string): string {
   const date = new Date(dateString)
   return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
+
+// Computed properties for translated labels
+const sourceLabel = computed(() => {
+  return props.dataSource?.type === 'postgis' ? t('map.postgisDatabase') : t('map.localFile')
+})
+
+const featuresLabel = computed(() => {
+  const count = (props.dataSource?.metadata as any)?.featureCount
+  return count !== undefined && count !== null ? `${count} ${t('map.features')}` : 'N/A'
+})
 </script>
 
 <style scoped lang="scss">

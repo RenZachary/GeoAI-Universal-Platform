@@ -4,7 +4,7 @@
       <h2>{{ $t('templates.title') }}</h2>
       <el-button type="primary" @click="handleCreateTemplate">
         <el-icon><Plus /></el-icon>
-        New Template
+        {{ $t('templates.newTemplate') }}
       </el-button>
     </div>
     
@@ -25,15 +25,15 @@
               text
               @click="() => handleEditTemplate(template)"
             >
-              Edit
+              {{ $t('common.edit') }}
             </el-button>
             <el-popconfirm
-              title="Are you sure to delete this template?"
+              :title="$t('templates.deleteConfirm', { name: template.name })"
               @confirm="handleDeleteTemplate(template.id)"
             >
               <template #reference>
                 <el-button size="small" type="danger" text>
-                  Delete
+                  {{ $t('common.delete') }}
                 </el-button>
               </template>
             </el-popconfirm>
@@ -44,18 +44,18 @@
         
         <div class="template-meta">
           <span class="template-updated">
-            Updated: {{ formatDate(template.updatedAt) }}
+            {{ $t('data.uploadedAt') }}: {{ formatDate(template.updatedAt) }}
           </span>
         </div>
       </el-card>
       
       <el-empty 
         v-if="!templateStore.isLoading && templateStore.templates.length === 0"
-        description="No templates yet"
+        :description="$t('templates.noTemplates')"
         :image-size="120"
       >
         <el-button type="primary" @click="handleCreateTemplate">
-          Create Template
+          {{ $t('templates.createTemplate') }}
         </el-button>
       </el-empty>
     </div>
@@ -63,45 +63,45 @@
     <!-- Create/Edit Dialog -->
     <el-dialog
       v-model="showEditorDialog"
-      :title="editingTemplate ? 'Edit Template' : 'New Template'"
+      :title="editingTemplate ? $t('templates.edit') : $t('templates.newTemplate')"
       width="900px"
       :close-on-click-modal="false"
     >
       <el-form :model="templateForm" label-width="100px">
-        <el-form-item label="Name" required>
-          <el-input v-model="templateForm.name" placeholder="Template name" />
+        <el-form-item :label="$t('templates.name')" required>
+          <el-input v-model="templateForm.name" :placeholder="$t('templates.name')" />
         </el-form-item>
         
-        <el-form-item label="Language">
-          <el-select v-model="templateForm.language" placeholder="Select language" style="width: 100%" :disabled="!!editingTemplate">
-            <el-option label="English (US)" value="en-US" />
-            <el-option label="Chinese (Simplified)" value="zh-CN" />
+        <el-form-item :label="$t('templates.language')">
+          <el-select v-model="templateForm.language" :placeholder="$t('templates.selectLanguage')" style="width: 100%" :disabled="!!editingTemplate">
+            <el-option :label="$t('templates.englishUS')" value="en-US" />
+            <el-option :label="$t('templates.chineseSimplified')" value="zh-CN" />
           </el-select>
         </el-form-item>
         
-        <el-form-item label="Description">
+        <el-form-item :label="$t('templates.description')">
           <el-input 
             v-model="templateForm.description" 
             type="textarea"
             :rows="2"
-            placeholder="Brief description of this template (optional)"
+            :placeholder="$t('templates.briefDescription')"
           />
         </el-form-item>
         
-        <el-form-item label="Content" required>
+        <el-form-item :label="$t('templates.content')" required>
           <el-input 
             v-model="templateForm.content" 
             type="textarea"
             :rows="15"
-            placeholder="Enter template content with variables like {{variable}}"
+            :placeholder="$t('templates.enterContent')"
             class="template-editor"
           />
           <div class="editor-help">
-            Use {`{{`}variable{`}}`} syntax for dynamic values. Example: {`{{`}query{`}}`}, {`{{`}data_source{`}}`}
+            {{ $t('templates.variableSyntax') }}
           </div>
         </el-form-item>
         
-        <el-form-item label="Variables">
+        <el-form-item :label="$t('templates.variables')">
           <el-tag 
             v-for="varName in extractedVariables" 
             :key="varName"
@@ -112,15 +112,15 @@
             {{ varName }}
           </el-tag>
           <span v-if="extractedVariables.length === 0" class="no-variables">
-            No variables detected
+            {{ $t('templates.noVariablesDetected') }}
           </span>
         </el-form-item>
       </el-form>
       
       <template #footer>
-        <el-button @click="showEditorDialog = false">Cancel</el-button>
+        <el-button @click="showEditorDialog = false">{{ $t('templates.cancel') }}</el-button>
         <el-button type="primary" @click="handleSaveTemplate">
-          Save Template
+          {{ $t('templates.saveTemplate') }}
         </el-button>
       </template>
     </el-dialog>
@@ -133,8 +133,10 @@ import { useTemplateStore } from '@/stores/templates'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import type { PromptTemplate } from '@/types'
+import { useI18n } from 'vue-i18n'
 
 const templateStore = useTemplateStore()
+const { t } = useI18n()
 
 const showEditorDialog = ref(false)
 const editingTemplate = ref<PromptTemplate | null>(null)
@@ -187,19 +189,19 @@ async function handleEditTemplate(template: PromptTemplate) {
     }
     showEditorDialog.value = true
   } catch (error: any) {
-    ElMessage.error(error.message || 'Failed to load template')
+    ElMessage.error(error.message || t('templates.operationFailed'))
   }
 }
 
 async function handleSaveTemplate() {
   // Validation
   if (!templateForm.value.name.trim()) {
-    ElMessage.error('Template name is required')
+    ElMessage.error(t('templates.templateNameRequired'))
     return
   }
   
   if (!templateForm.value.content.trim()) {
-    ElMessage.error('Template content is required')
+    ElMessage.error(t('templates.templateContentRequired'))
     return
   }
   
@@ -210,7 +212,7 @@ async function handleSaveTemplate() {
         content: templateForm.value.content,
         description: templateForm.value.description
       })
-      ElMessage.success('Template updated')
+      ElMessage.success(t('templates.updateSuccess'))
     } else {
       // Create new
       await templateStore.createTemplate({
@@ -220,21 +222,21 @@ async function handleSaveTemplate() {
         content: templateForm.value.content,
         version: '1.0.0'
       })
-      ElMessage.success('Template created')
+      ElMessage.success(t('templates.createSuccess'))
     }
     
     showEditorDialog.value = false
   } catch (error: any) {
-    ElMessage.error(error.message || 'Operation failed')
+    ElMessage.error(error.message || t('templates.operationFailed'))
   }
 }
 
 async function handleDeleteTemplate(id: string) {
   try {
     await templateStore.deleteTemplate(id)
-    ElMessage.success('Template deleted')
+    ElMessage.success(t('templates.deleteSuccess'))
   } catch (error: any) {
-    ElMessage.error(error.message || 'Delete failed')
+    ElMessage.error(error.message || t('templates.deleteFailed'))
   }
 }
 
