@@ -7,26 +7,22 @@ import type { LLMConfig } from '../adapters/LLMAdapterFactory.js';
 import { LLMAdapterFactory } from '../adapters/LLMAdapterFactory.js';
 import type { PromptManager } from '../managers/PromptManager.js';
 import type { GeoAIStateType, ExecutionPlan} from '../workflow/GeoAIGraph.js';
-import type { ToolRegistry } from '../../plugin-orchestration';
+import { ToolRegistryInstance } from '../../plugin-orchestration';
 import { DataSourceRepository } from '../../data-access/repositories';
-import type Database from 'better-sqlite3';
+import { SQLiteManagerInstance } from '../../storage/index.js';
 
 export class TaskPlannerAgent {
   private llmConfig: LLMConfig;
   private promptManager: PromptManager;
-  private toolRegistry: ToolRegistry;
   private dataSourceRepo: DataSourceRepository;
 
   constructor(
     llmConfig: LLMConfig,
-    promptManager: PromptManager,
-    toolRegistry: ToolRegistry,
-    db: Database.Database
+    promptManager: PromptManager
   ) {
     this.llmConfig = llmConfig;
     this.promptManager = promptManager;
-    this.toolRegistry = toolRegistry;
-    this.dataSourceRepo = new DataSourceRepository(db);
+    this.dataSourceRepo = new DataSourceRepository(SQLiteManagerInstance.getDatabase());
   }
 
   /**
@@ -51,7 +47,7 @@ export class TaskPlannerAgent {
       );
 
       // Get available tools for context
-      const availableTools = this.toolRegistry.listToolsWithMetadata();
+      const availableTools = ToolRegistryInstance.listToolsWithMetadata();
       
       // Get available data sources with metadata
       const dataSources = this.dataSourceRepo.listAll();
@@ -62,7 +58,7 @@ export class TaskPlannerAgent {
         stepId: z.string().describe('Unique identifier for this step'),
         pluginId: z.string().describe('ID of the plugin/tool to execute'),
         parameters: z.record(z.any()).describe('Parameters to pass to the plugin'),
-        dependsOn: z.array(z.string()).optional().describe('Step IDs that must complete first')
+        dependsOn: z.array(z.string()).nullable().default([]).describe('Step IDs that must complete first')
       });
 
       const planSchema = z.object({

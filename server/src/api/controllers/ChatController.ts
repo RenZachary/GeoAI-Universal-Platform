@@ -46,7 +46,17 @@ export class ChatController {
       res.setHeader('Connection', 'keep-alive');
       res.setHeader('Access-Control-Allow-Origin', '*');
 
-      // Create streaming handler
+      // Send initial message_start event (what frontend expects)
+      res.write(`data: ${JSON.stringify({
+        type: 'message_start',
+        data: {
+          conversationId: convId,
+          content: message
+        },
+        timestamp: Date.now()
+      })}\n\n`);
+
+      // Create streaming handler for workflow progress (for debugging)
       const streamingHandler = new GeoAIStreamingHandler(res);
 
       // Initialize LangGraph workflow with conversation memory support
@@ -89,24 +99,60 @@ export class ChatController {
 
       // Process stream events
       let finalServices: any[] = [];
+      let finalSummary: string = '';
       
       for await (const chunk of stream) {
-        console.log('[Chat API] Workflow step:', Object.keys(chunk));
+        const stepKeys = Object.keys(chunk);
+        console.log('[Chat API] Workflow step:', stepKeys);
+        
+        // Send step_start event for each workflow node
+        if (stepKeys.length > 0) {
+          const stepName = stepKeys[0]; // e.g., 'goalSplitter', 'taskPlanner', etc.
+          res.write(`data: ${JSON.stringify({
+            type: 'step_start',
+            step: stepName,
+            timestamp: Date.now()
+          })}\n\n`);
+        }
         
         // Capture visualization services from outputGenerator node
         if (chunk.outputGenerator && chunk.outputGenerator.visualizationServices) {
           finalServices = chunk.outputGenerator.visualizationServices;
         }
         
-        // Stream is handled by callbacks
-        // Additional processing can be added here
+        // Capture summary from summaryGenerator node
+        if (chunk.summaryGenerator && chunk.summaryGenerator.summary) {
+          finalSummary = chunk.summaryGenerator.summary;
+        }
+      }
+
+      // Stream the summary as tokens (what frontend expects for display)
+      if (finalSummary) {
+        // Simulate token-by-token streaming for better UX
+        const words = finalSummary.split(' ');
+        for (let i = 0; i < words.length; i += 5) { // Stream in chunks of 5 words
+          const tokenChunk = words.slice(i, i + 5).join(' ') + ' ';
+          res.write(`data: ${JSON.stringify({
+            type: 'token',
+            data: {
+              token: tokenChunk
+            },
+            timestamp: Date.now()
+          })}\n\n`);
+          
+          // Small delay to simulate natural typing (optional, can be removed for instant display)
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
       }
 
       // Send completion event with summary and all services
       res.write(`data: ${JSON.stringify({
-        type: 'complete',
-        conversationId: convId,
-        services: finalServices,  // Include all accumulated services
+        type: 'message_complete',
+        data: {
+          conversationId: convId,
+          summary: finalSummary,
+          services: finalServices
+        },
         timestamp: Date.now()
       })}\n\n`);
 

@@ -18,12 +18,14 @@ import type Database from 'better-sqlite3';
 
 export class PluginToolWrapper {
   private static db: Database.Database;
+  private static workspaceBase: string;
 
   /**
-   * Initialize with database connection
+   * Initialize with database connection and workspace base
    */
-  static initialize(db: Database.Database): void {
+  static initialize(db: Database.Database, workspaceBase?: string): void {
     this.db = db;
+    this.workspaceBase = workspaceBase || process.cwd();
   }
 
   /**
@@ -42,28 +44,28 @@ export class PluginToolWrapper {
           switch (plugin.id) {
             case 'buffer_analysis':
               {
-                const bufferExecutor = new BufferAnalysisExecutor(this.db);
+                const bufferExecutor = new BufferAnalysisExecutor(this.db, this.workspaceBase);
                 result = await bufferExecutor.execute(input as BufferAnalysisParams);
                 break;
               }
 
             case 'overlay_analysis':
               {
-                const overlayExecutor = new OverlayAnalysisExecutor(this.db);
+                const overlayExecutor = new OverlayAnalysisExecutor(this.db, this.workspaceBase);
                 result = await overlayExecutor.execute(input as OverlayAnalysisParams);
                 break;
               }
 
             case 'mvt_publisher':
               {
-                const mvtExecutor = new MVTPublisherExecutor(this.db);
+                const mvtExecutor = new MVTPublisherExecutor(this.db, this.workspaceBase);
                 result = await mvtExecutor.execute(input as MVTPublisherParams);
                 break;
               }
 
             case 'statistics_calculator':
               {
-                const statsExecutor = new StatisticsCalculatorExecutor(this.db);
+                const statsExecutor = new StatisticsCalculatorExecutor(this.db, this.workspaceBase);
                 result = await statsExecutor.execute(input as StatisticsCalculatorParams);
                 break;
               }

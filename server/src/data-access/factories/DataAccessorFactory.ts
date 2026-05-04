@@ -49,7 +49,7 @@ export class DataAccessorFactory {
         accessor = new ShapefileAccessor(this.workspaceBase);
         break;
       case 'geojson':
-        accessor = new GeoJSONAccessor();
+        accessor = new GeoJSONAccessor(this.workspaceBase);
         break;
       case 'postgis':
         if (!this.postGISConfig) {

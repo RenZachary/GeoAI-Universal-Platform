@@ -8,10 +8,12 @@ import { BUILT_IN_PLUGINS, PluginToolWrapper } from '../../plugin-orchestration'
 import { SQLiteManagerInstance } from '../../storage';
 
 export class ToolController {
+  private workspaceBase: string;
 
-  constructor() {    
-    // Initialize PluginToolWrapper with database connection
-    PluginToolWrapper.initialize(SQLiteManagerInstance.getDatabase());
+  constructor(workspaceBase?: string) {
+    this.workspaceBase = workspaceBase || process.cwd();
+    // Initialize PluginToolWrapper with database connection and workspace base
+    PluginToolWrapper.initialize(SQLiteManagerInstance.getDatabase(), this.workspaceBase);
   }
 
   /**

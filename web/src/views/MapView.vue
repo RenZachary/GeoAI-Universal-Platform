@@ -126,11 +126,11 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, onUnmounted, ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useMapStore } from '@/stores/map'
 import { useDataSourceStore } from '@/stores/dataSources'
-import { MapLocation, List, Delete, Connection, Document, Picture } from '@element-plus/icons-vue'
+import { MapLocation, List, Connection, Document, Picture } from '@element-plus/icons-vue'
 import type { DataSource } from '@/types'
 import LayerItemCard from '@/components/map/LayerItemCard.vue'
 import { getDataSourceServiceUrl } from '@/services/dataSource'
@@ -190,6 +190,15 @@ onMounted(async () => {
   // Auto-add all data sources as map layers with proper service URLs
   for (const ds of dataSourceStore.dataSources) {
     try {
+      const layerId = `layer-${ds.id}`
+      
+      // Check if layer already exists to prevent duplicates
+      const existingLayer = mapStore.layers.find(l => l.id === layerId)
+      if (existingLayer) {
+        console.log(`Layer ${layerId} already exists, skipping...`)
+        continue
+      }
+      
       // Get the appropriate service URL (MVT or WMS)
       const serviceInfo = await getDataSourceServiceUrl(ds.id)
       
@@ -205,7 +214,7 @@ onMounted(async () => {
       }
       
       mapStore.addLayer({
-        id: `layer-${ds.id}`,
+        id: layerId,
         type: layerType,
         url: url,
         visible: true,
@@ -226,6 +235,15 @@ onMounted(async () => {
 function handleBasemapChange(basemapType: string) {
   mapStore.setBasemap(basemapType as any)
 }
+
+// Cleanup on component unmount
+onUnmounted(() => {
+  // Remove all auto-added layers from data sources
+  dataSourceStore.dataSources.forEach(ds => {
+    const layerId = `layer-${ds.id}`
+    mapStore.removeLayer(layerId)
+  })
+})
 
 </script>
 

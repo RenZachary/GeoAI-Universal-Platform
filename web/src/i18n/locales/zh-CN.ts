@@ -79,10 +79,12 @@ export default {
     title: '数据管理',
     upload: '上传数据',
     uploadTitle: '上传文件',
+    noDataSources: '暂无数据源。上传您的第一个文件！',
     search: '搜索数据源...',
     filterType: '按类型筛选',
     name: '名称',
     type: '类型',
+    size: '大小',
     features: '要素数',
     uploadedAt: '上传时间',
     metadata: '元数据',
@@ -91,14 +93,46 @@ export default {
     deleteSuccess: '数据源删除成功',
     uploadSuccess: '文件上传成功',
     metadataTitle: '数据源元数据',
-    schemaTitle: '字段结构'
+    schemaTitle: '字段结构',
+    postgis: {
+      addConnection: '添加 PostGIS 连接',
+      dialogTitle: '添加 PostGIS 连接',
+      connectionName: '连接名称',
+      host: '主机',
+      port: '端口',
+      database: '数据库',
+      username: '用户名',
+      password: '密码',
+      schema: '模式',
+      schemaTip: '默认：public',
+      connectAndRegister: '连接并注册',
+      cancel: '取消',
+      placeholder: {
+        connectionName: '我的 PostGIS 数据库',
+        host: 'localhost',
+        database: 'gis_database',
+        username: 'postgres',
+        password: '请输入密码',
+        schema: 'public'
+      },
+      validation: {
+        requiredFields: '请填写所有必填字段'
+      },
+      messages: {
+        connected: '连接成功！已注册 {count} 个表',
+        connectionFailed: '连接 PostGIS 失败',
+        connectionError: '无法连接到 PostGIS 数据库'
+      }
+    }
   },
   upload: {
     dropText: '拖拽文件到此处或',
     clickText: '点击上传',
-    supportedFormats: '支持格式：Shapefile、GeoJSON、GeoTIFF、CSV',
-    maxSize: '最大文件大小：100MB',
-    fileTooLarge: '文件大小超过100MB限制',
+    supportedFormats: '支持格式：Shapefile (.shp, .shx, .dbf, .prj)、GeoJSON、GeoTIFF、CSV',
+    maxSize: '最大文件大小：每个文件 100MB',
+    uploadProgress: '上传进度',
+    uploadButton: '上传',
+    fileTooLarge: '文件{name}超过100MB限制',
     uploadFailed: '上传失败'
   },
   tools: {

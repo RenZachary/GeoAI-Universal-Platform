@@ -6,6 +6,7 @@ import { StateGraph, Annotation, END, START } from '@langchain/langgraph';
 import type { BaseMessage} from '@langchain/core/messages';
 import { HumanMessage } from '@langchain/core/messages';
 import type { LLMConfig } from '../adapters/LLMAdapterFactory.js';
+import type Database from 'better-sqlite3';
 import { PromptManager } from '../managers/PromptManager.js';
 import { GoalSplitterAgent } from '../agents/GoalSplitterAgent.js';
 import { TaskPlannerAgent } from '../agents/TaskPlannerAgent.js';
@@ -97,16 +98,26 @@ export function createGeoAIGraph(
   // Initialize managers and agents
   const promptManager = new PromptManager(workspaceBase);
   const goalSplitter = new GoalSplitterAgent(llmConfig, promptManager);
-  const db = SQLiteManagerInstance.getDatabase();
-  // TaskPlanner needs database for data source context
-  if (!db) {
-    console.warn('[GeoAIGraph] Database not provided - TaskPlanner will have limited data source context');
+  
+  // Get database instance with validation
+  let db: Database.Database | null = null;
+  try {
+    db = SQLiteManagerInstance.getDatabase();
+    // Validate that db has the expected methods
+    if (!db || typeof db.prepare !== 'function') {
+      console.warn('[GeoAIGraph] Invalid database instance - TaskPlanner will have limited data source context');
+      db = null;
+    }
+  } catch (error) {
+    console.warn('[GeoAIGraph] Failed to get database instance:', error);
+    db = null;
   }
-  const taskPlanner = new TaskPlannerAgent(llmConfig, promptManager, ToolRegistryInstance, db!);
+  
+  const taskPlanner = new TaskPlannerAgent(llmConfig, promptManager);
   
   // Initialize service publisher and summary generator
   const servicePublisher = new ServicePublisher();
-  const summaryGenerator = new SummaryGenerator(workspaceBase);
+  const summaryGenerator = new SummaryGenerator(workspaceBase, 'en-US', llmConfig);
   
   const workflow = new StateGraph(GeoAIStateAnnotation)
     // Memory Loading Node - Load conversation history at start

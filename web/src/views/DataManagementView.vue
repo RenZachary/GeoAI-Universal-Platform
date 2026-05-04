@@ -5,11 +5,11 @@
       <div class="header-actions">
         <el-button @click="showPostGISDialog = true">
           <el-icon><Connection /></el-icon>
-          Add PostGIS Connection
+          {{ $t('data.postgis.addConnection') }}
         </el-button>
         <el-button type="primary" @click="showUploadDialog = true">
           <el-icon><Upload /></el-icon>
-          Upload Files
+          {{ $t('data.uploadTitle') }}
         </el-button>
       </div>
     </div>
@@ -21,7 +21,7 @@
       stripe
       style="width: 100%"
     >
-      <el-table-column prop="name" label="Name" min-width="200">
+      <el-table-column prop="name" :label="$t('data.name')" min-width="200">
         <template #default="{ row }">
           <div class="data-source-name">
             <el-icon><Document /></el-icon>
@@ -30,7 +30,7 @@
         </template>
       </el-table-column>
       
-      <el-table-column prop="type" label="Type" width="120">
+      <el-table-column prop="type" :label="$t('data.type')" width="120">
         <template #default="{ row }">
           <el-tag size="small" :type="getTypeColor(row.type)">
             {{ row.type }}
@@ -38,33 +38,33 @@
         </template>
       </el-table-column>
       
-      <el-table-column prop="metadata.featureCount" label="Records" width="100" align="right">
+      <el-table-column prop="metadata.featureCount" :label="$t('map.features')" width="100" align="right">
         <template #default="{ row }">
           {{ row.metadata?.featureCount || 'N/A' }}
         </template>
       </el-table-column>
       
-      <el-table-column prop="metadata.fileSize" label="Size" width="100">
+      <el-table-column prop="metadata.fileSize" :label="$t('data.size')" width="100">
         <template #default="{ row }">
           {{ formatFileSize(row.metadata?.fileSize) }}
         </template>
       </el-table-column>
       
-      <el-table-column prop="createdAt" label="Uploaded" width="180">
+      <el-table-column prop="createdAt" :label="$t('data.uploadedAt')" width="180">
         <template #default="{ row }">
           {{ formatDate(row.createdAt) }}
         </template>
       </el-table-column>
       
-      <el-table-column label="Actions" width="100" fixed="right">
+      <el-table-column :label="$t('common.actions')" width="100" fixed="right">
         <template #default="{ row }">
           <el-popconfirm
-            title="Are you sure to delete this data source?"
+            :title="$t('data.deleteConfirm', { name: row.name })"
             @confirm="handleDelete(row.id)"
           >
             <template #reference>
               <el-button size="small" type="danger" text>
-                Delete
+                {{ $t('common.delete') }}
               </el-button>
             </template>
           </el-popconfirm>
@@ -74,18 +74,18 @@
     
     <el-empty 
       v-if="!dataSourceStore.isLoading && dataSourceStore.dataSources.length === 0"
-      description="No data sources yet. Upload your first file!"
+      :description="$t('data.noDataSources')"
       :image-size="120"
     >
       <el-button type="primary" @click="showUploadDialog = true">
-        Upload Files
+        {{ $t('data.uploadTitle') }}
       </el-button>
     </el-empty>
     
     <!-- Upload Dialog -->
     <el-dialog
       v-model="showUploadDialog"
-      title="Upload Data Files"
+      :title="$t('data.uploadTitle')"
       width="600px"
       :close-on-click-modal="false"
     >
@@ -101,19 +101,19 @@
       >
         <el-icon class="el-icon--upload"><upload-filled /></el-icon>
         <div class="el-upload__text">
-          Drop files here or <em>click to upload</em>
+          {{ $t('upload.dropText') }} <em>{{ $t('upload.clickText') }}</em>
         </div>
         <template #tip>
           <div class="el-upload__tip">
-            Supported formats: Shapefile (.shp, .shx, .dbf, .prj), GeoJSON, GeoTIFF, CSV<br/>
-            Maximum file size: 100MB per file
+            {{ $t('upload.supportedFormats') }}<br/>
+            {{ $t('upload.maxSize') }}
           </div>
         </template>
       </el-upload>
       
       <!-- Upload Progress -->
       <div v-if="dataSourceStore.uploadTasks.length > 0" class="upload-progress">
-        <h4>Upload Progress</h4>
+        <h4>{{ $t('upload.uploadProgress') }}</h4>
         <div 
           v-for="task in dataSourceStore.uploadTasks" 
           :key="task.id"
@@ -134,14 +134,14 @@
       </div>
       
       <template #footer>
-        <el-button @click="handleCancelUpload">Cancel</el-button>
+        <el-button @click="handleCancelUpload">{{ $t('common.cancel') }}</el-button>
         <el-button 
           type="primary" 
           :loading="isUploading"
           :disabled="selectedFiles.length === 0"
           @click="handleUploadFiles"
         >
-          Upload ({{ selectedFiles.length }})
+          {{ $t('upload.uploadButton') }} ({{ selectedFiles.length }})
         </el-button>
       </template>
     </el-dialog>
@@ -149,50 +149,50 @@
     <!-- PostGIS Connection Dialog -->
     <el-dialog
       v-model="showPostGISDialog"
-      title="Add PostGIS Connection"
+      :title="$t('data.postgis.dialogTitle')"
       width="600px"
       :close-on-click-modal="false"
     >
       <el-form :model="postGISForm" label-width="120px" ref="postGISFormRef">
-        <el-form-item label="Connection Name" required>
-          <el-input v-model="postGISForm.name" placeholder="My PostGIS Database" />
+        <el-form-item :label="$t('data.postgis.connectionName')" required>
+          <el-input v-model="postGISForm.name" :placeholder="$t('data.postgis.placeholder.connectionName')" />
         </el-form-item>
         
-        <el-form-item label="Host" required>
-          <el-input v-model="postGISForm.host" placeholder="localhost" />
+        <el-form-item :label="$t('data.postgis.host')" required>
+          <el-input v-model="postGISForm.host" :placeholder="$t('data.postgis.placeholder.host')" />
         </el-form-item>
         
-        <el-form-item label="Port">
+        <el-form-item :label="$t('data.postgis.port')">
           <el-input-number v-model="postGISForm.port" :min="1" :max="65535" style="width: 100%" />
         </el-form-item>
         
-        <el-form-item label="Database" required>
-          <el-input v-model="postGISForm.database" placeholder="gis_database" />
+        <el-form-item :label="$t('data.postgis.database')" required>
+          <el-input v-model="postGISForm.database" :placeholder="$t('data.postgis.placeholder.database')" />
         </el-form-item>
         
-        <el-form-item label="Username" required>
-          <el-input v-model="postGISForm.user" placeholder="postgres" />
+        <el-form-item :label="$t('data.postgis.username')" required>
+          <el-input v-model="postGISForm.user" :placeholder="$t('data.postgis.placeholder.username')" />
         </el-form-item>
         
-        <el-form-item label="Password" required>
+        <el-form-item :label="$t('data.postgis.password')" required>
           <el-input 
             v-model="postGISForm.password" 
             type="password" 
             show-password
-            placeholder="Enter password"
+            :placeholder="$t('data.postgis.placeholder.password')"
           />
         </el-form-item>
         
-        <el-form-item label="Schema">
-          <el-input v-model="postGISForm.schema" placeholder="public" />
-          <div class="form-tip">Default: public</div>
+        <el-form-item :label="$t('data.postgis.schema')">
+          <el-input v-model="postGISForm.schema" :placeholder="$t('data.postgis.placeholder.schema')" />
+          <div class="form-tip">{{ $t('data.postgis.schemaTip') }}</div>
         </el-form-item>
       </el-form>
       
       <template #footer>
-        <el-button @click="handleCancelPostGIS">Cancel</el-button>
+        <el-button @click="handleCancelPostGIS">{{ $t('data.postgis.cancel') }}</el-button>
         <el-button type="primary" @click="handleSubmitPostGIS" :loading="isConnecting">
-          Connect & Register
+          {{ $t('data.postgis.connectAndRegister') }}
         </el-button>
       </template>
     </el-dialog>
@@ -201,11 +201,13 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useDataSourceStore } from '@/stores/dataSources'
 import { ElMessage } from 'element-plus'
 import { Upload, Document, UploadFilled, Connection } from '@element-plus/icons-vue'
 import type { UploadUserFile } from 'element-plus'
 
+const { t } = useI18n()
 const dataSourceStore = useDataSourceStore()
 
 const showUploadDialog = ref(false)
@@ -242,7 +244,7 @@ function handleFileSelect(file: UploadUserFile) {
 function beforeUpload(file: File) {
   const maxSize = 100 * 1024 * 1024 // 100MB
   if (file.size > maxSize) {
-    ElMessage.error(`File ${file.name} exceeds 100MB limit`)
+    ElMessage.error(t('upload.fileTooLarge', { name: file.name }))
     return false
   }
   
@@ -255,7 +257,7 @@ function beforeUpload(file: File) {
   
   const ext = '.' + file.name.split('.').pop()?.toLowerCase()
   if (!allowedTypes.includes(ext)) {
-    ElMessage.error(`File type ${ext} is not supported`)
+    ElMessage.error(t('plugins.unsupportedType', { ext }))
     return false
   }
   
@@ -269,14 +271,14 @@ async function handleUploadFiles() {
   
   try {
     await dataSourceStore.uploadMultipleFiles(selectedFiles.value)
-    ElMessage.success(`Successfully uploaded ${selectedFiles.value.length} file(s)`)
+    ElMessage.success(t('data.uploadSuccess'))
     
     // Reset
     selectedFiles.value = []
     showUploadDialog.value = false
     dataSourceStore.clearCompletedUploads()
   } catch (error) {
-    ElMessage.error('Some files failed to upload')
+    ElMessage.error(t('upload.uploadFailed'))
   } finally {
     isUploading.value = false
   }
@@ -291,7 +293,7 @@ function handleCancelUpload() {
 async function handleSubmitPostGIS() {
   // Validate required fields
   if (!postGISForm.host || !postGISForm.database || !postGISForm.user || !postGISForm.password) {
-    ElMessage.error('Please fill in all required fields')
+    ElMessage.error(t('data.postgis.validation.requiredFields'))
     return
   }
   
@@ -318,7 +320,8 @@ async function handleSubmitPostGIS() {
     const result = await response.json()
     
     if (result.success) {
-      ElMessage.success(`Connected successfully! Registered ${result.dataSources?.length || 0} tables`)
+      const count = result.dataSources?.length || 0
+      ElMessage.success(t('data.postgis.messages.connected', { count }))
       
       // Reset form and close dialog
       resetPostGISForm()
@@ -327,11 +330,11 @@ async function handleSubmitPostGIS() {
       // Reload data sources to show newly registered tables
       await dataSourceStore.loadDataSources()
     } else {
-      ElMessage.error(result.error || 'Failed to connect to PostGIS')
+      ElMessage.error(result.error || t('data.postgis.messages.connectionFailed'))
     }
   } catch (error) {
     console.error('PostGIS connection error:', error)
-    ElMessage.error('Failed to connect to PostGIS database')
+    ElMessage.error(t('data.postgis.messages.connectionError'))
   } finally {
     isConnecting.value = false
   }
@@ -355,9 +358,9 @@ function resetPostGISForm() {
 async function handleDelete(id: string) {
   try {
     await dataSourceStore.deleteDataSource(id)
-    ElMessage.success('Data source deleted')
+    ElMessage.success(t('data.deleteSuccess'))
   } catch (error) {
-    ElMessage.error('Failed to delete data source')
+    ElMessage.error(t('plugins.operationFailed'))
   }
 }
 

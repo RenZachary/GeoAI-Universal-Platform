@@ -43,7 +43,7 @@ export async function scanAndRegisterDataFiles(
   
   // Initialize services
   const dataSourceRepo = new DataSourceRepository(SQLiteManagerInstance.getDatabase());
-  const accessorFactory = new DataAccessorFactory();
+  const accessorFactory = new DataAccessorFactory(workspaceBase);
   
   // Check which files are already registered
   const existingSources = dataSourceRepo.listAll();

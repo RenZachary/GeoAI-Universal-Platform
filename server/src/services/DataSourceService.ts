@@ -92,9 +92,9 @@ export class DataSourceService {
   private dataSourceRepo: DataSourceRepository;
   private accessorFactory: DataAccessorFactory;
 
-  constructor(dataSourceRepo: DataSourceRepository) {
+  constructor(dataSourceRepo: DataSourceRepository, workspaceBase?: string) {
     this.dataSourceRepo = dataSourceRepo;
-    this.accessorFactory = new DataAccessorFactory();
+    this.accessorFactory = new DataAccessorFactory(workspaceBase);
   }
 
   // ==========================================================================

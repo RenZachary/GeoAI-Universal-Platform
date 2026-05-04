@@ -79,10 +79,12 @@ export default {
     title: 'Data Management',
     upload: 'Upload Data',
     uploadTitle: 'Upload Files',
+    noDataSources: 'No data sources yet. Upload your first file!',
     search: 'Search data sources...',
     filterType: 'Filter by type',
     name: 'Name',
     type: 'Type',
+    size: 'Size',
     features: 'Features',
     uploadedAt: 'Uploaded At',
     metadata: 'Metadata',
@@ -91,14 +93,46 @@ export default {
     deleteSuccess: 'Data source deleted successfully',
     uploadSuccess: 'File uploaded successfully',
     metadataTitle: 'Data Source Metadata',
-    schemaTitle: 'Field Schema'
+    schemaTitle: 'Field Schema',
+    postgis: {
+      addConnection: 'Add PostGIS Connection',
+      dialogTitle: 'Add PostGIS Connection',
+      connectionName: 'Connection Name',
+      host: 'Host',
+      port: 'Port',
+      database: 'Database',
+      username: 'Username',
+      password: 'Password',
+      schema: 'Schema',
+      schemaTip: 'Default: public',
+      connectAndRegister: 'Connect & Register',
+      cancel: 'Cancel',
+      placeholder: {
+        connectionName: 'My PostGIS Database',
+        host: 'localhost',
+        database: 'gis_database',
+        username: 'postgres',
+        password: 'Enter password',
+        schema: 'public'
+      },
+      validation: {
+        requiredFields: 'Please fill in all required fields'
+      },
+      messages: {
+        connected: 'Connected successfully! Registered {count} tables',
+        connectionFailed: 'Failed to connect to PostGIS',
+        connectionError: 'Failed to connect to PostGIS database'
+      }
+    }
   },
   upload: {
-    dropText: 'Drop file here or',
+    dropText: 'Drop files here or',
     clickText: 'click to upload',
-    supportedFormats: 'Supported formats: Shapefile, GeoJSON, GeoTIFF, CSV',
-    maxSize: 'Maximum file size: 100MB',
-    fileTooLarge: 'File size exceeds 100MB limit',
+    supportedFormats: 'Supported formats: Shapefile (.shp, .shx, .dbf, .prj), GeoJSON, GeoTIFF, CSV',
+    maxSize: 'Maximum file size: 100MB per file',
+    uploadProgress: 'Upload Progress',
+    uploadButton: 'Upload',
+    fileTooLarge: 'File {name} exceeds 100MB limit',
     uploadFailed: 'Upload failed'
   },
   tools: {

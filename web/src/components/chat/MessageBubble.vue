@@ -17,6 +17,35 @@
       
       <div class="message-text" v-html="renderedContent" />
       
+      <!-- Service links -->
+      <div v-if="message.services && message.services.length > 0" class="service-links">
+        <div class="service-links-header">
+          <el-icon><Link /></el-icon>
+          <span>Generated Services ({{ message.services.length }})</span>
+        </div>
+        <div class="service-link-list">
+          <div 
+            v-for="service in message.services" 
+            :key="service.id"
+            class="service-link-item"
+          >
+            <el-icon>
+              <Document v-if="service.type === 'geojson'" />
+              <MapLocation v-else />
+            </el-icon>
+            <span class="service-name">{{ getServiceName(service) }}</span>
+            <el-button 
+              link 
+              type="primary" 
+              size="small"
+              @click="handleViewService(service)"
+            >
+              {{ getActionText(service) }}
+            </el-button>
+          </div>
+        </div>
+      </div>
+      
       <!-- Streaming indicator -->
       <div v-if="isStreaming" class="streaming-indicator">
         <span class="dot"></span>
@@ -41,8 +70,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { ChatMessage } from '@/types'
-import { User, ChatDotRound, DocumentCopy, RefreshRight } from '@element-plus/icons-vue'
+import type { ChatMessage, VisualizationService } from '@/types'
+import { User, ChatDotRound, DocumentCopy, RefreshRight, Link, Document, MapLocation } from '@element-plus/icons-vue'
 import { marked } from 'marked'
 import { useChatStore } from '@/stores/chat'
 
@@ -70,6 +99,36 @@ const renderedContent = computed(() => {
 function formatTime(timestamp: string): string {
   const date = new Date(timestamp)
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function getServiceName(service: VisualizationService): string {
+  const metadata = service.metadata
+  if (metadata?.pluginId) {
+    return metadata.pluginId.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
+  }
+  return service.type.toUpperCase() + ' Service'
+}
+
+function getActionText(service: VisualizationService): string {
+  if (service.type === 'mvt' || service.type === 'wms') {
+    return 'View on Map'
+  } else if (service.type === 'geojson') {
+    return 'Download'
+  } else if (service.type === 'heatmap') {
+    return 'View Heatmap'
+  }
+  return 'View'
+}
+
+function handleViewService(service: VisualizationService) {
+  // For MVT/WMS, emit event to add layer to map
+  if (service.type === 'mvt' || service.type === 'wms') {
+    // TODO: Implement map integration
+    window.open(service.url, '_blank')
+  } else {
+    // For file-based services, open in new tab
+    window.open(service.url, '_blank')
+  }
 }
 
 function handleCopy() {
@@ -227,5 +286,51 @@ function handleRegenerate() {
 
 .message-bubble:hover .message-actions {
   opacity: 1;
+}
+
+.service-links {
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--el-fill-color-lighter);
+  border-radius: 8px;
+  border: 1px solid var(--el-border-color-lighter);
+}
+
+.service-links-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  margin-bottom: 12px;
+}
+
+.service-link-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.service-link-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--el-bg-color);
+  border-radius: 6px;
+  border: 1px solid var(--el-border-color);
+  transition: all 0.2s;
+  
+  &:hover {
+    border-color: var(--el-color-primary);
+    background: var(--el-fill-color-light);
+  }
+}
+
+.service-name {
+  flex: 1;
+  font-size: 13px;
+  color: var(--el-text-color-regular);
 }
 </style>

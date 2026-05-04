@@ -29,10 +29,10 @@ export class BufferAnalysisExecutor {
   private dataSourceRepo: DataSourceRepository;
   private accessorFactory: DataAccessorFactory;
 
-  constructor(db: Database.Database) {
+  constructor(db: Database.Database, workspaceBase?: string) {
     this.db = db;
     this.dataSourceRepo = new DataSourceRepository(db);
-    this.accessorFactory = new DataAccessorFactory();
+    this.accessorFactory = new DataAccessorFactory(workspaceBase);
   }
 
   /**

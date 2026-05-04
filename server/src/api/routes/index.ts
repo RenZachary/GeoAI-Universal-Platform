@@ -41,13 +41,13 @@ export class ApiRouter {
     const dataSourceRepo = new DataSourceRepository(db);
     
     // Initialize services (dependency injection)
-    const dataSourceService = new DataSourceService(dataSourceRepo);
+    const dataSourceService = new DataSourceService(dataSourceRepo, workspaceBase);
     const fileUploadService = new FileUploadService(dataSourceRepo, workspaceBase);
     const promptTemplateService = new PromptTemplateService(workspaceBase);
     const conversationService = new ConversationService(db);
     
     // Initialize controllers with injected dependencies
-    this.toolController = new ToolController();
+    this.toolController = new ToolController(workspaceBase);
     this.chatController = new ChatController(llmConfig, workspaceBase, conversationService);
     
     // Initialize shared MVTDynamicPublisher singleton
@@ -81,6 +81,7 @@ export class ApiRouter {
   private setupRoutes(): void {
     // Chat endpoints
     this.router.post('/chat', (req, res) => this.chatController.handleChat(req, res));
+    this.router.post('/chat/stream', (req, res) => this.chatController.handleChat(req, res)); // SSE streaming endpoint
     this.router.get('/chat/conversations', (req, res) => this.chatController.listConversations(req, res));
     this.router.get('/chat/conversations/:id', (req, res) => this.chatController.getConversation(req, res));
     this.router.delete('/chat/conversations/:id', (req, res) => this.chatController.deleteConversation(req, res));

@@ -50,6 +50,20 @@ export class SQLiteMessageHistory extends BaseChatMessageHistory {
   async addMessage(message: BaseMessage): Promise<void> {
     const role = message._getType() === 'human' ? 'user' : 'assistant';
 
+    // Ensure conversation exists before inserting message
+    // This prevents FOREIGN KEY constraint failures
+    const conversationExists = this.db.prepare(`
+      SELECT COUNT(*) as count FROM conversations WHERE id = ?
+    `).get(this.conversationId) as { count: number };
+
+    if (conversationExists.count === 0) {
+      // Create conversation record with default values
+      this.db.prepare(`
+        INSERT INTO conversations (id, title, created_at, updated_at)
+        VALUES (?, ?, datetime('now'), datetime('now'))
+      `).run(this.conversationId, `Conversation ${this.conversationId}`);
+    }
+
     this.db.prepare(`
       INSERT INTO conversation_messages (conversation_id, role, content, timestamp)
       VALUES (?, ?, ?, datetime('now'))

@@ -92,8 +92,9 @@ class SQLiteManager {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS conversations (
         id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        context TEXT NOT NULL,
+        user_id TEXT NOT NULL DEFAULT 'anonymous',
+        title TEXT NOT NULL DEFAULT 'Untitled Conversation',
+        context TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       )
@@ -219,14 +220,6 @@ class SQLiteManager {
       this.db = null;
       console.log('Database connection closed');
     }
-  }
-
-  /**
-   * Run a migration (placeholder for future schema changes)
-   */
-  // TODO: Implement migration system for schema updates
-  runMigration(migrationName: string): void {
-    console.warn(`Migration system not yet implemented: ${migrationName}`);
   }
 }
 export const SQLiteManagerInstance = SQLiteManager.getInstance();

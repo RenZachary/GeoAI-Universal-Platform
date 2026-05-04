@@ -4,6 +4,8 @@
  */
 
 import { PromptManager } from '../managers/PromptManager.js';
+import { LLMAdapterFactory } from '../adapters/LLMAdapterFactory.js';
+import type { LLMConfig } from '../adapters/LLMAdapterFactory.js';
 import type { GeoAIStateType, AnalysisGoal, AnalysisResult, VisualizationService } from './GeoAIGraph.js';
 
 export interface SummaryOptions {
@@ -17,11 +19,13 @@ export interface SummaryOptions {
 
 export class SummaryGenerator {
   private promptManager: PromptManager;
+  private llmConfig?: LLMConfig;
   private defaultLanguage: string;
 
-  constructor(workspaceBase: string, defaultLanguage: string = 'en-US') {
+  constructor(workspaceBase: string, defaultLanguage: string = 'en-US', llmConfig?: LLMConfig) {
     this.promptManager = new PromptManager(workspaceBase);
     this.defaultLanguage = defaultLanguage;
+    this.llmConfig = llmConfig;
   }
 
   /**
@@ -38,11 +42,17 @@ export class SummaryGenerator {
     } = options;
 
     try {
-      // Try to load summary template
+      // Try LLM-based generation first (if API keys configured)
+      if (this.llmConfig) {
+        console.log('[Summary Generator] Using LLM for natural language summary');
+        return await this.generateWithLLM(state, language);
+      }
+      
+      // Fallback to template-based generation
+      console.log('[Summary Generator] LLM not configured, using template fallback');
       const template = await this.loadSummaryTemplate(language);
       
       if (template) {
-        // Use template-based generation
         return this.generateFromTemplate(state, template, {
           includeGoals,
           includeResults,
@@ -51,8 +61,6 @@ export class SummaryGenerator {
           includeNextSteps
         });
       } else {
-        // Fallback to hardcoded generation
-        console.warn('[Summary Generator] Template not found, using fallback');
         return this.generateFallback(state, {
           includeGoals,
           includeResults,
@@ -92,11 +100,15 @@ export class SummaryGenerator {
     // Prepare template variables
     const variables = this.prepareTemplateVariables(state, options);
     
-    // Simple template substitution (can be enhanced with LLM later)
+    // Simple template substitution
+    // Note: After PromptManager conversion, templates use {variable} syntax (single braces)
     let summary = template;
     
     for (const [key, value] of Object.entries(variables)) {
-      summary = summary.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
+      // Escape special regex characters in variable name
+      const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // Match {variable} with single braces (LangChain format after conversion)
+      summary = summary.replace(new RegExp(`\\{${escapedKey}\\}`, 'g'), value);
     }
     
     return summary;
@@ -111,7 +123,15 @@ export class SummaryGenerator {
     // Goals summary
     if (options.includeGoals && state.goals) {
       variables.completedGoals = state.goals.length.toString();
-      variables.failedGoals = '0'; // Will be calculated from results
+      
+      // Calculate failed goals from execution results
+      let failedGoalsCount = 0;
+      if (state.executionResults) {
+        const results = Array.from(state.executionResults.values());
+        failedGoalsCount = results.filter(r => r.status === 'failed').length;
+      }
+      variables.failedGoals = failedGoalsCount.toString();
+      
       variables.goalsList = this.formatGoalsList(state.goals);
     }
 
@@ -139,6 +159,128 @@ export class SummaryGenerator {
     }
 
     return variables;
+  }
+
+  /**
+   * Generate summary using LLM for natural language output
+   */
+  private async generateWithLLM(state: GeoAIStateType, language: string): Promise<string> {
+    try {
+      // Prepare context for LLM
+      const context = this.prepareLLMContext(state);
+      
+      // Load prompt template for summary generation
+      const promptTemplate = await this.promptManager.loadTemplate('response-summary', language);
+      
+      if (!this.llmConfig) {
+        console.warn('[Summary Generator] LLM config not found, cannot generate summary');
+        return '';
+      }
+      // Create LLM instance
+      const llm = LLMAdapterFactory.createAdapter(this.llmConfig);
+      
+      // Create chain with prompt and LLM
+      const chain = promptTemplate.pipe(llm);
+      
+      // Invoke LLM with context
+      const response = await chain.invoke(context);
+      
+      // Extract text content from response (handle different response types)
+      let summary: string;
+      if (typeof response === 'string') {
+        summary = response;
+      } else if (Array.isArray(response)) {
+        // Handle array of content blocks
+        summary = response
+          .map(block => {
+            if (typeof block === 'string') return block;
+            if (block && typeof block === 'object' && 'text' in block) return block.text;
+            return '';
+          })
+          .join('');
+      } else if (response && typeof response === 'object' && 'content' in response) {
+        summary = String(response.content);
+      } else {
+        summary = String(response);
+      }
+      
+      console.log('[Summary Generator] LLM generated summary successfully');
+      return summary;
+      
+    } catch (error) {
+      console.error('[Summary Generator] LLM generation failed, falling back to template:', error);
+      throw error; // Will be caught by outer try-catch
+    }
+  }
+
+  /**
+   * Prepare context object for LLM prompt
+   */
+  private prepareLLMContext(state: GeoAIStateType): Record<string, any> {
+    const context: Record<string, any> = {};
+    
+    // Goals information
+    if (state.goals && state.goals.length > 0) {
+      context.completedGoals = state.goals.length.toString();
+      context.goalsList = state.goals.map(g => `- ${g.description} (${g.type})`).join('\n');
+    } else {
+      context.completedGoals = '0';
+      context.goalsList = 'No goals were processed.';
+    }
+    
+    // Results information
+    if (state.executionResults) {
+      const results = Array.from(state.executionResults.values());
+      const successCount = results.filter(r => r.status === 'success').length;
+      const failCount = results.filter(r => r.status === 'failed').length;
+      
+      // Use template variable names (failedGoals, not failCount)
+      context.failedGoals = failCount.toString();
+      context.successCount = successCount.toString();
+      context.totalCount = results.length.toString();
+      
+      // Format results summary for template
+      context.resultsSummary = this.formatResultsSummary(results, successCount, failCount);
+      
+      // Format successful operations
+      const successOps = results.filter(r => r.status === 'success');
+      context.successfulOperations = successOps.length > 0
+        ? successOps.map(r => `- ${r.metadata?.pluginId || 'Unknown'}: Completed successfully`).join('\n')
+        : 'None';
+      
+      // Format failed operations with errors
+      const failedOps = results.filter(r => r.status === 'failed');
+      context.failedOperations = failedOps.length > 0
+        ? failedOps.map(r => `- ${r.metadata?.pluginId || 'Unknown'}: ${r.error}`).join('\n')
+        : 'None';
+    } else {
+      context.failedGoals = '0';
+      context.successCount = '0';
+      context.totalCount = '0';
+      context.resultsSummary = 'No execution results available.';
+      context.successfulOperations = 'None';
+      context.failedOperations = 'None';
+    }
+    
+    // Services information
+    if (state.visualizationServices && state.visualizationServices.length > 0) {
+      context.serviceCount = state.visualizationServices.length.toString();
+      context.servicesList = state.visualizationServices.map(s => 
+        `- ${s.type.toUpperCase()} Service: ${s.url}`
+      ).join('\n');
+    } else {
+      context.serviceCount = '0';
+      context.servicesList = 'No visualization services were generated.';
+    }
+    
+    // Errors and warnings
+    if (state.errors && state.errors.length > 0) {
+      context.errorsList = state.errors.map(e => `- ${e.goalId}: ${e.error}`).join('\n');
+    } else {
+      context.errorsList = 'No errors occurred.';
+    }
+    
+    return context;
   }
 
   /**
@@ -204,6 +346,16 @@ export class SummaryGenerator {
         if (service.metadata?.resultType) {
           summary += `   - Data Type: ${service.metadata.resultType}\n`;
         }
+        
+        // Add action links based on service type
+        if (service.type === 'mvt' || service.type === 'image') {
+          summary += `   - 🗺️ [View on Map](${service.url})\n`;
+        } else if (service.type === 'geojson') {
+          summary += `   - 📥 [Download GeoJSON](${service.url})\n`;
+        } else if (service.type === 'report') {
+          summary += `   - 📄 [View Report](${service.url})\n`;
+        }
+        
         summary += '\n';
       });
     }

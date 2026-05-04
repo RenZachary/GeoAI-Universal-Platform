@@ -76,6 +76,12 @@
     
     <!-- Main Chat Area -->
     <div class="chat-main">
+      <!-- Workflow Status Indicator -->
+      <WorkflowStatusIndicator 
+        :status="chatStore.workflowStatus"
+        :active-tools="chatStore.activeTools"
+      />
+      
       <!-- Messages Container -->
       <div class="messages-container" ref="messagesContainerRef">
         <div v-if="chatStore.currentMessages.length === 0" class="empty-state">
@@ -125,13 +131,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, watch } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { useDataSourceStore } from '@/stores/dataSources'
 import { useI18n } from 'vue-i18n'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
+import WorkflowStatusIndicator from '@/components/chat/WorkflowStatusIndicator.vue'
+import ServicesPreview from '@/components/chat/ServicesPreview.vue'
 import { Plus, Delete, ChatDotRound, Promotion, Folder } from '@element-plus/icons-vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessageBox, ElMessage } from 'element-plus'
 
 const { t } = useI18n()
 const chatStore = useChatStore()
@@ -140,6 +148,14 @@ const inputMessage = ref('')
 const messagesContainerRef = ref<HTMLElement>()
 const sidebarCollapsed = ref(false)
 const showDataSources = ref(false)
+
+// Debug: Watch partialServices changes
+watch(() => chatStore.partialServices, (newVal) => {
+  console.log('[ChatView] partialServices changed:', newVal.length, 'services')
+  if (newVal.length > 0) {
+    console.log('[ChatView] First service:', newVal[0])
+  }
+}, { deep: true })
 
 // Lifecycle
 import { onMounted } from 'vue'
@@ -214,6 +230,37 @@ function scrollToBottom() {
     if (messagesContainerRef.value) {
       messagesContainerRef.value.scrollTop = messagesContainerRef.value.scrollHeight
     }
+  })
+}
+
+// Service handlers
+function handleServicePreview(service: any) {
+  // Open service URL in new tab or show preview dialog
+  window.open(service.url, '_blank')
+  ElMessage.success(`Opening ${service.type} preview`)
+}
+
+function handleServiceDownload(service: any) {
+  // Trigger download
+  const link = document.createElement('a')
+  link.href = service.url
+  link.download = `${service.stepId || 'result'}.${service.type}`
+  link.click()
+  ElMessage.success(`Downloading ${service.type} file`)
+}
+
+function handleViewOnMap(service: any) {
+  // TODO: Add layer to map store
+  console.log('[ChatView] View on map:', service)
+  ElMessage.info(`Adding ${service.type} layer to map...`)
+  
+  // Navigate to map view if not already there
+  // In future, integrate with mapStore to add layer directly
+  // For now, just show a message
+  ElMessage({
+    message: `MVT/WMS service ready. You can view it on the Map page.`,
+    type: 'success',
+    duration: 3000
   })
 }
 </script>

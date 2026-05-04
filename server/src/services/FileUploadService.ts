@@ -78,7 +78,7 @@ export class FileUploadService {
 
   constructor(dataSourceRepo: DataSourceRepository, workspaceBase?: string) {
     this.dataSourceRepo = dataSourceRepo;
-    this.accessorFactory = new DataAccessorFactory();
+    this.accessorFactory = new DataAccessorFactory(workspaceBase);
 
     // Configure upload directory
     this.uploadDir = workspaceBase
