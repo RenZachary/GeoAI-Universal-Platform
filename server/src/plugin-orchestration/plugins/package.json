@@ -1,0 +1,7 @@
+{
+  "name": "plugins",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  }
+}
