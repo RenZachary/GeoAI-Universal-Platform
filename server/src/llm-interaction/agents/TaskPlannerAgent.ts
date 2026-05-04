@@ -86,9 +86,10 @@ export class TaskPlannerAgent {
             availableTools: JSON.stringify(availableTools, null, 2),
             dataSourcesMetadata,
             availablePlugins: JSON.stringify(availableTools.map(t => ({
-              id: t.name,
+              id: t.id,
+              name: t.name,
               description: t.description,
-              parameters: t.parameters  // Fixed: use 'parameters' not 'schema'
+              parameters: t.parameters
             })), null, 2),
             previousResults: '',  // TODO: Add previous results context
             timestamp: new Date().toISOString()

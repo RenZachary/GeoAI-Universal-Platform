@@ -155,8 +155,8 @@ function handleRegenerate() {
 .message-bubble {
   display: flex;
   gap: 12px;
-  margin-bottom: 24px;
-  padding: 16px;
+  margin-bottom: 8px;
+  padding: 8px;
   border-radius: 12px;
   
   &.user {

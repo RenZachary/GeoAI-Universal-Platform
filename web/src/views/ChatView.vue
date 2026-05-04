@@ -137,7 +137,6 @@ import { useDataSourceStore } from '@/stores/dataSources'
 import { useI18n } from 'vue-i18n'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
 import WorkflowStatusIndicator from '@/components/chat/WorkflowStatusIndicator.vue'
-import ServicesPreview from '@/components/chat/ServicesPreview.vue'
 import { Plus, Delete, ChatDotRound, Promotion, Folder } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 
@@ -396,7 +395,7 @@ function handleViewOnMap(service: any) {
 .messages-container {
   flex: 1;
   overflow-y: auto;
-  padding: 24px;
+  padding: 8px;
 }
 
 .empty-state {

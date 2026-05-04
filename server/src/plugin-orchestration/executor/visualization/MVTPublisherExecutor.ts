@@ -6,6 +6,7 @@
 import type { NativeData, DataSourceType } from '../../../core/index';
 import { DataAccessorFactory } from '../../../data-access/factories/DataAccessorFactory.js';
 import { MVTPublisher } from '../../../utils/publishers/MVTPublisher.js';
+import { DataSourceRepository } from '../../../data-access/repositories';
 import type Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -36,20 +37,27 @@ export class MVTPublisherExecutor {
     const { dataSourceId, minZoom = 0, maxZoom = 14, layerName = 'default' } = params;
 
     try {
-      // Step 1: Read data source using DataAccessorFactory
+      // Step 1: Get data source metadata from database
+      const dataSourceRepo = new DataSourceRepository(this.db);
+      const dataSource = dataSourceRepo.getById(dataSourceId);
+      
+      if (!dataSource) {
+        throw new Error(`Data source not found: ${dataSourceId}`);
+      }
+      
+      console.log(`[MVTPublisherExecutor] Data source type: ${dataSource.type}`);
+      
+      // Step 2: Read data source using DataAccessorFactory
       const factory = new DataAccessorFactory();
+      const accessor = factory.createAccessor(dataSource.type);
       
-      // Determine accessor type based on dataSourceId format or metadata
-      const accessorType = this.detectAccessorType(dataSourceId);
-      const accessor = factory.createAccessor(accessorType);
-      
-      console.log(`[MVTPublisherExecutor] Using accessor type: ${accessorType}`);
+      console.log(`[MVTPublisherExecutor] Using accessor type: ${dataSource.type}`);
       
       // Read the NativeData (metadata reference)
       const nativeData = await accessor.read(dataSourceId);
       console.log(`[MVTPublisherExecutor] Loaded NativeData: id=${nativeData.id}, type=${nativeData.type}`);
       
-      // Step 2: Generate MVT tiles using MVTPublisher with strategy pattern
+      // Step 3: Generate MVT tiles using MVTPublisher with strategy pattern
       // MVTPublisher will automatically select the appropriate strategy based on nativeData.type
       const mvtPublisher = new MVTPublisher(this.workspaceBase);
       const tilesetId = await mvtPublisher.generateTiles(nativeData, {
@@ -60,7 +68,7 @@ export class MVTPublisherExecutor {
       
       console.log(`[MVTPublisherExecutor] Generated tileset: ${tilesetId}`);
       
-      // Step 3: Return result as NativeData with MVT service URL
+      // Step 4: Return result as NativeData with MVT service URL
       return {
         id: tilesetId,
         type: 'mvt',
@@ -85,31 +93,5 @@ export class MVTPublisherExecutor {
       (wrappedError as any).cause = error;
       throw wrappedError;
     }
-  }
-  
-  /**
-   * Detect accessor type from dataSourceId
-   * This is a simple heuristic - in production, use DataSourceRepository
-   */
-  private detectAccessorType(dataSourceId: string): DataSourceType {
-    // If it looks like a file path, detect from extension
-    if (dataSourceId.includes('/') || dataSourceId.includes('\\')) {
-      const ext = dataSourceId.split('.').pop()?.toLowerCase();
-      switch (ext) {
-        case 'geojson':
-        case 'json':
-          return 'geojson';
-        case 'shp':
-          return 'shapefile';
-        case 'tif':
-        case 'tiff':
-          return 'tif';
-        default:
-          return 'geojson'; // Default to geojson
-      }
-    }
-    
-    // Otherwise, assume it's already a valid DataSourceType
-    return dataSourceId as DataSourceType;
   }
 }
