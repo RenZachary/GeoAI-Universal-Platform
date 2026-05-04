@@ -38,15 +38,15 @@
         </template>
       </el-table-column>
       
-      <el-table-column prop="recordCount" label="Records" width="100" align="right">
+      <el-table-column prop="metadata.featureCount" label="Records" width="100" align="right">
         <template #default="{ row }">
-          {{ row.recordCount || 'N/A' }}
+          {{ row.metadata?.featureCount || 'N/A' }}
         </template>
       </el-table-column>
       
-      <el-table-column prop="fileSize" label="Size" width="100">
+      <el-table-column prop="metadata.fileSize" label="Size" width="100">
         <template #default="{ row }">
-          {{ formatFileSize(row.fileSize) }}
+          {{ formatFileSize(row.metadata?.fileSize) }}
         </template>
       </el-table-column>
       
@@ -56,24 +56,8 @@
         </template>
       </el-table-column>
       
-      <el-table-column label="Actions" width="200" fixed="right">
+      <el-table-column label="Actions" width="100" fixed="right">
         <template #default="{ row }">
-          <el-button 
-            size="small" 
-            type="primary" 
-            text
-            @click="handlePreview(row)"
-          >
-            Preview
-          </el-button>
-          <el-button 
-            size="small" 
-            type="success" 
-            text
-            @click="handleAddToMap(row)"
-          >
-            Add to Map
-          </el-button>
           <el-popconfirm
             title="Are you sure to delete this data source?"
             @confirm="handleDelete(row.id)"
@@ -212,47 +196,23 @@
         </el-button>
       </template>
     </el-dialog>
-    
-    <!-- Preview Dialog -->
-    <el-dialog
-      v-model="showPreviewDialog"
-      title="Data Preview"
-      width="800px"
-    >
-      <div v-if="previewData" class="preview-content">
-        <el-table :data="previewData.features || previewData" max-height="400" border>
-          <el-table-column 
-            v-for="(_value, key) in (previewData.features?.[0]?.properties || previewData[0] || {})" 
-            :key="key"
-            :prop="key"
-            :label="key"
-            min-width="120"
-          />
-        </el-table>
-      </div>
-    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { useDataSourceStore } from '@/stores/dataSources'
-import { useMapStore } from '@/stores/map'
 import { ElMessage } from 'element-plus'
 import { Upload, Document, UploadFilled, Connection } from '@element-plus/icons-vue'
 import type { UploadUserFile } from 'element-plus'
 
 const dataSourceStore = useDataSourceStore()
-const mapStore = useMapStore()
 
 const showUploadDialog = ref(false)
 const showPostGISDialog = ref(false)
-const showPreviewDialog = ref(false)
 const selectedFiles = ref<File[]>([])
 const isUploading = ref(false)
 const isConnecting = ref(false)
-const previewData = ref<any>(null)
-const currentPreviewId = ref<string>('')
 
 // PostGIS Connection Form
 const postGISFormRef = ref()
@@ -392,51 +352,6 @@ function resetPostGISForm() {
   postGISForm.schema = 'public'
 }
 
-async function handlePreview(dataSource: any) {
-  try {
-    previewData.value = await dataSourceStore.previewDataSource(dataSource.id, 10)
-    currentPreviewId.value = dataSource.id
-    showPreviewDialog.value = true
-  } catch (error) {
-    ElMessage.error('Failed to load preview')
-  }
-}
-
-function handleAddToMap(dataSource: any) {
-  // Determine layer type based on data source type
-  let layerType: 'geojson' | 'mvt' | 'wms' | 'heatmap' = 'geojson'
-  
-  if (dataSource.type === 'postgis') {
-    layerType = 'mvt' // Use MVT for PostGIS data
-  } else if (dataSource.type === 'raster') {
-    layerType = 'wms' // Use WMS for raster data
-  }
-  
-  // Construct layer URL based on type
-  let url = ''
-  if (layerType === 'geojson') {
-    url = `/api/datasources/${dataSource.id}/geojson`
-  } else if (layerType === 'mvt') {
-    url = `/api/mvt-dynamic/${dataSource.id}/{z}/{x}/{y}.pbf`
-  } else if (layerType === 'wms') {
-    url = `/api/wms/${dataSource.id}`
-  }
-  
-  mapStore.addLayer({
-    id: `layer-${dataSource.id}`,
-    type: layerType,
-    url: url,
-    visible: true,
-    opacity: 0.7,
-    style: {
-      fillColor: '#409eff',
-      fillOpacity: 0.5
-    }
-  })
-  
-  ElMessage.success(`Added "${dataSource.name}" to map`)
-}
-
 async function handleDelete(id: string) {
   try {
     await dataSourceStore.deleteDataSource(id)
@@ -453,19 +368,19 @@ function getTypeColor(type: string): 'success' | 'warning' | 'info' | 'primary' 
     'shapefile': 'warning',
     'postgis': 'primary',
     'raster': 'info',
-    'csv': ''
+    'csv': 'info'
   }
-  return colors[type] || ''
+  return colors[type] || 'info'
 }
 
 function getTaskStatusColor(status: string): 'success' | 'warning' | 'danger' | 'info' {
   const colors: Record<string, any> = {
     'pending': 'info',
-    'uploading': '',
+    'uploading': 'warning',
     'success': 'success',
     'error': 'danger'
   }
-  return colors[status] || ''
+  return colors[status] || 'info'
 }
 
 function formatFileSize(bytes: number): string {
@@ -501,7 +416,7 @@ function formatDate(dateString: string): string {
   h2 {
     margin: 0;
     font-size: 24px;
-    color: #303133;
+    color: var(--el-text-color-primary);
   }
   
   .header-actions {
@@ -521,14 +436,14 @@ function formatDate(dateString: string): string {
   
   h4 {
     margin-bottom: 12px;
-    color: #606266;
+    color: var(--el-text-color-regular);
   }
 }
 
 .upload-task {
   margin-bottom: 16px;
   padding: 12px;
-  background: #f5f7fa;
+  background: var(--el-fill-color-light);
   border-radius: 8px;
 }
 
@@ -541,13 +456,13 @@ function formatDate(dateString: string): string {
 
 .task-name {
   font-size: 14px;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .task-error {
   margin-top: 8px;
   font-size: 12px;
-  color: #f56c6c;
+  color: var(--el-color-danger);
 }
 
 .preview-content {
@@ -557,7 +472,7 @@ function formatDate(dateString: string): string {
 
 .form-tip {
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   margin-top: 4px;
 }
 </style>

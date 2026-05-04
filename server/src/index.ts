@@ -10,9 +10,9 @@ import dotenv from 'dotenv';
 import { WorkspaceManager, CleanupScheduler } from './storage/index.js';
 import { SQLiteManager } from './storage/index.js';
 import { ApiRouter } from './api/routes/index.js';
-import type { LLMConfig } from './llm-interaction';
 import { ToolRegistry, CustomPluginLoader } from './plugin-orchestration';
 import { LLMConfigManager } from './services/LLMConfigService.js';
+import { scanAndRegisterDataFiles } from './utils/DataDirectoryScanner.js';
 
 // Load environment variables
 const __filename = fileURLToPath(import.meta.url);
@@ -56,9 +56,14 @@ async function startServer() {
     workspaceManager.initialize();
     sqliteManager.initialize();
     
+    const db = sqliteManager.getDatabase();
+    
+    // Scan and register existing files in data directory
+    console.log('Scanning data directory for existing files...');
+    await scanAndRegisterDataFiles(db, WORKSPACE_BASE);
+    
     // Initialize cleanup scheduler
     console.log('Initializing cleanup scheduler...');
-    const db = sqliteManager.getDatabase();
     const cleanupScheduler = new CleanupScheduler(WORKSPACE_BASE, db, {
       tempFileMaxAge: 24 * 60 * 60 * 1000,           // 24 hours
       mvtServiceMaxAge: 7 * 24 * 60 * 60 * 1000,     // 7 days

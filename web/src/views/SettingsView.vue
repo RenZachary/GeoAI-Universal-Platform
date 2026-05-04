@@ -89,8 +89,11 @@
           </el-form-item>
           
           <el-form-item>
-            <el-button type="primary" @click="handleSaveLLMConfig">
+            <el-button type="primary" @click="handleSaveLLMConfig" :loading="loading">
               Save Configuration
+            </el-button>
+            <el-button @click="handleTestLLMConnection" :loading="loading" style="margin-left: 10px">
+              Test Connection
             </el-button>
           </el-form-item>
         </el-form>
@@ -100,7 +103,7 @@
       <el-tab-pane label="Appearance" name="appearance">
         <el-form label-width="150px" style="max-width: 600px">
           <el-form-item label="Theme">
-            <el-radio-group v-model="uiStore.theme">
+            <el-radio-group :model-value="uiStore.theme" @change="handleThemeChange">
               <el-radio-button label="light">Light</el-radio-button>
               <el-radio-button label="dark">Dark</el-radio-button>
               <el-radio-button label="auto">Auto</el-radio-button>
@@ -120,7 +123,8 @@
           
           <el-form-item label="Sidebar">
             <el-switch 
-              v-model="uiStore.sidebarCollapsed"
+              :model-value="uiStore.sidebarCollapsed"
+              @change="handleSidebarChange"
               active-text="Collapsed"
               inactive-text="Expanded"
             />
@@ -175,7 +179,7 @@
           </el-form-item>
           
           <el-form-item>
-            <el-button type="primary" @click="handleSaveMapDefaults">
+            <el-button type="primary" @click="handleSaveMapDefaults" :loading="loading">
               Save Map Defaults
             </el-button>
           </el-form-item>
@@ -217,11 +221,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useConfigStore } from '@/stores/config'
 import { useUIStore } from '@/stores/ui'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
+import { settingsService, type LLMConfig, type MapDefaults } from '@/services/settings'
 
 const configStore = useConfigStore()
 const uiStore = useUIStore()
@@ -229,15 +234,16 @@ const { locale } = useI18n()
 
 const activeTab = ref('llm')
 const appVersion = import.meta.env.VITE_APP_VERSION || '1.0.0'
+const loading = ref(false)
 
 // LLM Configuration
-const llmConfig = reactive({
-  provider: (localStorage.getItem('llm_provider') as any) || 'openai',
-  apiUrl: localStorage.getItem('llm_api_url') || '',
-  apiKey: localStorage.getItem('llm_api_key') || '',
-  model: localStorage.getItem('llm_model') || 'gpt-4o',
-  temperature: parseFloat(localStorage.getItem('llm_temperature') || '0.7'),
-  maxTokens: parseInt(localStorage.getItem('llm_max_tokens') || '2000')
+const llmConfig = reactive<LLMConfig>({
+  provider: 'openai',
+  apiUrl: '',
+  apiKey: '',
+  model: 'gpt-4o',
+  temperature: 0.7,
+  maxTokens: 2000
 })
 
 // Helper functions for provider-specific placeholders
@@ -271,35 +277,100 @@ function getApiKeyPlaceholder(provider: string): string {
 }
 
 // Map Defaults
-const mapDefaults = reactive({
-  basemap: (localStorage.getItem('map_basemap') as any) || 'cartoDark',
-  center: JSON.parse(localStorage.getItem('map_center') || '[104.0, 35.0]'),
-  zoom: parseInt(localStorage.getItem('map_zoom') || '3')
+const mapDefaults = reactive<MapDefaults>({
+  basemap: 'cartoDark',
+  center: [104.0, 35.0],
+  zoom: 3
 })
 
+// Load settings on component mount
+onMounted(async () => {
+  await loadSettings()
+})
+
+async function loadSettings() {
+  loading.value = true
+  try {
+    // Load LLM config from backend
+    const llmConfigData = await settingsService.getLLMConfig()
+    if (llmConfigData) {
+      Object.assign(llmConfig, llmConfigData)
+    }
+    
+    // Load map defaults from localStorage (backend support pending)
+    const savedBasemap = localStorage.getItem('map_basemap')
+    const savedCenter = localStorage.getItem('map_center')
+    const savedZoom = localStorage.getItem('map_zoom')
+    
+    if (savedBasemap) mapDefaults.basemap = savedBasemap
+    if (savedCenter) mapDefaults.center = JSON.parse(savedCenter)
+    if (savedZoom) mapDefaults.zoom = parseInt(savedZoom)
+  } catch (error) {
+    console.error('Failed to load settings:', error)
+    ElMessage.error('Failed to load settings')
+  } finally {
+    loading.value = false
+  }
+}
+
 // Methods
-function handleSaveLLMConfig() {
-  localStorage.setItem('llm_provider', llmConfig.provider)
-  localStorage.setItem('llm_api_url', llmConfig.apiUrl)
-  localStorage.setItem('llm_api_key', llmConfig.apiKey)
-  localStorage.setItem('llm_model', llmConfig.model)
-  localStorage.setItem('llm_temperature', String(llmConfig.temperature))
-  localStorage.setItem('llm_max_tokens', String(llmConfig.maxTokens))
-  
-  ElMessage.success('LLM configuration saved')
+async function handleSaveLLMConfig() {
+  loading.value = true
+  try {
+    const success = await settingsService.saveLLMConfig(llmConfig)
+    if (success) {
+      ElMessage.success('LLM configuration saved successfully')
+    } else {
+      ElMessage.error('Failed to save LLM configuration')
+    }
+  } catch (error) {
+    console.error('Failed to save LLM config:', error)
+    ElMessage.error('Failed to save LLM configuration')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleTestLLMConnection() {
+  loading.value = true
+  try {
+    const result = await settingsService.testLLMConnection(llmConfig)
+    if (result.connected) {
+      ElMessage.success(`Connection successful: ${result.message}`)
+    } else {
+      ElMessage.warning(`Connection failed: ${result.message}`)
+    }
+  } catch (error) {
+    console.error('Failed to test connection:', error)
+    ElMessage.error('Connection test failed')
+  } finally {
+    loading.value = false
+  }
 }
 
 function handleLanguageChange(lang: string) {
   configStore.setLanguage(lang as any)
   locale.value = lang
+  settingsService.saveUIPreferences({ language: lang })
   ElMessage.success('Language changed')
 }
 
+function handleThemeChange(theme: string) {
+  uiStore.setTheme(theme as any)
+  settingsService.saveUIPreferences({ theme })
+  ElMessage.success('Theme changed')
+}
+
+function handleSidebarChange(collapsed: boolean) {
+  // Update the store
+  uiStore.sidebarCollapsed = collapsed
+  localStorage.setItem('sidebarCollapsed', String(collapsed))
+  // Save preference for persistence (future backend implementation)
+  settingsService.saveUIPreferences({ sidebarCollapsed: collapsed })
+}
+
 function handleSaveMapDefaults() {
-  localStorage.setItem('map_basemap', mapDefaults.basemap)
-  localStorage.setItem('map_center', JSON.stringify(mapDefaults.center))
-  localStorage.setItem('map_zoom', String(mapDefaults.zoom))
-  
+  settingsService.saveMapDefaults(mapDefaults)
   ElMessage.success('Map defaults saved')
 }
 </script>
@@ -317,19 +388,19 @@ function handleSaveMapDefaults() {
   h2 {
     margin: 0;
     font-size: 24px;
-    color: #303133;
+    color: var(--el-text-color-primary);
   }
 }
 
 .settings-tabs {
-  background: #fff;
+  background: var(--el-bg-color);
   padding: 20px;
   border-radius: 8px;
 }
 
 .form-help {
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   margin-top: 4px;
   line-height: 1.5;
 }
@@ -339,12 +410,12 @@ function handleSaveMapDefaults() {
   
   h3 {
     margin: 0 0 8px 0;
-    color: #303133;
+    color: var(--el-text-color-primary);
   }
   
   .version {
     margin: 0 0 24px 0;
-    color: #909399;
+    color: var(--el-text-color-secondary);
     font-size: 14px;
   }
   
@@ -353,12 +424,12 @@ function handleSaveMapDefaults() {
     
     h4 {
       margin: 0 0 8px 0;
-      color: #606266;
+      color: var(--el-text-color-regular);
     }
     
     p {
       margin: 0;
-      color: #909399;
+      color: var(--el-text-color-secondary);
       font-size: 14px;
     }
   }

@@ -65,6 +65,7 @@ export default {
     uploadFailed: '上传失败'
   },
   tools: {
+    title: '工具库',
     categories: '分类',
     all: '全部工具',
     analysis: '分析',

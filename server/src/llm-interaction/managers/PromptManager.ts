@@ -57,12 +57,15 @@ export class PromptManager {
   ): Promise<PromptTemplate> {
     const content = fs.readFileSync(filePath, 'utf-8');
 
+    // Remove HTML comment from first line if present (used for description)
+    const cleanedContent = this.removeHtmlComment(content);
+
     // Extract variables {{variable}}
-    const variables = this.extractVariables(content);
+    const variables = this.extractVariables(cleanedContent);
 
     console.log(`Loaded prompt template: ${templateId} (${language}) with variables: [${variables.join(', ')}]`);
 
-    return PromptTemplate.fromTemplate(content);
+    return PromptTemplate.fromTemplate(cleanedContent);
   }
 
   /**
@@ -73,6 +76,23 @@ export class PromptManager {
     if (!matches) return [];
 
     return matches.map(match => match.replace(/[{}]/g, ''));
+  }
+
+  /**
+   * Remove HTML comment from first line (used for description metadata)
+   */
+  private removeHtmlComment(content: string): string {
+    const lines = content.split('\n');
+    
+    // Check if first line is an HTML comment
+    if (lines[0].trim().startsWith('<!--') && lines[0].trim().endsWith('-->')) {
+      // Remove the first line (HTML comment)
+      lines.shift();
+      // Return remaining content, trim leading empty lines
+      return lines.join('\n').replace(/^\s*\n/, '');
+    }
+    
+    return content;
   }
 
   /**

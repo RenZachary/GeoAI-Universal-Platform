@@ -28,16 +28,6 @@
         
         <h3 class="tool-name">{{ tool.name }}</h3>
         <p class="tool-description">{{ tool.description }}</p>
-        
-        <div class="tool-actions">
-          <el-button 
-            type="primary" 
-            size="small"
-            @click="handleExecuteTool(tool)"
-          >
-            Execute
-          </el-button>
-        </div>
       </el-card>
       
       <el-empty 
@@ -47,147 +37,25 @@
       />
     </div>
     
-    <!-- Tool Execution Dialog -->
-    <el-dialog
-      v-model="showExecutionDialog"
-      :title="`Execute: ${selectedTool?.name}`"
-      width="700px"
-      :close-on-click-modal="false"
-    >
-      <div v-if="selectedTool" class="execution-form">
-        <el-alert
-          :title="selectedTool.description"
-          type="info"
-          :closable="false"
-          show-icon
-          style="margin-bottom: 20px"
-        />
-        
-        <!-- Dynamic Parameter Form -->
-        <el-form :model="executionParams" label-width="120px">
-          <el-form-item 
-            v-for="param in selectedTool.inputSchema" 
-            :key="param.name"
-            :label="param.name"
-            :required="param.required"
-          >
-            <!-- String input -->
-            <el-input 
-              v-if="param.type === 'string'"
-              v-model="executionParams[param.name]"
-              :placeholder="param.description || `Enter ${param.name}`"
-            />
-            
-            <!-- Number input -->
-            <el-input-number 
-              v-else-if="param.type === 'number'"
-              v-model="executionParams[param.name]"
-              :min="param.validation?.min"
-              :max="param.validation?.max"
-              style="width: 100%"
-            />
-            
-            <!-- Boolean toggle -->
-            <el-switch 
-              v-else-if="param.type === 'boolean'"
-              v-model="executionParams[param.name]"
-            />
-            
-            <!-- Object/JSON input -->
-            <el-input 
-              v-else-if="param.type === 'object'"
-              v-model="executionParams[param.name]"
-              type="textarea"
-              :rows="4"
-              :placeholder="'Enter JSON object'"
-            />
-            
-            <!-- Data source selector -->
-            <el-select 
-              v-else-if="param.type === 'data_reference'"
-              v-model="executionParams[param.name]"
-              placeholder="Select data source"
-              style="width: 100%"
-            >
-              <el-option
-                v-for="ds in dataSourceStore.dataSources"
-                :key="ds.id"
-                :label="ds.name"
-                :value="ds.id"
-              />
-            </el-select>
-            
-            <!-- Array input -->
-            <el-input 
-              v-else-if="param.type === 'array'"
-              v-model="executionParams[param.name]"
-              type="textarea"
-              :rows="3"
-              :placeholder="'Enter comma-separated values'"
-            />
-            
-            <div v-if="param.description" class="param-help">
-              {{ param.description }}
-            </div>
-          </el-form-item>
-        </el-form>
-        
-        <!-- Execution Result -->
-        <div v-if="toolStore.executionResult" class="execution-result">
-          <h4>Result</h4>
-          <pre>{{ JSON.stringify(toolStore.executionResult, null, 2) }}</pre>
-          
-          <div class="result-actions">
-            <el-button 
-              type="success" 
-              @click="handleAddResultToMap"
-            >
-              Add to Map
-            </el-button>
-            <el-button @click="toolStore.clearExecutionResult">
-              Clear
-            </el-button>
-          </div>
-        </div>
-      </div>
-      
-      <template #footer>
-        <el-button @click="showExecutionDialog = false">Cancel</el-button>
-        <el-button 
-          type="primary" 
-          :loading="toolStore.executingToolId === selectedTool?.id"
-          @click="handleConfirmExecution"
-        >
-          Execute
-        </el-button>
-      </template>
-    </el-dialog>
+
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useToolStore } from '@/stores/tools'
-import { useDataSourceStore } from '@/stores/dataSources'
-import { useMapStore } from '@/stores/map'
 import { ElMessage } from 'element-plus'
 import { Search, Operation, DataAnalysis, Location, TrendCharts } from '@element-plus/icons-vue'
 import type { Tool } from '@/types'
 
 const toolStore = useToolStore()
-const dataSourceStore = useDataSourceStore()
-const mapStore = useMapStore()
 
 const searchQuery = ref('')
-const showExecutionDialog = ref(false)
-const selectedTool = ref<Tool | null>(null)
-const executionParams = ref<Record<string, any>>({})
 
 // Lifecycle
 import { onMounted } from 'vue'
 onMounted(() => {
   toolStore.loadTools()
-  dataSourceStore.loadDataSources()
 })
 
 // Computed
@@ -201,74 +69,6 @@ const filteredTools = computed(() => {
     tool.category.toLowerCase().includes(query)
   )
 })
-
-// Methods
-function handleExecuteTool(tool: Tool) {
-  selectedTool.value = tool
-  executionParams.value = {}
-  
-  // Initialize params with defaults
-  if (tool.inputSchema) {
-    tool.inputSchema.forEach((param: any) => {
-      executionParams.value[param.name] = param.default ?? ''
-    })
-  }
-  
-  showExecutionDialog.value = true
-}
-
-async function handleConfirmExecution() {
-  if (!selectedTool.value) return
-  
-  try {
-    await toolStore.executeTool(selectedTool.value.id, executionParams.value)
-    ElMessage.success('Tool executed successfully')
-  } catch (error: any) {
-    ElMessage.error(error.message || 'Execution failed')
-  }
-}
-
-function handleAddResultToMap() {
-  if (!toolStore.executionResult || !selectedTool.value) return
-  
-  // Determine how to add result to map based on tool type
-  const result = toolStore.executionResult
-  
-  if (result.geojson) {
-    // Result contains GeoJSON
-    mapStore.addLayer({
-      id: `result-${selectedTool.value.id}-${Date.now()}`,
-      type: 'geojson',
-      url: URL.createObjectURL(new Blob([JSON.stringify(result.geojson)], { type: 'application/json' })),
-      visible: true,
-      opacity: 0.7,
-      style: {
-        fillColor: '#67c23a',
-        fillOpacity: 0.5
-      }
-    })
-    
-    ElMessage.success('Result added to map')
-    showExecutionDialog.value = false
-  } else if (result.dataSourceId) {
-    // Result is a new data source
-    const ds = dataSourceStore.dataSources.find(d => d.id === result.dataSourceId)
-    if (ds) {
-      mapStore.addLayer({
-        id: `layer-${ds.id}`,
-        type: 'geojson',
-        url: `/api/datasources/${ds.id}/geojson`,
-        visible: true,
-        opacity: 0.7
-      })
-      
-      ElMessage.success('Result added to map')
-      showExecutionDialog.value = false
-    }
-  } else {
-    ElMessage.warning('Result cannot be visualized on map')
-  }
-}
 
 // Utility functions
 function getToolIcon(category: string) {
@@ -288,7 +88,7 @@ function getCategoryColor(category: string): 'primary' | 'success' | 'warning' |
     'spatial': 'warning',
     'processing': 'info'
   }
-  return colors[category] || ''
+  return colors[category] || 'info'
 }
 </script>
 
@@ -308,7 +108,7 @@ function getCategoryColor(category: string): 'primary' | 'success' | 'warning' |
   h2 {
     margin: 0;
     font-size: 24px;
-    color: #303133;
+    color: var(--el-text-color-primary);
   }
 }
 
@@ -330,19 +130,19 @@ function getCategoryColor(category: string): 'primary' | 'success' | 'warning' |
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
 .tool-name {
   margin: 0 0 8px 0;
   font-size: 18px;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .tool-description {
-  margin: 0 0 16px 0;
+  margin: 0;
   font-size: 14px;
-  color: #606266;
+  color: var(--el-text-color-regular);
   line-height: 1.5;
   min-height: 42px;
 }
@@ -359,29 +159,30 @@ function getCategoryColor(category: string): 'primary' | 'success' | 'warning' |
 
 .param-help {
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   margin-top: 4px;
 }
 
 .execution-result {
   margin-top: 24px;
   padding: 16px;
-  background: #f5f7fa;
+  background: var(--el-fill-color-light);
   border-radius: 8px;
   
   h4 {
     margin: 0 0 12px 0;
-    color: #303133;
+    color: var(--el-text-color-primary);
   }
   
   pre {
     max-height: 300px;
     overflow: auto;
-    background: #282c34;
-    color: #abb2bf;
+    background: var(--el-bg-color-page);
+    color: var(--el-text-color-regular);
     padding: 12px;
     border-radius: 4px;
     font-size: 12px;
+    border: 1px solid var(--el-border-color);
   }
 }
 

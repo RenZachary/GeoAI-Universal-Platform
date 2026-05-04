@@ -106,31 +106,44 @@ export class FileUploadService {
    * @throws FormatError if format is unsupported
    */
   async processSingleFile(file: UploadedFile): Promise<UploadResult> {
-    const fileName = file.originalname;
-    const filePath = file.path;
+    const originalFileName = file.originalname;
+    const tempFilePath = file.path;
     const fileSize = file.size;
     
-    console.log(`[FileUploadService] Processing file: ${fileName} (${fileSize} bytes)`);
+    console.log(`[FileUploadService] Processing file: ${originalFileName} (${fileSize} bytes)`);
 
+    let finalFilePath: string;
+    
     try {
       // Step 1: Detect data source type
-      const type = this.detectDataSourceType(fileName);
+      const type = this.detectDataSourceType(originalFileName);
       
-      // Step 2: Validate file based on type
-      await this.validateFile(filePath, type);
+      // Step 2: Move file from temp to data/local directory
+      const uniqueFileName = `${Date.now()}_${originalFileName}`;
+      finalFilePath = path.join(this.uploadDir, uniqueFileName);
       
-      // Step 3: Extract metadata using appropriate accessor
-      const nativeData = await this.extractMetadata(filePath, type);
+      // Copy file to final location
+      fs.copyFileSync(tempFilePath, finalFilePath);
+      console.log(`[FileUploadService] Moved file to: ${finalFilePath}`);
       
-      // Step 4: Register data source in database
+      // Clean up temp file
+      this.cleanupFile(tempFilePath);
+      
+      // Step 3: Validate file based on type
+      await this.validateFile(finalFilePath, type);
+      
+      // Step 4: Extract metadata using appropriate accessor
+      const nativeData = await this.extractMetadata(finalFilePath, type);
+      
+      // Step 5: Register data source in database
       const dataSourceId = uuidv4();
       const dataSource = this.dataSourceRepo.create(
-        path.basename(fileName, path.extname(fileName)),
+        path.basename(originalFileName, path.extname(originalFileName)),
         type,
-        filePath,
+        finalFilePath,
         {
           ...nativeData.metadata,
-          originalFileName: fileName,
+          originalFileName: originalFileName,
           fileSize,
           uploadedAt: new Date().toISOString()
         }
@@ -147,8 +160,13 @@ export class FileUploadService {
         uploadedAt: dataSource.createdAt
       };
     } catch (error) {
-      // Clean up uploaded file if processing fails
-      this.cleanupFile(filePath);
+      // Clean up files if processing fails
+      if (finalFilePath && fs.existsSync(finalFilePath)) {
+        this.cleanupFile(finalFilePath);
+      }
+      if (tempFilePath && fs.existsSync(tempFilePath)) {
+        this.cleanupFile(tempFilePath);
+      }
       
       if (error instanceof FileUploadError) {
         throw error;

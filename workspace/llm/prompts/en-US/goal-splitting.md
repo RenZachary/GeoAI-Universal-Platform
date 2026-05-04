@@ -1,3 +1,4 @@
+<!-- Split user goals into independent sub-goals -->
 Identify and split the user's request into independent goals.
 
 User input: {{userInput}}

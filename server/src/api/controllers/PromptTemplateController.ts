@@ -135,6 +135,7 @@ export class PromptTemplateController {
           id: template.id,
           name: template.name,
           language: template.language,
+          content: template.content,
           description: template.description,
           version: template.version,
           createdAt: template.createdAt,

@@ -4,7 +4,7 @@
       <el-icon v-if="message.role === 'user'" :size="24">
         <User />
       </el-icon>
-      <el-icon v-else :size="24" color="#409eff">
+      <el-icon v-else :size="24" color="var(--el-color-primary)">
         <ChatDotRound />
       </el-icon>
     </div>
@@ -101,21 +101,21 @@ function handleRegenerate() {
   border-radius: 12px;
   
   &.user {
-    background: #f5f7fa;
+    background: var(--el-fill-color-light);
     
     .message-avatar {
-      background: #67c23a;
+      background: var(--el-color-success);
       color: white;
     }
   }
   
   &.assistant {
-    background: #fff;
-    border: 1px solid #e4e7ed;
+    background: var(--el-bg-color);
+    border: 1px solid var(--el-border-color);
     
     .message-avatar {
-      background: #ecf5ff;
-      color: #409eff;
+      background: var(--el-color-primary-light-9);
+      color: var(--el-color-primary);
     }
   }
 }
@@ -145,18 +145,18 @@ function handleRegenerate() {
 .message-role {
   font-weight: 600;
   font-size: 14px;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .message-time {
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
 }
 
 .message-text {
   font-size: 14px;
   line-height: 1.6;
-  color: #606266;
+  color: var(--el-text-color-regular);
   word-wrap: break-word;
   
   :deep(p) {
@@ -164,19 +164,20 @@ function handleRegenerate() {
   }
   
   :deep(code) {
-    background: #f5f7fa;
+    background: var(--el-fill-color-light);
     padding: 2px 6px;
     border-radius: 4px;
     font-family: 'Courier New', monospace;
   }
   
   :deep(pre) {
-    background: #282c34;
-    color: #abb2bf;
+    background: var(--el-bg-color-page);
+    color: var(--el-text-color-regular);
     padding: 16px;
     border-radius: 8px;
     overflow-x: auto;
     margin: 12px 0;
+    border: 1px solid var(--el-border-color);
     
     code {
       background: transparent;
@@ -194,7 +195,7 @@ function handleRegenerate() {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: #409eff;
+    background: var(--el-color-primary);
     animation: bounce 1.4s infinite ease-in-out both;
     
     &:nth-child(1) {

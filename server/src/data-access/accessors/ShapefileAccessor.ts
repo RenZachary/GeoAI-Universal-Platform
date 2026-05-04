@@ -94,10 +94,43 @@ export class ShapefileAccessor extends GeoJSONBasedAccessor implements DataAcces
     const dbfPath = path.join(dir, `${baseName}.dbf`);
     const prjPath = path.join(dir, `${baseName}.prj`);
     
+    // Calculate total size of all shapefile components
+    let totalSize = stats.size;
+    if (fs.existsSync(shxPath)) totalSize += fs.statSync(shxPath).size;
+    if (fs.existsSync(dbfPath)) totalSize += fs.statSync(dbfPath).size;
+    if (fs.existsSync(prjPath)) totalSize += fs.statSync(prjPath).size;
+    
+    // Read shapefile to extract feature count and fields
+    let featureCount = 0;
+    const fieldSet = new Set<string>();
+    
+    try {
+      const source = await shapefile.open(reference.replace('.shp', ''));
+      
+      // Read all features to count and extract fields
+      let feature;
+      
+      while (!(feature = await source.read()).done) {
+        featureCount++;
+        
+        // Collect field names from properties
+        if (feature.value && feature.value.properties) {
+          Object.keys(feature.value.properties).forEach(key => {
+            fieldSet.add(key);
+          });
+        }
+      }
+      
+    } catch (error) {
+      console.warn(`Failed to read shapefile for metadata: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // Continue with basic metadata if reading fails
+    }
+    
     const metadata: DataMetadata = {
-      fileSize: stats.size,
+      fileSize: totalSize,
       crs: fs.existsSync(prjPath) ? 'EPSG:4326' : undefined,
-      bbox: undefined,
+      featureCount,
+      fields: Array.from(fieldSet)
     };
     
     return metadata;

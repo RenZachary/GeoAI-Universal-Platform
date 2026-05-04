@@ -14,6 +14,9 @@ export async function listTemplates(): Promise<PromptTemplate[]> {
  */
 export async function getTemplate(id: string): Promise<PromptTemplate> {
   const response = await api.get(`/api/prompts/${id}`)
+  if (!response.data.success) {
+    throw new Error(response.data.error || 'Failed to get template')
+  }
   return response.data.template
 }
 
@@ -22,6 +25,9 @@ export async function getTemplate(id: string): Promise<PromptTemplate> {
  */
 export async function createTemplate(template: Omit<PromptTemplate, 'id' | 'createdAt' | 'updatedAt'>): Promise<PromptTemplate> {
   const response = await api.post('/api/prompts', template)
+  if (!response.data.success) {
+    throw new Error(response.data.error || 'Failed to create template')
+  }
   return response.data.template
 }
 
@@ -30,12 +36,20 @@ export async function createTemplate(template: Omit<PromptTemplate, 'id' | 'crea
  */
 export async function updateTemplate(id: string, template: Partial<PromptTemplate>): Promise<PromptTemplate> {
   const response = await api.put(`/api/prompts/${id}`, template)
-  return response.data.template
+  if (!response.data.success) {
+    throw new Error(response.data.error || 'Failed to update template')
+  }
+  // For update, the backend returns { success: true, message: '...' }
+  // We need to fetch the updated template
+  return await getTemplate(id)
 }
 
 /**
  * Delete a template
  */
 export async function deleteTemplate(id: string): Promise<void> {
-  await api.delete(`/api/prompts/${id}`)
+  const response = await api.delete(`/api/prompts/${id}`)
+  if (!response.data.success) {
+    throw new Error(response.data.error || 'Failed to delete template')
+  }
 }

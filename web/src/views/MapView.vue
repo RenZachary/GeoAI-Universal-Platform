@@ -49,15 +49,6 @@
           <el-statistic title="Visible" :value="mapStore.visibleLayers.length" style="margin-left: 20px" />
         </div>
         
-        <el-button 
-          type="danger" 
-          size="small" 
-          @click="handleClearAllLayers"
-          style="margin: 16px 0"
-        >
-          Clear All Layers
-        </el-button>
-        
         <el-empty 
           v-if="mapStore.layers.length === 0"
           description="No layers added. Data sources will appear here automatically."
@@ -231,14 +222,6 @@ function handleBasemapChange(basemapType: string) {
   mapStore.setBasemap(basemapType as any)
 }
 
-function handleClearAllLayers() {
-  mapStore.clearAllLayers()
-}
-
-function truncateUrl(url: string, maxLength: number = 40): string {
-  if (url.length <= maxLength) return url
-  return url.substring(0, maxLength) + '...'
-}
 </script>
 
 <style scoped lang="scss">
@@ -266,12 +249,19 @@ function truncateUrl(url: string, maxLength: number = 40): string {
   padding: 8px;
 }
 
+:deep(.el-drawer__header){
+  margin-bottom: 0;
+}
+:deep(.el-drawer__body){
+  padding:10px;
+}
+
 .layer-item {
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--el-border-color);
   border-radius: 8px;
   padding: 12px;
   margin-bottom: 12px;
-  background: #f9fafb;
+  background: var(--el-fill-color-lighter);
 }
 
 .layer-header {
@@ -290,7 +280,7 @@ function truncateUrl(url: string, maxLength: number = 40): string {
 
 .layer-url {
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -302,7 +292,7 @@ function truncateUrl(url: string, maxLength: number = 40): string {
 
 .opacity-label {
   font-size: 12px;
-  color: #606266;
+  color: var(--el-text-color-regular);
   margin-bottom: 4px;
   display: block;
 }
@@ -311,13 +301,12 @@ function truncateUrl(url: string, maxLength: number = 40): string {
   display: flex;
   gap: 20px;
   padding: 12px;
-  background: #f5f7fa;
+  background: var(--el-fill-color-light);
   border-radius: 6px;
   margin-bottom: 12px;
 }
 
 .layers-list {
-  max-height: calc(100vh - 250px);
   overflow-y: auto;
 }
 

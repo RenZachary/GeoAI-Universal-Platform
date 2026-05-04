@@ -220,13 +220,13 @@ function scrollToBottom() {
 .chat-view {
   display: flex;
   height: 100%;
-  background: #f5f7fa;
+  background: var(--el-bg-color-page);
 }
 
 .conversation-sidebar {
   width: 260px;
-  background: #fff;
-  border-right: 1px solid #e4e7ed;
+  background: var(--el-bg-color);
+  border-right: 1px solid var(--el-border-color);
   display: flex;
   flex-direction: column;
   transition: width 0.3s;
@@ -239,7 +239,7 @@ function scrollToBottom() {
 
 .sidebar-header {
   padding: 16px;
-  border-bottom: 1px solid #e4e7ed;
+  border-bottom: 1px solid var(--el-border-color);
 }
 
 .conversation-list {
@@ -258,12 +258,12 @@ function scrollToBottom() {
   margin-bottom: 4px;
   
   &:hover {
-    background: #f5f7fa;
+    background: var(--el-fill-color-light);
   }
   
   &.active {
-    background: #ecf5ff;
-    color: #409eff;
+    background: var(--el-color-primary-light-9);
+    color: var(--el-color-primary);
   }
 }
 
@@ -280,7 +280,7 @@ function scrollToBottom() {
   transition: opacity 0.2s;
   
   &:hover {
-    color: #f56c6c;
+    color: var(--el-color-danger);
   }
 }
 
@@ -289,21 +289,21 @@ function scrollToBottom() {
 }
 
 .data-sources-toggle {
-  padding: 8px 16px;
-  border-bottom: 1px solid #e4e7ed;
+  padding: 8px 8px;
+  border-bottom: 1px solid var(--el-border-color);
 }
 
 .data-sources-section {
   max-height: 300px;
   overflow-y: auto;
-  border-bottom: 1px solid #e4e7ed;
+  border-bottom: 1px solid var(--el-border-color);
 }
 
 .section-title {
   padding: 12px 16px 8px;
   font-size: 12px;
   font-weight: 600;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   text-transform: uppercase;
 }
 
@@ -313,7 +313,7 @@ function scrollToBottom() {
   transition: background 0.2s;
   
   &:hover {
-    background: #f5f7fa;
+    background: var(--el-fill-color-light);
   }
 }
 
@@ -326,7 +326,7 @@ function scrollToBottom() {
 
 .ds-name {
   font-size: 14px;
-  color: #303133;
+  color: var(--el-text-color-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -334,14 +334,14 @@ function scrollToBottom() {
 
 .ds-meta {
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
 }
 
 .chat-main {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--el-bg-color);
 }
 
 .messages-container {
@@ -357,7 +357,7 @@ function scrollToBottom() {
   justify-content: center;
   height: 100%;
   gap: 24px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   
   p {
     font-size: 16px;
@@ -371,14 +371,17 @@ function scrollToBottom() {
 }
 
 .input-area {
-  border-top: 1px solid #e4e7ed;
-  padding: 16px;
-  background: #fff;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  border-top: 1px solid var(--el-border-color);
+  padding: 8px;
+  background: var(--el-bg-color);
 }
 
 .input-actions {
   display: flex;
   justify-content: flex-end;
-  margin-top: 12px;
+  align-items: center;
 }
 </style>

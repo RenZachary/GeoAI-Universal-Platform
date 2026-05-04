@@ -1,3 +1,4 @@
+<!-- Generate friendly summary of analysis results -->
 Generate a friendly summary of the analysis results.
 
 Goals completed: {{completedGoals}}

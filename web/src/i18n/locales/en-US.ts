@@ -65,6 +65,7 @@ export default {
     uploadFailed: 'Upload failed'
   },
   tools: {
+    title: 'Tool Library',
     categories: 'Categories',
     all: 'All Tools',
     analysis: 'Analysis',

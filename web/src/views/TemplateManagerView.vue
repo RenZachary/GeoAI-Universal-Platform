@@ -23,7 +23,7 @@
             <el-button 
               size="small" 
               text
-              @click="handleEditTemplate(template)"
+              @click="() => handleEditTemplate(template)"
             >
               Edit
             </el-button>
@@ -72,9 +72,10 @@
           <el-input v-model="templateForm.name" placeholder="Template name" />
         </el-form-item>
         
-        <el-form-item label="Category">
-          <el-select v-model="templateForm.category" placeholder="Select category" style="width: 100%" disabled>
-            <el-option label="General" value="chat" />
+        <el-form-item label="Language">
+          <el-select v-model="templateForm.language" placeholder="Select language" style="width: 100%" :disabled="!!editingTemplate">
+            <el-option label="English (US)" value="en-US" />
+            <el-option label="Chinese (Simplified)" value="zh-CN" />
           </el-select>
         </el-form-item>
         
@@ -83,7 +84,7 @@
             v-model="templateForm.description" 
             type="textarea"
             :rows="2"
-            placeholder="Brief description of this template"
+            placeholder="Brief description of this template (optional)"
           />
         </el-form-item>
         
@@ -139,9 +140,9 @@ const showEditorDialog = ref(false)
 const editingTemplate = ref<PromptTemplate | null>(null)
 const templateForm = ref({
   name: '',
+  language: 'en-US',
   description: '',
-  content: '',
-  category: 'chat'
+  content: ''
 })
 
 // Lifecycle
@@ -152,7 +153,8 @@ onMounted(() => {
 
 // Computed - Extract variables from template content
 const extractedVariables = computed(() => {
-  const matches = templateForm.value.content.match(/\{\{(\w+)\}\}/g)
+  const content = templateForm.value.content || ''
+  const matches = content.match(/\{\{(\w+)\}\}/g)
   if (!matches) return []
   
   // Extract unique variable names
@@ -165,22 +167,28 @@ function handleCreateTemplate() {
   editingTemplate.value = null
   templateForm.value = {
     name: '',
+    language: 'en-US',
     description: '',
-    content: '',
-    category: 'chat'
+    content: ''
   }
   showEditorDialog.value = true
 }
 
-function handleEditTemplate(template: PromptTemplate) {
+async function handleEditTemplate(template: PromptTemplate) {
   editingTemplate.value = template
-  templateForm.value = {
-    name: template.name,
-    description: template.description || '',
-    content: template.content,
-    category: 'chat'
+  try {
+    // Fetch full template with content
+    const fullTemplate = await templateStore.getTemplate(template.id)
+    templateForm.value = {
+      name: fullTemplate.name,
+      language: fullTemplate.language,
+      description: fullTemplate.description || '',
+      content: fullTemplate.content || ''
+    }
+    showEditorDialog.value = true
+  } catch (error: any) {
+    ElMessage.error(error.message || 'Failed to load template')
   }
-  showEditorDialog.value = true
 }
 
 async function handleSaveTemplate() {
@@ -199,19 +207,18 @@ async function handleSaveTemplate() {
     if (editingTemplate.value) {
       // Update existing
       await templateStore.updateTemplate(editingTemplate.value.id, {
-        name: templateForm.value.name,
-        description: templateForm.value.description,
-        content: templateForm.value.content
+        content: templateForm.value.content,
+        description: templateForm.value.description
       })
       ElMessage.success('Template updated')
     } else {
       // Create new
       await templateStore.createTemplate({
         name: templateForm.value.name,
+        language: templateForm.value.language,
         description: templateForm.value.description,
         content: templateForm.value.content,
-        language: 'en-US',
-        version: '1.0'
+        version: '1.0.0'
       })
       ElMessage.success('Template created')
     }
@@ -233,8 +240,9 @@ async function handleDeleteTemplate(id: string) {
 
 function removeVariable(varName: string) {
   // Remove all occurrences of this variable from content
+  const content = templateForm.value.content || ''
   const regex = new RegExp(`\\{\\{${varName}\\}\\}`, 'g')
-  templateForm.value.content = templateForm.value.content.replace(regex, '')
+  templateForm.value.content = content.replace(regex, '')
 }
 
 function formatDate(dateString: string): string {

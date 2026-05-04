@@ -4,7 +4,7 @@
     <div class="card-header">
       <el-checkbox 
         :model-value="layer.visible"
-        @change="(val) => $emit('toggle-visibility', layer.id)"
+        @change="() => $emit('toggleVisibility', layer.id)"
         class="layer-checkbox"
       >
         <span class="layer-name">{{ dataSource?.name || layer.id }}</span>
@@ -18,15 +18,6 @@
           title="Show Info"
         >
           <el-icon><InfoFilled /></el-icon>
-        </el-button>
-        <el-button 
-          text 
-          type="danger"
-          size="small"
-          @click="$emit('remove', layer.id)"
-          title="Remove Layer"
-        >
-          <el-icon><Delete /></el-icon>
         </el-button>
       </div>
     </div>
@@ -56,7 +47,7 @@
         :min="0"
         :max="1"
         :step="0.05"
-        @input="(val: number) => $emit('opacity-change', layer.id, val)"
+        @input="(val: number) => $emit('opacityChange', layer.id, val)"
         size="small"
       />
     </div>
@@ -93,7 +84,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Delete, InfoFilled, Folder } from '@element-plus/icons-vue'
+import { InfoFilled, Folder } from '@element-plus/icons-vue'
 import type { MapLayer, DataSource } from '@/types'
 
 const props = defineProps<{
@@ -103,7 +94,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   toggleVisibility: [layerId: string]
-  remove: [layerId: string]
   opacityChange: [layerId: string, opacity: number]
 }>()
 
@@ -192,6 +182,8 @@ function formatDate(dateString: string): string {
 
 .card-metadata {
   margin-bottom: 8px;
+  display: flex;
+  gap: 8px;
   
   .meta-row {
     display: flex;
@@ -211,6 +203,7 @@ function formatDate(dateString: string): string {
     gap: 4px;
     font-size: 12px;
     color: #606266;
+    margin-bottom: 6px;
     
     .el-icon {
       font-size: 14px;

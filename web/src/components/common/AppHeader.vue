@@ -46,7 +46,6 @@ const { locale } = useI18n()
 function handleLanguageChange(lang: string) {
   configStore.setLanguage(lang as any)
   locale.value = lang
-  location.reload()
 }
 
 function toggleTheme() {

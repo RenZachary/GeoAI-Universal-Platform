@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
+import 'element-plus/theme-chalk/dark/css-vars.css'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import { createI18n } from 'vue-i18n'
 import router from './router'
@@ -10,10 +11,13 @@ import messages from './i18n/locales'
 import { initializeFingerprint } from './utils/fingerprint'
 import { useConfigStore } from './stores/config'
 
+// Get saved language from localStorage or use default
+const savedLanguage = localStorage.getItem('language') || import.meta.env.VITE_DEFAULT_LANGUAGE || 'en-US'
+
 // Initialize i18n
 const i18n = createI18n({
   legacy: false,
-  locale: import.meta.env.VITE_DEFAULT_LANGUAGE || 'en-US',
+  locale: savedLanguage,
   fallbackLocale: 'en-US',
   messages
 })

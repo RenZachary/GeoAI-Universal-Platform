@@ -94,13 +94,13 @@ export class ApiRouter {
     // Data source endpoints
     this.router.get('/data-sources', (req, res) => this.dataSourceController.listDataSources(req, res));
     this.router.get('/data-sources/available', (req, res) => this.dataSourceController.getAvailableDataSources(req, res));
+    this.router.get('/data-sources/search', (req, res) => this.dataSourceController.searchDataSources(req, res));
     this.router.get('/data-sources/:id', (req, res) => this.dataSourceController.getDataSource(req, res));
     this.router.get('/data-sources/:id/schema', (req, res) => this.dataSourceController.getDataSourceSchema(req, res));
     this.router.post('/data-sources', (req, res) => this.dataSourceController.registerDataSource(req, res));
     this.router.post('/data-sources/postgis', (req, res) => this.dataSourceController.registerPostGISConnection(req, res));
     this.router.put('/data-sources/:id/metadata', (req, res) => this.dataSourceController.updateMetadata(req, res));
     this.router.delete('/data-sources/:id', (req, res) => this.dataSourceController.deleteDataSource(req, res));
-    this.router.get('/data-sources/search', (req, res) => this.dataSourceController.searchDataSources(req, res));
 
     // File upload endpoints
     this.router.post('/upload/single', upload.single('file'), (req, res) => this.fileUploadController.uploadSingleFile(req, res));

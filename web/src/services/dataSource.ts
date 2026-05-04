@@ -5,7 +5,7 @@ import type { DataSource } from '@/types'
  * List all data sources
  */
 export async function listDataSources(): Promise<DataSource[]> {
-  const response = await api.get('/api/datasources')
+  const response = await api.get('/api/data-sources')
   return response.data.dataSources || []
 }
 
@@ -13,7 +13,7 @@ export async function listDataSources(): Promise<DataSource[]> {
  * Get a specific data source
  */
 export async function getDataSource(id: string): Promise<DataSource> {
-  const response = await api.get(`/api/datasources/${id}`)
+  const response = await api.get(`/api/data-sources/${id}`)
   return response.data.dataSource
 }
 
@@ -21,7 +21,7 @@ export async function getDataSource(id: string): Promise<DataSource> {
  * Delete a data source
  */
 export async function deleteDataSource(id: string): Promise<void> {
-  await api.delete(`/api/datasources/${id}`)
+  await api.delete(`/api/data-sources/${id}`)
 }
 
 /**

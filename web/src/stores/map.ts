@@ -76,14 +76,13 @@ export const useMapStore = defineStore('map', () => {
     } else {
       layers.value.push({
         ...layer,
+        visible: false, // Always default to invisible
         createdAt: new Date().toISOString()
       })
     }
     
-    // Add to map if instance exists
-    if (mapInstance.value && layer.visible) {
-      addLayerToMap(layer)
-    }
+    // Note: Layer won't be added to map initially since visible is false
+    // User must manually toggle visibility to show the layer
   }
   
   function removeLayer(layerId: string) {
