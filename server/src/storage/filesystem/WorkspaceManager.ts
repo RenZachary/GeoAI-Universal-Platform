@@ -10,10 +10,19 @@ import {
 import type { WorkspaceInfo, WorkspaceDirectories } from '../../core';
 import { formatBytes } from '../../core';
 
-export class WorkspaceManager {
-  private baseDir: string;
+class WorkspaceManager {
+  private static instance: WorkspaceManager | null = null;
+  static getInstance(): WorkspaceManager {
+    if (!WorkspaceManager.instance) {
+      WorkspaceManager.instance = new WorkspaceManager();
+    }
+    return WorkspaceManager.instance;
+  }
+  private baseDir: string | undefined;
   
-  constructor(baseDir: string) {
+  private constructor() {
+  }
+  init(baseDir: string): void {
     this.baseDir = baseDir;
   }
   
@@ -59,9 +68,13 @@ export class WorkspaceManager {
       WORKSPACE_DIRS.RESULTS_WMS,
       WORKSPACE_DIRS.RESULTS_REPORTS,
     ];
-    
+    if (!this.baseDir) 
+    {
+      console.warn('Base directory not set. Please call init() first.');
+      return;
+    }
     dirs.forEach(dir => {
-      const fullPath = path.join(this.baseDir, dir);
+      const fullPath = path.join(this.baseDir || '', dir);
       if (!fs.existsSync(fullPath)) {
         fs.mkdirSync(fullPath, { recursive: true });
       }
@@ -75,6 +88,10 @@ export class WorkspaceManager {
    * Initialize default prompt templates
    */
   private initializeDefaultPrompts(): void {
+    if (!this.baseDir) {
+      console.warn('Base directory not set. Please call init() first.');
+      return;
+    }
     const promptsDir = path.join(this.baseDir, WORKSPACE_DIRS.LLM_PROMPTS_EN_US);
     const defaultTemplates = [...DEFAULT_PROMPT_TEMPLATES];
     
@@ -108,7 +125,11 @@ export class WorkspaceManager {
    */
   getWorkspaceInfo(): WorkspaceInfo {
     const storageUsage = this.calculateStorageUsage();
-    
+    if (!this.baseDir) {
+      console.warn('Base directory not set. Please call init() first.');
+      return { baseDir: '', directories: {} as WorkspaceDirectories, storageUsage: 0, updatedAt: new Date() };
+    }
+
     const directories: WorkspaceDirectories = {
       dataLocal: path.join(this.baseDir, WORKSPACE_DIRS.DATA_LOCAL),
       dataPostgis: path.join(this.baseDir, WORKSPACE_DIRS.DATA_POSTGIS),
@@ -139,6 +160,10 @@ export class WorkspaceManager {
    * Calculate total storage usage
    */
   private calculateStorageUsage(): number {
+    if (!this.baseDir) {
+      console.warn('Base directory not set. Please call init() first.');
+      return 0;
+    }
     try {
       const stats = fs.statSync(this.baseDir);
       
@@ -213,6 +238,10 @@ export class WorkspaceManager {
    * Clean up temporary files
    */
   async cleanupTemp(): Promise<void> {
+    if (!this.baseDir) {
+      console.warn('Base directory not set. Please call init() first.');
+      return;
+    }
     const tempDir = path.join(this.baseDir, WORKSPACE_DIRS.TEMP);
     
     try {
@@ -239,6 +268,10 @@ export class WorkspaceManager {
    * Get path for a specific directory
    */
   getDirectoryPath(dirName: keyof typeof WORKSPACE_DIRS): string {
+    if (!this.baseDir) {
+      console.warn('Base directory not set. Please call init() first.');
+      return '';
+    }
     return path.join(this.baseDir, WORKSPACE_DIRS[dirName]);
   }
   
@@ -246,6 +279,11 @@ export class WorkspaceManager {
    * Get full path for a file in a directory
    */
   getFilePath(dirName: keyof typeof WORKSPACE_DIRS, fileName: string): string {
+    if (!this.baseDir) {
+      console.warn('Base directory not set. Please call init() first.');
+      return '';
+    }
     return path.join(this.baseDir, WORKSPACE_DIRS[dirName], fileName);
   }
 }
+export const WorkspaceManagerInstance = WorkspaceManager.getInstance();

@@ -3,20 +3,15 @@
  */
 
 import type { Request, Response } from 'express';
-import type Database from 'better-sqlite3';
-import type { ToolRegistry } from '../../plugin-orchestration';
+import { ToolRegistryInstance } from '../../plugin-orchestration';
 import { BUILT_IN_PLUGINS, PluginToolWrapper } from '../../plugin-orchestration';
+import { SQLiteManagerInstance } from '../../storage';
 
 export class ToolController {
-  private toolRegistry: ToolRegistry;
-  private db: Database.Database;
 
-  constructor(toolRegistry: ToolRegistry, db: Database.Database) {
-    this.toolRegistry = toolRegistry;
-    this.db = db;
-    
+  constructor() {    
     // Initialize PluginToolWrapper with database connection
-    PluginToolWrapper.initialize(db);
+    PluginToolWrapper.initialize(SQLiteManagerInstance.getDatabase());
   }
 
   /**
@@ -24,8 +19,8 @@ export class ToolController {
    */
   async initialize(): Promise<void> {
     console.log('[Tool Controller] Initializing built-in tools...');
-    await this.toolRegistry.registerPlugins(BUILT_IN_PLUGINS);
-    console.log(`[Tool Controller] Registered ${this.toolRegistry.getToolCount()} tools`);
+    await ToolRegistryInstance.registerPlugins(BUILT_IN_PLUGINS);
+    console.log(`[Tool Controller] Registered ${ToolRegistryInstance.getToolCount()} tools`);
   }
 
   /**
@@ -33,7 +28,7 @@ export class ToolController {
    */
   async listTools(req: Request, res: Response): Promise<void> {
     try {
-      const tools = this.toolRegistry.listToolsWithMetadata();
+      const tools = ToolRegistryInstance.listToolsWithMetadata();
 
       res.json({
         success: true,
@@ -57,7 +52,7 @@ export class ToolController {
     try {
       const { id } = req.params;
       const pluginId = Array.isArray(id) ? id[0] : id;
-      const plugin = this.toolRegistry.getPlugin(pluginId);
+      const plugin = ToolRegistryInstance.getPlugin(pluginId);
 
       if (!plugin) {
         res.status(404).json({
@@ -67,7 +62,7 @@ export class ToolController {
         return;
       }
 
-      const tool = this.toolRegistry.getTool(pluginId);
+      const tool = ToolRegistryInstance.getTool(pluginId);
 
       res.json({
         success: true,
@@ -102,7 +97,7 @@ export class ToolController {
       const toolId = Array.isArray(id) ? id[0] : id;
       const parameters = req.body;
 
-      const tool = this.toolRegistry.getTool(toolId);
+      const tool = ToolRegistryInstance.getTool(toolId);
 
       if (!tool) {
         res.status(404).json({
@@ -150,7 +145,7 @@ export class ToolController {
         installedAt: new Date()
       };
 
-      await this.toolRegistry.registerPlugin(mockPlugin);
+      await ToolRegistryInstance.registerPlugin(mockPlugin);
 
       res.json({
         success: true,
@@ -175,7 +170,7 @@ export class ToolController {
       const { id } = req.params;
       const pluginId = Array.isArray(id) ? id[0] : id;
 
-      if (!this.toolRegistry.hasPlugin(pluginId)) {
+      if (!ToolRegistryInstance.hasPlugin(pluginId)) {
         res.status(404).json({
           success: false,
           error: `Tool not found: ${id}`
@@ -183,7 +178,7 @@ export class ToolController {
         return;
       }
 
-      this.toolRegistry.unregisterPlugin(pluginId);
+      ToolRegistryInstance.unregisterPlugin(pluginId);
 
       res.json({
         success: true,

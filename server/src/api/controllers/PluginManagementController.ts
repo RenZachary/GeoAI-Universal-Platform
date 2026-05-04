@@ -4,15 +4,13 @@
  */
 
 import type { Request, Response } from 'express';
-import type { CustomPluginLoader, ToolRegistry } from '../../plugin-orchestration';
+import type { CustomPluginLoader } from '../../plugin-orchestration';
 
 export class PluginManagementController {
   private pluginLoader: CustomPluginLoader;
-  private toolRegistry: ToolRegistry;
 
-  constructor(pluginLoader: CustomPluginLoader, toolRegistry: ToolRegistry) {
+  constructor(pluginLoader: CustomPluginLoader) {
     this.pluginLoader = pluginLoader;
-    this.toolRegistry = toolRegistry;
   }
 
   /**

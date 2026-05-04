@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { DataSourceRepository } from '../data-access/repositories';
 import { DataAccessorFactory } from '../data-access/factories/DataAccessorFactory.js';
 import type { DataSourceType } from '../core';
+import { SQLiteManagerInstance } from '../storage';
 
 /**
  * Scan data directory and register unregistered files
@@ -15,7 +16,6 @@ import type { DataSourceType } from '../core';
  * @param workspaceBase - Base workspace directory path
  */
 export async function scanAndRegisterDataFiles(
-  db: any,
   workspaceBase: string
 ): Promise<void> {
   const dataDir = path.join(workspaceBase, 'data', 'local');
@@ -42,7 +42,7 @@ export async function scanAndRegisterDataFiles(
   console.log(`  Found ${files.length} files in data directory`);
   
   // Initialize services
-  const dataSourceRepo = new DataSourceRepository(db);
+  const dataSourceRepo = new DataSourceRepository(SQLiteManagerInstance.getDatabase());
   const accessorFactory = new DataAccessorFactory();
   
   // Check which files are already registered

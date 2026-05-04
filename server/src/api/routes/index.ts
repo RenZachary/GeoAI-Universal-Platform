@@ -14,11 +14,11 @@ import { MVTDynamicController } from '../controllers/MVTDynamicController.js';
 import { WMSServiceController } from '../controllers/WMSServiceController.js';
 import { ResultController } from '../controllers/ResultController.js';
 import { LLMConfigController } from '../controllers/LLMConfigController.js';
-import { DataSourceService, FileUploadService, PromptTemplateService, getMVTPublisher } from '../../services';
+import { DataSourceService, FileUploadService, PromptTemplateService, getMVTPublisher, ConversationService } from '../../services';
 import { DataSourceRepository } from '../../data-access/repositories';
-import type Database from 'better-sqlite3';
 import type { LLMConfig } from '../../llm-interaction';
-import { ToolRegistry, type CustomPluginLoader } from '../../plugin-orchestration';
+import { ToolRegistryInstance, type CustomPluginLoader } from '../../plugin-orchestration';
+import { SQLiteManagerInstance } from '../../storage/index.js';
 
 export class ApiRouter {
   private router: Router;
@@ -33,14 +33,10 @@ export class ApiRouter {
   private wmsServiceController: WMSServiceController;
   private resultController: ResultController;
   private llmConfigController: LLMConfigController;
-  private toolRegistry: ToolRegistry;
 
-  constructor(db: Database.Database, llmConfig: LLMConfig, workspaceBase: string, toolRegistry?: ToolRegistry, customPluginLoader?: CustomPluginLoader) {
+  constructor(llmConfig: LLMConfig, workspaceBase: string, customPluginLoader?: CustomPluginLoader) {
     this.router = Router();
-    
-    // Use provided toolRegistry or create new one
-    this.toolRegistry = toolRegistry || new ToolRegistry();
-    
+    const db = SQLiteManagerInstance.getDatabase();    
     // Initialize repositories
     const dataSourceRepo = new DataSourceRepository(db);
     
@@ -48,10 +44,11 @@ export class ApiRouter {
     const dataSourceService = new DataSourceService(dataSourceRepo);
     const fileUploadService = new FileUploadService(dataSourceRepo, workspaceBase);
     const promptTemplateService = new PromptTemplateService(workspaceBase);
+    const conversationService = new ConversationService(db);
     
     // Initialize controllers with injected dependencies
-    this.toolController = new ToolController(this.toolRegistry, db);
-    this.chatController = new ChatController(db, llmConfig, this.toolRegistry, workspaceBase);
+    this.toolController = new ToolController();
+    this.chatController = new ChatController(llmConfig, workspaceBase, conversationService);
     
     // Initialize shared MVTDynamicPublisher singleton
     const mvtDynamicPublisher = getMVTPublisher(workspaceBase, 10000);
@@ -63,11 +60,11 @@ export class ApiRouter {
     this.mvtDynamicController = new MVTDynamicController(mvtDynamicPublisher); // ✅ Use shared publisher
     this.wmsServiceController = new WMSServiceController(workspaceBase, db);
     this.resultController = new ResultController(workspaceBase);
-    this.llmConfigController = new LLMConfigController(workspaceBase);
+    this.llmConfigController = new LLMConfigController();
     
     // Initialize plugin management controller if customPluginLoader is provided
     if (customPluginLoader) {
-      this.pluginManagementController = new PluginManagementController(customPluginLoader, this.toolRegistry);
+      this.pluginManagementController = new PluginManagementController(customPluginLoader);
     }
 
     // Initialize tools
@@ -84,9 +81,9 @@ export class ApiRouter {
   private setupRoutes(): void {
     // Chat endpoints
     this.router.post('/chat', (req, res) => this.chatController.handleChat(req, res));
-    this.router.get('/conversations', (req, res) => this.chatController.listConversations(req, res));
-    this.router.get('/conversations/:id', (req, res) => this.chatController.getConversation(req, res));
-    this.router.delete('/conversations/:id', (req, res) => this.chatController.deleteConversation(req, res));
+    this.router.get('/chat/conversations', (req, res) => this.chatController.listConversations(req, res));
+    this.router.get('/chat/conversations/:id', (req, res) => this.chatController.getConversation(req, res));
+    this.router.delete('/chat/conversations/:id', (req, res) => this.chatController.deleteConversation(req, res));
 
     // Tool endpoints
     this.router.get('/tools', (req, res) => this.toolController.listTools(req, res));

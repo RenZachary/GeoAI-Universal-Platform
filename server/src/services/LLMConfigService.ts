@@ -10,10 +10,22 @@ export interface StoredLLMConfig extends LLMConfig {
   updatedAt: string;
 }
 
-export class LLMConfigManager {
-  private configPath: string;
+class LLMConfigManager {
+  private static instance: LLMConfigManager;
+  static getInstance(): LLMConfigManager {
+    if (!LLMConfigManager.instance) {
+      LLMConfigManager.instance = new LLMConfigManager();
+    }
+    if(!LLMConfigManager.instance.configPath){
+      console.warn('[LLMConfigManager] configPath is not initialized');
+    }
+    return LLMConfigManager.instance;
+  }
 
-  constructor(workspaceBase: string) {
+  private configPath: string | undefined;
+
+  private constructor() { }
+  init(workspaceBase: string): void {
     this.configPath = path.join(workspaceBase, 'llm', 'config', 'llm-config.json');
     
     // Ensure directory exists
@@ -29,6 +41,10 @@ export class LLMConfigManager {
    */
   loadConfig(): StoredLLMConfig {
     try {
+      if (!this.configPath) {
+        console.warn('[LLMConfigManager] configPath is not initialized');
+        return this.getDefaultConfig();
+      }
       if (fs.existsSync(this.configPath)) {
         const data = fs.readFileSync(this.configPath, 'utf-8');
         return JSON.parse(data) as StoredLLMConfig;
@@ -50,7 +66,10 @@ export class LLMConfigManager {
         ...config,
         updatedAt: new Date().toISOString()
       };
-
+      if (!this.configPath) {
+        console.warn('[LLMConfigManager] configPath is not initialized');
+        return this.getDefaultConfig();
+      }
       fs.writeFileSync(this.configPath, JSON.stringify(storedConfig, null, 2), 'utf-8');
       console.log('[LLMConfigManager] Configuration saved successfully');
       
@@ -83,7 +102,7 @@ export class LLMConfigManager {
    * Check if configuration exists
    */
   hasConfig(): boolean {
-    return fs.existsSync(this.configPath);
+    return fs.existsSync(this.configPath || '');
   }
 
   /**
@@ -91,8 +110,8 @@ export class LLMConfigManager {
    */
   deleteConfig(): void {
     try {
-      if (fs.existsSync(this.configPath)) {
-        fs.unlinkSync(this.configPath);
+      if (fs.existsSync(this.configPath || '')) {
+        fs.unlinkSync(this.configPath || '');
         console.log('[LLMConfigManager] Configuration deleted');
       }
     } catch (error) {
@@ -104,3 +123,4 @@ export class LLMConfigManager {
     }
   }
 }
+export const LLMConfigManagerInstance = LLMConfigManager.getInstance();

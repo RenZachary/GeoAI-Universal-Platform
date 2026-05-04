@@ -22,8 +22,11 @@ export type {
   TemplateListOptions 
 } from './PromptTemplateService';
 
-export { LLMConfigManager } from './LLMConfigService';
+export { LLMConfigManagerInstance } from './LLMConfigService';
 export type { StoredLLMConfig } from './LLMConfigService';
+
+export { ConversationService } from './ConversationService';
+export type { ConversationSummary, ChatMessage } from './ConversationService';
 
 // MVTDynamicPublisher Singleton (re-export from utils)
 export { getMVTPublisher, resetMVTPublisher, MVTDynamicPublisher } from '../utils/publishers/MVTDynamicPublisher';

@@ -4,16 +4,16 @@
 
 import { StateGraph, Annotation, END, START } from '@langchain/langgraph';
 import type { BaseMessage} from '@langchain/core/messages';
-import { HumanMessage, AIMessage } from '@langchain/core/messages';
+import { HumanMessage } from '@langchain/core/messages';
 import type { LLMConfig } from '../adapters/LLMAdapterFactory.js';
 import { PromptManager } from '../managers/PromptManager.js';
 import { GoalSplitterAgent } from '../agents/GoalSplitterAgent.js';
 import { TaskPlannerAgent } from '../agents/TaskPlannerAgent.js';
-import type { ToolRegistry } from '../../plugin-orchestration';
+import { ToolRegistryInstance } from '../../plugin-orchestration';
 import { ConversationBufferMemoryWithSQLite } from '../managers/ConversationMemoryManager.js';
 import { ServicePublisher } from './ServicePublisher.js';
 import { SummaryGenerator } from './SummaryGenerator.js';
-import type Database from 'better-sqlite3';
+import { SQLiteManagerInstance } from '../../storage/index.js';
 
 // State interface for the GeoAI workflow
 export interface GeoAIState {
@@ -92,19 +92,17 @@ export type GeoAIStateType = typeof GeoAIStateAnnotation.State;
 export function createGeoAIGraph(
   llmConfig: LLMConfig, 
   workspaceBase: string, 
-  toolRegistry: ToolRegistry,
-  db?: Database.Database,  // Optional database for conversation memory
   onPartialResult?: (service: VisualizationService) => void  // Callback for incremental streaming
 ) {
   // Initialize managers and agents
   const promptManager = new PromptManager(workspaceBase);
   const goalSplitter = new GoalSplitterAgent(llmConfig, promptManager);
-  
+  const db = SQLiteManagerInstance.getDatabase();
   // TaskPlanner needs database for data source context
   if (!db) {
     console.warn('[GeoAIGraph] Database not provided - TaskPlanner will have limited data source context');
   }
-  const taskPlanner = new TaskPlannerAgent(llmConfig, promptManager, toolRegistry, db!);
+  const taskPlanner = new TaskPlannerAgent(llmConfig, promptManager, ToolRegistryInstance, db!);
   
   // Initialize service publisher and summary generator
   const servicePublisher = new ServicePublisher();
@@ -172,7 +170,7 @@ export function createGeoAIGraph(
               console.log(`[Plugin Executor] Executing step: ${step.stepId} using plugin: ${step.pluginId}`);
               
               // Get tool from registry
-              const tool = toolRegistry.getTool(step.pluginId);
+              const tool = ToolRegistryInstance.getTool(step.pluginId);
               
               if (!tool) {
                 console.error(`[Plugin Executor] Tool not found: ${step.pluginId}`);
@@ -330,10 +328,8 @@ export function createGeoAIGraph(
 export function compileGeoAIGraph(
   llmConfig: LLMConfig, 
   workspaceBase: string, 
-  toolRegistry: ToolRegistry,
-  db?: Database.Database,
   onPartialResult?: (service: VisualizationService) => void
 ) {
-  const graph = createGeoAIGraph(llmConfig, workspaceBase, toolRegistry, db, onPartialResult);
+  const graph = createGeoAIGraph(llmConfig, workspaceBase, onPartialResult);
   return graph.compile();
 }

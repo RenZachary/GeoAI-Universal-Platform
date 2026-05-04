@@ -6,7 +6,15 @@ import type { DynamicStructuredTool } from '@langchain/core/tools';
 import type { Plugin } from '../../core';
 import { PluginToolWrapper } from '../tools/PluginToolWrapper.js';
 
-export class ToolRegistry {
+class ToolRegistry {
+  private constructor() {}
+  private static instance: ToolRegistry;
+  static getInstance(): ToolRegistry {
+    if (!ToolRegistry.instance) {
+      ToolRegistry.instance = new ToolRegistry();
+    }
+    return ToolRegistry.instance;
+  }
   private tools: Map<string, DynamicStructuredTool> = new Map();
   private pluginMap: Map<string, Plugin> = new Map();
 
@@ -139,3 +147,4 @@ export class ToolRegistry {
     return result;
   }
 }
+export const ToolRegistryInstance = ToolRegistry.getInstance();

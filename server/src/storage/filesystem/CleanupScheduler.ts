@@ -3,12 +3,13 @@
  * Runs periodic cleanup jobs to prevent disk space exhaustion
  */
 
-import { WorkspaceManager } from './WorkspaceManager.js';
+import { WorkspaceManagerInstance } from './WorkspaceManager.js';
 import { MVTPublisher } from '../../utils/publishers/MVTPublisher.js';
 import { WMSPublisher } from '../../utils/publishers/WMSPublisher.js';
 import type Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { SQLiteManagerInstance } from '../database/SQLiteManager.js';
 
 export interface CleanupConfig {
   tempFileMaxAge: number;        // Max age for temp files in milliseconds (default: 24 hours)
@@ -31,7 +32,6 @@ export interface CleanupResult {
 }
 
 export class CleanupScheduler {
-  private workspaceManager: WorkspaceManager;
   private mvtPublisher: MVTPublisher;
   private wmsPublisher: WMSPublisher;
   private db?: Database.Database;
@@ -41,13 +41,10 @@ export class CleanupScheduler {
 
   constructor(
     workspaceBase: string,
-    db?: Database.Database,
     config?: Partial<CleanupConfig>
   ) {
-    this.workspaceManager = new WorkspaceManager(workspaceBase);
-    this.mvtPublisher = new MVTPublisher(workspaceBase, db);
-    this.wmsPublisher = new WMSPublisher(workspaceBase, db);
-    this.db = db;
+    this.mvtPublisher = new MVTPublisher(workspaceBase, SQLiteManagerInstance.getDatabase());
+    this.wmsPublisher = new WMSPublisher(workspaceBase, SQLiteManagerInstance.getDatabase());
     
     // Default configuration
     this.config = {
@@ -194,7 +191,7 @@ export class CleanupScheduler {
   private async cleanupTempFiles(): Promise<{ deletedCount: number; spaceFreed: number }> {
     console.log('[Cleanup Scheduler] Cleaning temp files...');
     
-    const tempDir = this.workspaceManager.getDirectoryPath('TEMP');
+    const tempDir = WorkspaceManagerInstance.getDirectoryPath('TEMP');
     
     if (!fs.existsSync(tempDir)) {
       console.log('[Cleanup Scheduler] Temp directory does not exist');
@@ -284,7 +281,7 @@ export class CleanupScheduler {
           
           if (generatedAt < cutoffTime) {
             const serviceDir = path.join(
-              this.workspaceManager.getDirectoryPath('RESULTS_WMS'),
+              WorkspaceManagerInstance.getDirectoryPath('RESULTS_WMS'),
               service.id
             );
             
@@ -389,10 +386,10 @@ export class CleanupScheduler {
     wmsServiceCount: number;
     dataLocalSize: number;
   } {
-    const tempDir = this.workspaceManager.getDirectoryPath('TEMP');
-    const dataLocalDir = this.workspaceManager.getDirectoryPath('DATA_LOCAL');
-    const mvtDir = this.workspaceManager.getDirectoryPath('RESULTS_MVT');
-    const wmsDir = this.workspaceManager.getDirectoryPath('RESULTS_WMS');
+    const tempDir = WorkspaceManagerInstance.getDirectoryPath('TEMP');
+    const dataLocalDir = WorkspaceManagerInstance.getDirectoryPath('DATA_LOCAL');
+    const mvtDir = WorkspaceManagerInstance.getDirectoryPath('RESULTS_MVT');
+    const wmsDir = WorkspaceManagerInstance.getDirectoryPath('RESULTS_WMS');
 
     return {
       tempDirSize: this.getDirectorySize(tempDir),

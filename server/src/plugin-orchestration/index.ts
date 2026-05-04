@@ -36,7 +36,7 @@ export { PluginToolWrapper } from './tools/PluginToolWrapper';
 // ============================================================================
 // Registry
 // ============================================================================
-export { ToolRegistry } from './registry/ToolRegistry';
+export { ToolRegistryInstance } from './registry/ToolRegistry';
 
 // ============================================================================
 // Loader

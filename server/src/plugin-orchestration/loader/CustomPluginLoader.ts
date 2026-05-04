@@ -6,7 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { Plugin, PluginCategory } from '../../core';
-import type { ToolRegistry } from '../registry/ToolRegistry.js';
+import { ToolRegistryInstance } from '../registry/ToolRegistry.js';
 
 export interface PluginManifest {
   id: string;
@@ -33,13 +33,11 @@ export interface PluginStatus {
 export class CustomPluginLoader {
   private workspaceBase: string;
   private customPluginsDir: string;
-  private toolRegistry: ToolRegistry;
   private pluginStatuses: Map<string, PluginStatus> = new Map();
 
-  constructor(workspaceBase: string, toolRegistry: ToolRegistry) {
+  constructor(workspaceBase: string) {
     this.workspaceBase = workspaceBase;
-    this.customPluginsDir = path.join(workspaceBase, 'plugins', 'custom');
-    this.toolRegistry = toolRegistry;
+    this.customPluginsDir = path.join(this.workspaceBase, 'plugins', 'custom');
     
     // Ensure custom plugins directory exists
     if (!fs.existsSync(this.customPluginsDir)) {
@@ -124,7 +122,7 @@ export class CustomPluginLoader {
     };
 
     // Register with ToolRegistry
-    await this.toolRegistry.registerPlugin(plugin);
+    await ToolRegistryInstance.registerPlugin(plugin);
 
     // Update status
     this.pluginStatuses.set(manifest.id, {
@@ -193,7 +191,7 @@ export class CustomPluginLoader {
     }
 
     // Unregister from ToolRegistry
-    this.toolRegistry.unregisterPlugin(pluginId);
+    ToolRegistryInstance.unregisterPlugin(pluginId);
 
     // Update status
     status.status = 'disabled';
@@ -238,7 +236,7 @@ export class CustomPluginLoader {
 
     // Unregister if enabled
     if (status.status === 'enabled') {
-      this.toolRegistry.unregisterPlugin(pluginId);
+      ToolRegistryInstance.unregisterPlugin(pluginId);
     }
 
     // Remove from filesystem

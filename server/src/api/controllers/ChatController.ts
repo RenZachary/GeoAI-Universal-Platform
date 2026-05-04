@@ -7,20 +7,17 @@ import type { GeoAIStateType } from '../../llm-interaction';
 import { compileGeoAIGraph } from '../../llm-interaction';
 import { GeoAIStreamingHandler } from '../../llm-interaction/handlers/GeoAIStreamingHandler.js';
 import type { LLMConfig } from '../../llm-interaction';
-import type { ToolRegistry } from '../../plugin-orchestration';
-import type Database from 'better-sqlite3';
+import type { ConversationService } from '../../services';
 
 export class ChatController {
-  private db: Database.Database;
   private llmConfig: LLMConfig;
-  private toolRegistry: ToolRegistry;
   private workspaceBase: string;
+  private conversationService: ConversationService;
 
-  constructor(db: Database.Database, llmConfig: LLMConfig, toolRegistry: ToolRegistry, workspaceBase: string) {
-    this.db = db;
+  constructor( llmConfig: LLMConfig, workspaceBase: string, conversationService: ConversationService) {
     this.llmConfig = llmConfig;
-    this.toolRegistry = toolRegistry;
     this.workspaceBase = workspaceBase;
+    this.conversationService = conversationService;
   }
 
   /**
@@ -55,9 +52,7 @@ export class ChatController {
       // Initialize LangGraph workflow with conversation memory support
       const graph = compileGeoAIGraph(
         this.llmConfig, 
-        this.workspaceBase, 
-        this.toolRegistry,
-        this.db,  // Pass database for conversation memory
+        this.workspaceBase,
         // Incremental streaming callback - publish services as each goal completes
         (service) => {
           console.log(`[Chat API] Streaming partial result: ${service.id}`);
@@ -142,19 +137,14 @@ export class ChatController {
   }
 
   /**
-   * GET /api/conversations/:id - Get conversation history
+   * GET /api/chat/conversations/:id - Get conversation history
    */
   async getConversation(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
+      const conversationId = Array.isArray(id) ? id[0] : id;
 
-      // TODO: Query database for conversation messages
-      const messages = this.db.prepare(`
-        SELECT role, content, timestamp
-        FROM conversation_messages
-        WHERE conversation_id = ?
-        ORDER BY timestamp ASC
-      `).all(id);
+      const messages = this.conversationService.getConversation(conversationId);
 
       res.json({
         success: true,
@@ -172,17 +162,14 @@ export class ChatController {
   }
 
   /**
-   * DELETE /api/conversations/:id - Delete conversation
+   * DELETE /api/chat/conversations/:id - Delete conversation
    */
   async deleteConversation(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
+      const conversationId = Array.isArray(id) ? id[0] : id;
 
-      // Delete conversation messages
-      this.db.prepare(`
-        DELETE FROM conversation_messages
-        WHERE conversation_id = ?
-      `).run(id);
+      this.conversationService.deleteConversation(conversationId);
 
       res.json({
         success: true,
@@ -199,20 +186,11 @@ export class ChatController {
   }
 
   /**
-   * GET /api/conversations - List all conversations
+   * GET /api/chat/conversations - List all conversations
    */
   async listConversations(req: Request, res: Response): Promise<void> {
     try {
-      // Get unique conversation IDs
-      const conversations = this.db.prepare(`
-        SELECT DISTINCT conversation_id as id, 
-               MIN(timestamp) as created_at,
-               MAX(timestamp) as updated_at,
-               COUNT(*) as message_count
-        FROM conversation_messages
-        GROUP BY conversation_id
-        ORDER BY updated_at DESC
-      `).all();
+      const conversations = this.conversationService.listConversations();
 
       res.json({
         success: true,

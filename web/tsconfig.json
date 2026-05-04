@@ -19,6 +19,10 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "incremental": true,
+    "declaration": false,
+    "declarationMap": false,
 
     /* Path mapping */
     "baseUrl": ".",

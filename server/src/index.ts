@@ -7,11 +7,11 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import { WorkspaceManager, CleanupScheduler } from './storage/index.js';
-import { SQLiteManager } from './storage/index.js';
+import { WorkspaceManagerInstance, CleanupScheduler } from './storage/index.js';
+import { SQLiteManagerInstance } from './storage/index.js';
 import { ApiRouter } from './api/routes/index.js';
-import { ToolRegistry, CustomPluginLoader } from './plugin-orchestration';
-import { LLMConfigManager } from './services/LLMConfigService.js';
+import { CustomPluginLoader } from './plugin-orchestration';
+import { LLMConfigManagerInstance } from './services/LLMConfigService.js';
 import { scanAndRegisterDataFiles } from './utils/DataDirectoryScanner.js';
 
 // Load environment variables
@@ -31,12 +31,12 @@ app.use(express.urlencoded({ extended: true }));
 const WORKSPACE_BASE = process.env.WORKSPACE_DIR 
   ? path.resolve(__dirname, '..', process.env.WORKSPACE_DIR)
   : path.join(__dirname, '..', 'workspace');
-const workspaceManager = new WorkspaceManager(WORKSPACE_BASE);
-const sqliteManager = new SQLiteManager(workspaceManager.getDirectoryPath('DATABASE'));
+WorkspaceManagerInstance.init(WORKSPACE_BASE);
+SQLiteManagerInstance.init(WorkspaceManagerInstance.getDirectoryPath('DATABASE'));
 
 // Initialize LLM configuration manager - loads from workspace/llm/config
-const llmConfigManager = new LLMConfigManager(WORKSPACE_BASE);
-const llmConfig = llmConfigManager.loadConfig();
+LLMConfigManagerInstance.init(WORKSPACE_BASE);
+const llmConfig = LLMConfigManagerInstance.loadConfig();
 console.log('[Server] LLM Configuration loaded:', {
   provider: llmConfig.provider,
   model: llmConfig.model,
@@ -53,18 +53,16 @@ async function startServer() {
   try {
     // Initialize storage layer
     console.log('Initializing storage layer...');
-    workspaceManager.initialize();
-    sqliteManager.initialize();
-    
-    const db = sqliteManager.getDatabase();
-    
+    WorkspaceManagerInstance.initialize();
+    SQLiteManagerInstance.initialize();
+      
     // Scan and register existing files in data directory
     console.log('Scanning data directory for existing files...');
-    await scanAndRegisterDataFiles(db, WORKSPACE_BASE);
+    await scanAndRegisterDataFiles(WORKSPACE_BASE);
     
     // Initialize cleanup scheduler
     console.log('Initializing cleanup scheduler...');
-    const cleanupScheduler = new CleanupScheduler(WORKSPACE_BASE, db, {
+    const cleanupScheduler = new CleanupScheduler(WORKSPACE_BASE, {
       tempFileMaxAge: 24 * 60 * 60 * 1000,           // 24 hours
       mvtServiceMaxAge: 7 * 24 * 60 * 60 * 1000,     // 7 days
       wmsServiceMaxAge: 7 * 24 * 60 * 60 * 1000,     // 7 days
@@ -77,13 +75,12 @@ async function startServer() {
     
     // Initialize plugin system
     console.log('Initializing plugin system...');
-    const toolRegistry = new ToolRegistry();
-    const customPluginLoader = new CustomPluginLoader(WORKSPACE_BASE, toolRegistry);
+    const customPluginLoader = new CustomPluginLoader(WORKSPACE_BASE);
     await customPluginLoader.loadAllPlugins();
     console.log(`Plugin system initialized with ${customPluginLoader.getAllPluginStatuses().length} plugins`);
     
     // Initialize API routes after database is ready
-    const apiRouter = new ApiRouter(db, llmConfig, WORKSPACE_BASE, toolRegistry, customPluginLoader);
+    const apiRouter = new ApiRouter(llmConfig, WORKSPACE_BASE, customPluginLoader);
     app.use('/api', apiRouter.getRouter());
     
     // Start Express server

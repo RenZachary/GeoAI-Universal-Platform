@@ -8,47 +8,56 @@ import path from 'path';
 import fs from 'fs';
 import { DB_CONFIG } from '../../core';
 
-export class SQLiteManager {
-  private dbPath: string;
+class SQLiteManager {
+  private static instance: SQLiteManager | null = null;
+  static getInstance(): SQLiteManager {
+    if (!SQLiteManager.instance) {
+      SQLiteManager.instance = new SQLiteManager();
+    }
+    return SQLiteManager.instance;
+  }
+  private dbPath: string | undefined;
   private db: Database.Database | null = null;
-  
-  constructor(databaseDir: string) {
+
+  private constructor() {
+  }
+  init(databaseDir: string) {
     this.dbPath = path.join(databaseDir, DB_CONFIG.DATABASE_FILE);
   }
-  
+
   /**
    * Initialize database connection and create tables
    */
   initialize(): void {
     console.log('Initializing SQLite database...');
-    
+    if (!this.dbPath) { console.warn('Database path not initialized. Please call init() first.'); return; }
     // Ensure database directory exists
     const dbDir = path.dirname(this.dbPath);
     if (!fs.existsSync(dbDir)) {
       fs.mkdirSync(dbDir, { recursive: true });
     }
-    
+
     // Connect to database
     this.db = new Database(this.dbPath);
-    
+
     // Enable WAL mode for better performance
     this.db.pragma('journal_mode = WAL');
-    
+
     // Ensure UTF-8 encoding for proper Chinese character support
     this.db.pragma('encoding = "UTF-8"');
-    
+
     // Create tables
     this.createTables();
-    
+
     console.log(`Database initialized at: ${this.dbPath}`);
   }
-  
+
   /**
    * Create all required tables
    */
   private createTables(): void {
     if (!this.db) throw new Error('Database not initialized');
-    
+
     // Data sources table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS data_sources (
@@ -61,7 +70,7 @@ export class SQLiteManager {
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       )
     `);
-    
+
     // Plugins table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS plugins (
@@ -78,7 +87,7 @@ export class SQLiteManager {
         installed_at TEXT NOT NULL DEFAULT (datetime('now'))
       )
     `);
-    
+
     // Conversations table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS conversations (
@@ -89,7 +98,19 @@ export class SQLiteManager {
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       )
     `);
-    
+
+    // Conversation messages table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS conversation_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        conversation_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+      )
+    `);
+
     // Analysis history table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS analysis_history (
@@ -104,7 +125,7 @@ export class SQLiteManager {
         FOREIGN KEY (conversation_id) REFERENCES conversations(id)
       )
     `);
-    
+
     // Visualization services table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS visualization_services (
@@ -119,7 +140,7 @@ export class SQLiteManager {
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
       )
     `);
-    
+
     // Prompt templates table (for tracking, actual templates are files)
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS prompt_templates (
@@ -132,10 +153,10 @@ export class SQLiteManager {
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       )
     `);
-    
+
     console.log('Database tables created');
   }
-  
+
   /**
    * Get database instance
    */
@@ -145,47 +166,50 @@ export class SQLiteManager {
     }
     return this.db;
   }
-  
+
   /**
    * Backup database
    */
   async backup(backupDir: string): Promise<string> {
     if (!this.db) throw new Error('Database not initialized');
-    
+
     // Ensure backup directory exists
     if (!fs.existsSync(backupDir)) {
       fs.mkdirSync(backupDir, { recursive: true });
     }
-    
+
     // Generate backup filename with timestamp
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const backupFilename = `${DB_CONFIG.BACKUP_PREFIX}${timestamp}.db`;
     const backupPath = path.join(backupDir, backupFilename);
-    
+
     try {
       // Close current connection
       this.db.close();
-      
-      // Copy database file
+
+      if (!this.dbPath) {
+        console.warn('Database path not initialized. Please call init() first.');
+        return '';
+      }      // Copy database file
       fs.copyFileSync(this.dbPath, backupPath);
-      
+
       // Reopen database
       this.db = new Database(this.dbPath);
-      
+
       console.log(`Database backed up to: ${backupPath}`);
       return backupPath;
     } catch (error) {
       console.error('Database backup failed:', error);
-      
+
       // Try to reopen database even if backup failed
       if (!this.db || !this.db.open) {
         this.db = new Database(this.dbPath);
       }
-      
+
       throw error;
     }
   }
-  
+
   /**
    * Close database connection
    */
@@ -196,7 +220,7 @@ export class SQLiteManager {
       console.log('Database connection closed');
     }
   }
-  
+
   /**
    * Run a migration (placeholder for future schema changes)
    */
@@ -205,3 +229,4 @@ export class SQLiteManager {
     console.warn(`Migration system not yet implemented: ${migrationName}`);
   }
 }
+export const SQLiteManagerInstance = SQLiteManager.getInstance();

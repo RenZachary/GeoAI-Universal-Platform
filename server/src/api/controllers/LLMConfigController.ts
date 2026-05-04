@@ -3,14 +3,13 @@
  */
 
 import type { Request, Response } from 'express';
-import { LLMConfigManager } from '../../services/LLMConfigService.js';
+import { LLMConfigManagerInstance } from '../../services/LLMConfigService.js';
 import type { LLMConfig } from '../../llm-interaction/index.js';
 
 export class LLMConfigController {
-  private configManager: LLMConfigManager;
+  private configManager = LLMConfigManagerInstance;
 
-  constructor(workspaceBase: string) {
-    this.configManager = new LLMConfigManager(workspaceBase);
+  constructor() {
   }
 
   /**
