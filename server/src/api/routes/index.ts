@@ -6,7 +6,7 @@ import { Router } from 'express';
 import { ChatController } from '../controllers/ChatController.js';
 import { ToolController } from '../controllers/ToolController.js';
 import { DataSourceController } from '../controllers/DataSourceController.js';
-import { FileUploadController, upload } from '../controllers/FileUploadController.js';
+import { FileUploadController, upload, handleMultipartEncoding } from '../controllers/FileUploadController.js';
 import { PromptTemplateController } from '../controllers/PromptTemplateController.js';
 import { PluginManagementController } from '../controllers/PluginManagementController.js';
 import { MVTServiceController } from '../controllers/MVTServiceController.js';
@@ -108,8 +108,8 @@ export class ApiRouter {
     this.router.delete('/data-sources/:id', (req, res) => this.dataSourceController.deleteDataSource(req, res));
 
     // File upload endpoints
-    this.router.post('/upload/single', upload.single('file'), (req, res) => this.fileUploadController.uploadSingleFile(req, res));
-    this.router.post('/upload/multiple', upload.array('files', 50), (req, res) => this.fileUploadController.uploadMultipleFiles(req, res));
+    this.router.post('/upload/single', handleMultipartEncoding, upload.single('file'), (req, res) => this.fileUploadController.uploadSingleFile(req, res));
+    this.router.post('/upload/multiple', handleMultipartEncoding, upload.array('files', 50), (req, res) => this.fileUploadController.uploadMultipleFiles(req, res));
 
     // Prompt template endpoints
     this.router.get('/prompts', (req, res) => this.promptTemplateController.listTemplates(req, res));

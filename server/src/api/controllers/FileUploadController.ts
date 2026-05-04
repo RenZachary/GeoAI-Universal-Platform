@@ -21,6 +21,23 @@ import { FileUploadError, ValidationError, FormatError } from '../../services/Fi
 // Multer Configuration
 // ============================================================================
 
+// Middleware to handle UTF-8 encoding for filenames
+const handleMultipartEncoding = (req: Request, res: Response, next: any) => {
+  // Set charset to utf-8 for proper handling of non-ASCII filenames
+  // This must be done before multer processes the request
+  if (req.headers['content-type']?.includes('multipart/form-data')) {
+    const contentType = req.headers['content-type'];
+    if (!contentType.includes('charset')) {
+      req.headers['content-type'] = contentType + '; charset=utf-8';
+    }
+  }
+  next();
+};
+
+// ============================================================================
+// Multer Configuration
+// ============================================================================
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     // Store files in workspace/data/local directory
@@ -34,11 +51,40 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    // Keep original filename but add timestamp to avoid conflicts
-    const timestamp = Date.now();
-    const ext = path.extname(file.originalname);
-    const baseName = path.basename(file.originalname, ext);
-    cb(null, `${baseName}_${timestamp}${ext}`);
+    // Decode filename to handle UTF-8 characters (Chinese, etc.)
+    let originalName = file.originalname;
+      
+    // Try multiple decoding strategies
+    let decoded = false;
+      
+    // Strategy 1: If it looks like latin-1 encoded UTF-8 bytes (common issue)
+    const rawBytes = Buffer.from(originalName, 'binary');
+    const hasHighBytes = rawBytes.some(b => b > 127);
+      
+    if (hasHighBytes) {
+      try {
+        const utf8Str = rawBytes.toString('utf-8');
+        if (!utf8Str.includes('\ufffd')) {
+          originalName = utf8Str;
+          decoded = true;
+        }
+      } catch (e) {
+        console.warn('[FileUploadController] Binary to UTF-8 conversion failed', e);
+      }
+    }
+      
+    // Strategy 2: Try decodeURIComponent if not yet decoded
+    if (!decoded) {
+      try {
+        originalName = decodeURIComponent(originalName);
+        decoded = true;
+      } catch (e) {
+        console.warn('[FileUploadController] decodeURIComponent failed', e);
+      }
+    }
+    
+    // Use original filename without timestamp
+    cb(null, originalName);
   }
 });
 
@@ -68,6 +114,9 @@ export const upload = multer({
     files: 50 // Max 50 files per upload (for shapefile multi-file)
   }
 });
+
+// Export the encoding middleware
+export { handleMultipartEncoding };
 
 // ============================================================================
 // Controller Implementation

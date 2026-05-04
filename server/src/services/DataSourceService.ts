@@ -8,7 +8,6 @@
  * - Schema extraction and caching
  */
 
-import type Database from 'better-sqlite3';
 import type { DataSourceRepository} from '../data-access/repositories';
 import { type DataSourceRecord } from '../data-access/repositories';
 import { DataAccessorFactory } from '../data-access/factories/DataAccessorFactory';

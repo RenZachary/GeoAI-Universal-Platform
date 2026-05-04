@@ -8,10 +8,8 @@
  * - File cleanup on validation failure
  */
 
-import type Database from 'better-sqlite3';
 import type { DataSourceRepository } from '../data-access/repositories';
 import { DataAccessorFactory } from '../data-access/factories/DataAccessorFactory.js';
-import { v4 as uuidv4 } from 'uuid';
 import type { DataSourceType, NativeData } from '../core';
 import path from 'path';
 import fs from 'fs';
@@ -81,16 +79,58 @@ export class FileUploadService {
   constructor(dataSourceRepo: DataSourceRepository, workspaceBase?: string) {
     this.dataSourceRepo = dataSourceRepo;
     this.accessorFactory = new DataAccessorFactory();
-    
+
     // Configure upload directory
-    this.uploadDir = workspaceBase 
+    this.uploadDir = workspaceBase
       ? path.join(workspaceBase, 'data', 'local')
       : path.join(process.cwd(), '..', 'workspace', 'data', 'local');
-    
+
     // Ensure directory exists
     if (!fs.existsSync(this.uploadDir)) {
       fs.mkdirSync(this.uploadDir, { recursive: true });
     }
+  }
+
+  // ==========================================================================
+  // Private Helper Methods
+  // ==========================================================================
+
+  /**
+   * Decode filename to handle UTF-8 characters (Chinese, etc.)
+   * Tries multiple strategies to properly decode the filename
+   */
+  private decodeFilename(filename: string): string {
+    let decoded = filename;
+    let success = false;
+
+    // Strategy 1: If it looks like latin-1 encoded UTF-8 bytes (common issue)
+    const rawBytes = Buffer.from(filename, 'binary');
+    const hasHighBytes = rawBytes.some(b => b > 127);
+
+    if (hasHighBytes) {
+      try {
+        const utf8Str = rawBytes.toString('utf-8');
+        if (!utf8Str.includes('\ufffd')) {
+          decoded = utf8Str;
+          success = true;
+        }
+      } catch (e) {
+        console.warn('[FileUploadService] Binary to UTF-8 conversion failed');
+      }
+    }
+
+    // Strategy 2: Try decodeURIComponent if not yet decoded
+    if (!success) {
+      try {
+        decoded = decodeURIComponent(filename);
+        success = true;
+      } catch (e) {
+        // decodeURIComponent failed
+        console.warn('[FileUploadService] decodeURIComponent failed', e);
+      }
+    }
+
+    return decoded;
   }
 
   // ==========================================================================
@@ -109,41 +149,75 @@ export class FileUploadService {
     const originalFileName = file.originalname;
     const tempFilePath = file.path;
     const fileSize = file.size;
-    
-    console.log(`[FileUploadService] Processing file: ${originalFileName} (${fileSize} bytes)`);
 
-    let finalFilePath: string;
-    
+    let finalFilePath: string = '';
+
     try {
       // Step 1: Detect data source type
       const type = this.detectDataSourceType(originalFileName);
-      
-      // Step 2: Move file from temp to data/local directory
-      const uniqueFileName = `${Date.now()}_${originalFileName}`;
-      finalFilePath = path.join(this.uploadDir, uniqueFileName);
-      
-      // Copy file to final location
-      fs.copyFileSync(tempFilePath, finalFilePath);
-      console.log(`[FileUploadService] Moved file to: ${finalFilePath}`);
-      
-      // Clean up temp file
-      this.cleanupFile(tempFilePath);
-      
+
+      // Step 2: File is already saved by multer to upload directory
+      // Multer saves with the raw filename from the request (may be encoded)
+      const tempFilePath = path.join(this.uploadDir, originalFileName);
+
+      // Decode filename to handle UTF-8 characters (Chinese, etc.)
+      const decodedFileName = this.decodeFilename(originalFileName);
+      finalFilePath = path.join(this.uploadDir, decodedFileName);
+
+      // Handle file naming:
+      // 1. If multer saved with encoded name, rename to decoded name
+      // 2. If decoded name already exists, add counter suffix
+      if (fs.existsSync(tempFilePath) && tempFilePath !== finalFilePath) {
+        // Multer saved with encoded/different name, need to rename
+        if (fs.existsSync(finalFilePath)) {
+          // Decoded name already exists, find available name with counter
+          const ext = path.extname(decodedFileName);
+          const baseName = path.basename(decodedFileName, ext);
+          let counter = 1;
+          let newFilePath = finalFilePath;
+
+          while (fs.existsSync(newFilePath)) {
+            newFilePath = path.join(this.uploadDir, `${baseName}(${counter})${ext}`);
+            counter++;
+          }
+
+          fs.renameSync(tempFilePath, newFilePath);
+          finalFilePath = newFilePath;
+        } else {
+          // Decoded name doesn't exist, just rename to decoded name
+          fs.renameSync(tempFilePath, finalFilePath);
+        }
+      } else if (fs.existsSync(finalFilePath) && tempFilePath === finalFilePath) {
+        // File already saved with correct decoded name, but it's a duplicate upload
+        // Add counter suffix
+        const ext = path.extname(decodedFileName);
+        const baseName = path.basename(decodedFileName, ext);
+        let counter = 1;
+        let newFilePath = finalFilePath;
+
+        while (fs.existsSync(newFilePath)) {
+          newFilePath = path.join(this.uploadDir, `${baseName}(${counter})${ext}`);
+          counter++;
+        }
+
+        fs.renameSync(finalFilePath, newFilePath);
+        finalFilePath = newFilePath;
+      }
+
       // Step 3: Validate file based on type
       await this.validateFile(finalFilePath, type);
-      
+
       // Step 4: Extract metadata using appropriate accessor
       const nativeData = await this.extractMetadata(finalFilePath, type);
-      
+
       // Step 5: Register data source in database
-      const dataSourceId = uuidv4();
       const dataSource = this.dataSourceRepo.create(
-        path.basename(originalFileName, path.extname(originalFileName)),
+        path.basename(decodedFileName, path.extname(decodedFileName)),
         type,
         finalFilePath,
         {
           ...nativeData.metadata,
-          originalFileName: originalFileName,
+          originalFileName: decodedFileName,
           fileSize,
           uploadedAt: new Date().toISOString()
         }
@@ -161,13 +235,13 @@ export class FileUploadService {
       };
     } catch (error) {
       // Clean up files if processing fails
-      if (finalFilePath! && fs.existsSync(finalFilePath!)) {
-        this.cleanupFile(finalFilePath!);
+      if (finalFilePath && fs.existsSync(finalFilePath)) {
+        this.cleanupFile(finalFilePath);
       }
       if (tempFilePath && fs.existsSync(tempFilePath)) {
         this.cleanupFile(tempFilePath);
       }
-      
+
       if (error instanceof FileUploadError) {
         throw error;
       }
@@ -188,28 +262,81 @@ export class FileUploadService {
     try {
       // Step 1: Validate shapefile components
       const components = this.validateShapefileComponents(files);
-      
+
       // Step 2: Use .shp file as primary reference
-      const shpFile = files.find(f => f.originalname.toLowerCase().endsWith('.shp'))!;
-      const filePath = shpFile.path;
+      const shpFile = files && files.find(f => f.originalname.toLowerCase().endsWith('.shp'));
+      if (!shpFile)
+        throw new ValidationError('Shapefile is missing required .shp file');
+      // Decode filename to handle UTF-8 characters
+      const decodedShpName = this.decodeFilename(shpFile.originalname);
+
+      // Build final file paths for all components
+      const finalPaths: Record<string, string> = {};
+      for (const [ext, file] of Object.entries(components)) {
+        const decodedName = this.decodeFilename(file.originalname);
+        const tempPath = path.join(this.uploadDir, file.originalname);
+        let finalPath = path.join(this.uploadDir, decodedName);
+
+        // Handle file naming similar to single file upload
+        if (fs.existsSync(tempPath) && tempPath !== finalPath) {
+          // Multer saved with encoded/different name
+          if (fs.existsSync(finalPath)) {
+            // Decoded name already exists, find available name with counter
+            const ext = path.extname(decodedName);
+            const baseName = path.basename(decodedName, ext);
+            let counter = 1;
+            let newFilePath = finalPath;
+
+            while (fs.existsSync(newFilePath)) {
+              newFilePath = path.join(this.uploadDir, `${baseName}(${counter})${ext}`);
+              counter++;
+            }
+
+            fs.renameSync(tempPath, newFilePath);
+            finalPath = newFilePath;
+            console.log(`[FileUploadService] Shapefile component renamed from ${path.basename(tempPath)} to ${path.basename(newFilePath)}`);
+          } else {
+            // Just rename to decoded name
+            fs.renameSync(tempPath, finalPath);
+            console.log(`[FileUploadService] Shapefile component renamed from ${path.basename(tempPath)} to ${path.basename(finalPath)}`);
+          }
+        } else if (fs.existsSync(finalPath) && tempPath === finalPath) {
+          // File already has correct name but it's a duplicate
+          const ext = path.extname(decodedName);
+          const baseName = path.basename(decodedName, ext);
+          let counter = 1;
+          let newFilePath = finalPath;
+
+          while (fs.existsSync(newFilePath)) {
+            newFilePath = path.join(this.uploadDir, `${baseName}(${counter})${ext}`);
+            counter++;
+          }
+
+          fs.renameSync(finalPath, newFilePath);
+          finalPath = newFilePath;
+        }
+
+        finalPaths[ext] = finalPath;
+      }
+
+      const filePath = finalPaths['shp'];
       const fileSize = files.reduce((sum, f) => sum + f.size, 0);
-      
+
       // Step 3: Validate shapefile
       await this.validateFile(filePath, 'shapefile');
-      
+
       // Step 4: Extract metadata
       const nativeData = await this.extractMetadata(filePath, 'shapefile');
-      
+
       // Step 5: Register data source
-      const dataSourceId = uuidv4();
-      const baseName = path.basename(shpFile.originalname, '.shp');
+      const baseName = path.basename(decodedShpName, '.shp');
       const dataSource = this.dataSourceRepo.create(
         baseName,
         'shapefile',
         filePath,
         {
           ...nativeData.metadata,
-          originalFileName: shpFile.originalname,
+          originalFileName: decodedShpName,
           fileSize,
           components: Object.keys(components),
           uploadedAt: new Date().toISOString()
@@ -229,7 +356,7 @@ export class FileUploadService {
     } catch (error) {
       // Clean up all uploaded files if processing fails
       files.forEach(file => this.cleanupFile(file.path));
-      
+
       if (error instanceof FileUploadError) {
         throw error;
       }
@@ -253,7 +380,7 @@ export class FileUploadService {
    */
   private detectDataSourceType(fileName: string): DataSourceType {
     const ext = path.extname(fileName).toLowerCase();
-    
+
     switch (ext) {
       case '.geojson':
       case '.json':
@@ -276,16 +403,16 @@ export class FileUploadService {
   private async validateFile(filePath: string, type: DataSourceType): Promise<void> {
     try {
       const accessor = this.accessorFactory.createAccessor(type);
-      
+
       // For shapefile, validate all components exist
       if (type === 'shapefile') {
         await this.validateShapefileComplete(filePath);
         return;
       }
-      
+
       // Test reading the file to ensure it's valid
       await accessor.read(filePath);
-      
+
       console.log(`[FileUploadService] File validation successful: ${type}`);
     } catch (error) {
       throw new ValidationError(`File validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -299,9 +426,9 @@ export class FileUploadService {
     try {
       const accessor = this.accessorFactory.createAccessor(type);
       const nativeData = await accessor.read(filePath);
-      
+
       console.log(`[FileUploadService] Metadata extracted: ${JSON.stringify(nativeData.metadata)}`);
-      
+
       return nativeData;
     } catch (error) {
       throw new FileUploadError(`Failed to extract metadata: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -320,7 +447,7 @@ export class FileUploadService {
     ];
 
     const missingFiles = requiredFiles.filter(file => !fs.existsSync(file));
-    
+
     if (missingFiles.length > 0) {
       throw new ValidationError(`Incomplete shapefile. Missing components: ${missingFiles.map(f => path.basename(f)).join(', ')}`);
     }
@@ -333,10 +460,10 @@ export class FileUploadService {
    */
   private validateShapefileComponents(files: UploadedFile[]): ShapefileComponents {
     const components: ShapefileComponents = { shp: '' };
-    
+
     for (const file of files) {
       const ext = path.extname(file.originalname).toLowerCase();
-      
+
       switch (ext) {
         case '.shp':
           components.shp = file.path;

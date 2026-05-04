@@ -34,6 +34,9 @@ export class SQLiteManager {
     // Enable WAL mode for better performance
     this.db.pragma('journal_mode = WAL');
     
+    // Ensure UTF-8 encoding for proper Chinese character support
+    this.db.pragma('encoding = "UTF-8"');
+    
     // Create tables
     this.createTables();
     
