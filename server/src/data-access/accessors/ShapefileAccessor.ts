@@ -46,9 +46,23 @@ export class ShapefileAccessor extends GeoJSONBasedAccessor implements DataAcces
   // ========================================================================
 
   protected async loadGeoJSON(reference: string): Promise<GeoJSONFeatureCollection> {
-    const baseName = path.basename(reference, '.shp');
     const source = await shapefile.open(reference.replace('.shp', ''));
-    return await source.read();
+    
+    // Read all features from the shapefile
+    const features = [];
+    let result;
+    
+    while (!(result = await source.read()).done) {
+      if (result.value) {
+        features.push(result.value);
+      }
+    }
+    
+    // Return as FeatureCollection
+    return {
+      type: 'FeatureCollection',
+      features: features
+    };
   }
 
   protected async saveGeoJSON(geojson: GeoJSONFeatureCollection, hint?: string): Promise<string> {

@@ -17,7 +17,7 @@ export const useMapStore = defineStore('map', () => {
   const mapContainer = ref<HTMLElement | null>(null)
   
   // Computed
-  const visibleLayers = computed(() => layers.value.filter(l => l.visible))
+  const visibleLayers = computed<MapLayer[]>(() => layers.value.filter(l => l.visible))
   
   // Actions
   function initializeMap(containerId: string) {
@@ -158,9 +158,14 @@ export const useMapStore = defineStore('map', () => {
       map.removeSource(layer.id)
     }
     
+    // Convert relative URL to absolute URL for Mapbox GL JS
+    const dataUrl = layer.url.startsWith('http') 
+      ? layer.url 
+      : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${layer.url}`
+    
     map.addSource(layer.id, {
       type: 'geojson',
-      data: layer.url
+      data: dataUrl
     })
     
     map.addLayer({
@@ -180,9 +185,14 @@ export const useMapStore = defineStore('map', () => {
       map.removeSource(layer.id)
     }
     
+    // Convert relative URL to absolute URL for Mapbox GL JS
+    const tilesUrl = layer.url.startsWith('http') 
+      ? layer.url 
+      : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${layer.url}`
+    
     map.addSource(layer.id, {
       type: 'vector',
-      tiles: [layer.url],
+      tiles: [tilesUrl],
       minzoom: layer.minZoom || 0,
       maxzoom: layer.maxZoom || 22
     })
@@ -205,9 +215,14 @@ export const useMapStore = defineStore('map', () => {
       map.removeSource(layer.id)
     }
     
+    // Convert relative URL to absolute URL for Mapbox GL JS
+    const tilesUrl = layer.url.startsWith('http') 
+      ? layer.url 
+      : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${layer.url}`
+    
     map.addSource(layer.id, {
       type: 'raster',
-      tiles: [layer.url],
+      tiles: [tilesUrl],
       tileSize: 256
     })
     

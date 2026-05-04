@@ -68,7 +68,7 @@ async function startServer() {
       tempFileMaxAge: 24 * 60 * 60 * 1000,           // 24 hours
       mvtServiceMaxAge: 7 * 24 * 60 * 60 * 1000,     // 7 days
       wmsServiceMaxAge: 7 * 24 * 60 * 60 * 1000,     // 7 days
-      uploadFileMaxAge: 30 * 24 * 60 * 60 * 1000,    // 30 days
+      uploadFileMaxAge: 365 * 24 * 60 * 60 * 1000,   // 365 days (1 year) - preserve uploaded data sources
       interval: 60 * 60 * 1000,                       // 1 hour
       enableAutoCleanup: true
     });

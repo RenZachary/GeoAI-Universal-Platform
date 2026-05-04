@@ -3,14 +3,13 @@
  * Provides unified interface for all data source operations
  */
 
-// Core interfaces
-export {
+// Core interfaces (type-only exports)
+export type {
   DataAccessor,
   FileAccessor,
   DatabaseAccessor,
   PostGISAccessor as PostGISAccessorInterface,
   WebServiceAccessor,
-  AccessorRegistry,
   TableSchema,
   ColumnInfo,
   IndexInfo,

@@ -33,3 +33,18 @@ export async function previewDataSource(id: string, limit: number = 10): Promise
   })
   return response.data
 }
+
+/**
+ * Get service URL for a data source (auto-publishes if needed)
+ * Returns MVT URL for vector data, WMS URL for raster data
+ */
+export async function getDataSourceServiceUrl(id: string): Promise<{
+  serviceUrl: string
+  serviceType: 'mvt' | 'wms'
+}> {
+  const response = await api.get(`/api/data-sources/${id}/service-url`)
+  return {
+    serviceUrl: response.data.serviceUrl,
+    serviceType: response.data.serviceType
+  }
+}

@@ -11,8 +11,8 @@ export class MVTDynamicController {
   private publisher: MVTDynamicPublisher;
   private db?: Database.Database;
 
-  constructor(workspaceBase: string, db?: Database.Database, cacheSize: number = 10000) {
-    this.publisher = new MVTDynamicPublisher(workspaceBase, cacheSize);
+  constructor(publisher: MVTDynamicPublisher, db?: Database.Database) {
+    this.publisher = publisher;
     this.db = db;
     
     console.log('[MVT Dynamic Controller] Initialized');

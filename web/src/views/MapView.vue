@@ -132,6 +132,7 @@ import { useDataSourceStore } from '@/stores/dataSources'
 import { MapLocation, List, Delete, Connection, Document, Picture } from '@element-plus/icons-vue'
 import type { DataSource } from '@/types'
 import LayerItemCard from '@/components/map/LayerItemCard.vue'
+import { getDataSourceServiceUrl } from '@/services/dataSource'
 
 const mapStore = useMapStore()
 const dataSourceStore = useDataSourceStore()
@@ -184,38 +185,40 @@ onMounted(async () => {
   // Load data sources and auto-add as layers
   await dataSourceStore.loadDataSources()
   
-  // Auto-add all data sources as map layers
-  dataSourceStore.dataSources.forEach(ds => {
-    let layerType: 'geojson' | 'mvt' | 'wms' | 'heatmap' = 'geojson'
-    let url = ''
-    
-    // Determine layer type based on data source type
-    if (ds.type === 'postgis') {
-      layerType = 'mvt'
-      url = `/api/mvt-dynamic/${ds.id}/{z}/{x}/{y}.pbf`
-    } else if (ds.type === 'geotiff') {
-      layerType = 'wms'
-      url = `/api/wms/${ds.id}`
-    } else {
-      // geojson, shapefile, csv
-      layerType = 'geojson'
-      url = `/api/datasources/${ds.id}/geojson`
+  // Auto-add all data sources as map layers with proper service URLs
+  for (const ds of dataSourceStore.dataSources) {
+    try {
+      // Get the appropriate service URL (MVT or WMS)
+      const serviceInfo = await getDataSourceServiceUrl(ds.id)
+      
+      let layerType: 'geojson' | 'mvt' | 'wms' | 'heatmap'
+      let url: string
+      
+      if (serviceInfo.serviceType === 'wms') {
+        layerType = 'wms'
+        url = serviceInfo.serviceUrl
+      } else {
+        layerType = 'mvt'
+        url = serviceInfo.serviceUrl
+      }
+      
+      mapStore.addLayer({
+        id: `layer-${ds.id}`,
+        type: layerType,
+        url: url,
+        visible: true,
+        opacity: 0.7,
+        dataSourceId: ds.id,  // Link to data source
+        style: {
+          fillColor: '#409eff',
+          fillOpacity: 0.5
+        },
+        sourceLayer: ds.type === 'postgis' ? 'default' : undefined
+      })
+    } catch (error) {
+      console.error(`Failed to add layer for data source ${ds.id}:`, error)
     }
-    
-    mapStore.addLayer({
-      id: `layer-${ds.id}`,
-      type: layerType,
-      url: url,
-      visible: true,
-      opacity: 0.7,
-      dataSourceId: ds.id,  // Link to data source
-      style: {
-        fillColor: '#409eff',
-        fillOpacity: 0.5
-      },
-      sourceLayer: ds.type === 'postgis' ? 'default' : undefined
-    })
-  })
+  }
 })
 
 function handleBasemapChange(basemapType: string) {
@@ -257,9 +260,7 @@ function handleBasemapChange(basemapType: string) {
 }
 
 .layer-item {
-  border: 1px solid var(--el-border-color);
   border-radius: 8px;
-  padding: 12px;
   margin-bottom: 12px;
   background: var(--el-fill-color-lighter);
 }
@@ -318,16 +319,16 @@ function handleBasemapChange(basemapType: string) {
     align-items: center;
     gap: 8px;
     padding: 8px 12px;
-    background: #f0f2f5;
+    background: var(--el-fill-color-light);
     border-radius: 4px;
     margin-bottom: 12px;
     font-weight: 600;
-    color: #303133;
+    color: var(--el-text-color-primary);
     font-size: 14px;
     
     .el-icon {
       font-size: 16px;
-      color: #409eff;
+      color: var(--el-color-primary);
     }
   }
 }

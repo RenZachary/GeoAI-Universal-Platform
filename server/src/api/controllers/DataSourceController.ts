@@ -14,7 +14,10 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { DataSourceService } from '../../services';
 import { ConnectionError, ValidationError } from '../../services/DataSourceService';
+import { DataSourcePublishingService } from '../../services/DataSourcePublishingService';
 import type { DataSourceRecord } from '../../data-access/repositories';
+import type Database from 'better-sqlite3';
+import type { MVTDynamicPublisher } from '../../utils/publishers/MVTDynamicPublisher';
 
 // ============================================================================
 // Validation Schemas
@@ -40,9 +43,11 @@ const UpdateMetadataSchema = z.object({
 
 export class DataSourceController {
   private dataSourceService: DataSourceService;
+  private publishingService: DataSourcePublishingService;
 
-  constructor(dataSourceService: DataSourceService) {
+  constructor(dataSourceService: DataSourceService, db: Database.Database, workspaceBase: string, mvtPublisher?: MVTDynamicPublisher) {
     this.dataSourceService = dataSourceService;
+    this.publishingService = new DataSourcePublishingService(db, workspaceBase, mvtPublisher);
   }
 
   /**
@@ -269,6 +274,28 @@ export class DataSourceController {
         count: sources.length,
         query: q,
         dataSources: sources
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Get service URL for a data source (auto-publish if needed)
+   * GET /api/data-sources/:id/service-url
+   */
+  async getServiceUrl(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const dataSourceId = Array.isArray(id) ? id[0] : id;
+      
+      const serviceInfo = await this.publishingService.getServiceUrl(dataSourceId);
+      
+      res.json({
+        success: true,
+        dataSourceId,
+        serviceUrl: serviceInfo.url,
+        serviceType: serviceInfo.type
       });
     } catch (error) {
       this.handleError(res, error);

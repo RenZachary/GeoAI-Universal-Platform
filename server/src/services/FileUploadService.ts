@@ -161,8 +161,8 @@ export class FileUploadService {
       };
     } catch (error) {
       // Clean up files if processing fails
-      if (finalFilePath && fs.existsSync(finalFilePath)) {
-        this.cleanupFile(finalFilePath);
+      if (finalFilePath! && fs.existsSync(finalFilePath!)) {
+        this.cleanupFile(finalFilePath!);
       }
       if (tempFilePath && fs.existsSync(tempFilePath)) {
         this.cleanupFile(tempFilePath);

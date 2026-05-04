@@ -56,7 +56,6 @@
     <el-dialog
       v-model="showInfoDialog"
       :title="dataSource?.name || 'Layer Information'"
-      width="500px"
     >
       <el-descriptions :column="1" border>
         <el-descriptions-item label="Layer ID">
@@ -111,7 +110,7 @@ function getTypeColor(type?: string): string {
     csv: 'info',
     geotiff: 'danger'
   }
-  return colors[type || ''] || ''
+  return colors[type || ''] || 'info'
 }
 
 function getDisplayType(type?: string): string {
@@ -135,14 +134,13 @@ function formatDate(dateString: string): string {
 <style scoped lang="scss">
 .layer-item-card {
   padding: 12px;
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--el-border-color);
   border-radius: 6px;
-  margin-bottom: 12px;
-  background: #fff;
+  background: var(--el-bg-color);
   transition: all 0.3s;
   
   &.is-visible {
-    border-color: #409eff;
+    border-color: var(--el-color-primary);
     box-shadow: 0 2px 8px rgba(64, 158, 255, 0.1);
   }
   
@@ -162,7 +160,7 @@ function formatDate(dateString: string): string {
     
     :deep(.el-checkbox__label) {
       font-weight: 500;
-      color: #303133;
+      color: var(--el-text-color-primary);
     }
   }
   
@@ -193,7 +191,7 @@ function formatDate(dateString: string): string {
     
     .record-count {
       font-size: 12px;
-      color: #909399;
+      color: var(--el-text-color-secondary);
     }
   }
   
@@ -202,7 +200,7 @@ function formatDate(dateString: string): string {
     align-items: center;
     gap: 4px;
     font-size: 12px;
-    color: #606266;
+    color: var(--el-text-color-regular);
     margin-bottom: 6px;
     
     .el-icon {
@@ -214,12 +212,12 @@ function formatDate(dateString: string): string {
 .opacity-control {
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--el-border-color-light);
   
   .opacity-label {
     display: block;
     font-size: 12px;
-    color: #606266;
+    color: var(--el-text-color-regular);
     margin-bottom: 4px;
   }
   

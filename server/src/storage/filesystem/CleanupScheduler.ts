@@ -312,56 +312,14 @@ export class CleanupScheduler {
 
   /**
    * Clean up old uploaded files
+   * NOTE: This is disabled because data/local is the user's workspace directory
+   * and should never be automatically cleaned up.
    */
   private async cleanupUploadFiles(): Promise<{ deletedCount: number; spaceFreed: number }> {
-    console.log('[Cleanup Scheduler] Cleaning old uploaded files...');
+    console.log('[Cleanup Scheduler] Skipping uploaded files cleanup (user workspace directory)');
     
-    const dataLocalDir = this.workspaceManager.getDirectoryPath('DATA_LOCAL');
-    
-    if (!fs.existsSync(dataLocalDir)) {
-      console.log('[Cleanup Scheduler] Data local directory does not exist');
-      return { deletedCount: 0, spaceFreed: 0 };
-    }
-
-    let deletedCount = 0;
-    let spaceFreed = 0;
-    const cutoffTime = Date.now() - this.config.uploadFileMaxAge;
-
-    try {
-      const items = fs.readdirSync(dataLocalDir, { withFileTypes: true });
-
-      for (const item of items) {
-        const itemPath = path.join(dataLocalDir, item.name);
-        
-        try {
-          const stats = fs.statSync(itemPath);
-          
-          // Check if file is older than max age
-          if (stats.mtimeMs < cutoffTime) {
-            const size = this.getDirectorySize(itemPath);
-            
-            if (item.isDirectory()) {
-              fs.rmSync(itemPath, { recursive: true, force: true });
-            } else {
-              fs.unlinkSync(itemPath);
-            }
-            
-            deletedCount++;
-            spaceFreed += size;
-            console.log(`[Cleanup Scheduler] Deleted uploaded file: ${item.name} (${this.formatBytes(size)})`);
-          }
-        } catch (error) {
-          console.warn(`[Cleanup Scheduler] Failed to process uploaded file: ${item.name}`, error);
-        }
-      }
-
-      console.log(`[Cleanup Scheduler] Uploaded files cleanup: ${deletedCount} deleted, ${this.formatBytes(spaceFreed)} freed`);
-      return { deletedCount, spaceFreed };
-
-    } catch (error) {
-      console.error('[Cleanup Scheduler] Uploaded files cleanup failed:', error);
-      return { deletedCount: 0, spaceFreed: 0 };
-    }
+    // Disabled: data/local is the user's workspace and should not be auto-cleaned
+    return { deletedCount: 0, spaceFreed: 0 };
   }
 
   /**

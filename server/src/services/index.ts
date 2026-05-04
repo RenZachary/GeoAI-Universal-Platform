@@ -24,3 +24,6 @@ export type {
 
 export { LLMConfigManager } from './LLMConfigService';
 export type { StoredLLMConfig } from './LLMConfigService';
+
+// MVTDynamicPublisher Singleton (re-export from utils)
+export { getMVTPublisher, resetMVTPublisher, MVTDynamicPublisher } from '../utils/publishers/MVTDynamicPublisher';

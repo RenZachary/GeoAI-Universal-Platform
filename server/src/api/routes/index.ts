@@ -14,7 +14,7 @@ import { MVTDynamicController } from '../controllers/MVTDynamicController.js';
 import { WMSServiceController } from '../controllers/WMSServiceController.js';
 import { ResultController } from '../controllers/ResultController.js';
 import { LLMConfigController } from '../controllers/LLMConfigController.js';
-import { DataSourceService, FileUploadService, PromptTemplateService } from '../../services';
+import { DataSourceService, FileUploadService, PromptTemplateService, getMVTPublisher } from '../../services';
 import { DataSourceRepository } from '../../data-access/repositories';
 import type Database from 'better-sqlite3';
 import type { LLMConfig } from '../../llm-interaction';
@@ -52,11 +52,15 @@ export class ApiRouter {
     // Initialize controllers with injected dependencies
     this.toolController = new ToolController(this.toolRegistry, db);
     this.chatController = new ChatController(db, llmConfig, this.toolRegistry, workspaceBase);
-    this.dataSourceController = new DataSourceController(dataSourceService); // ✅ Injected service
+    
+    // Initialize shared MVTDynamicPublisher singleton
+    const mvtDynamicPublisher = getMVTPublisher(workspaceBase, 10000);
+    
+    this.dataSourceController = new DataSourceController(dataSourceService, db, workspaceBase, mvtDynamicPublisher); // ✅ Injected service with shared publisher
     this.fileUploadController = new FileUploadController(fileUploadService); // ✅ Injected service
     this.promptTemplateController = new PromptTemplateController(promptTemplateService); // ✅ Injected service
     this.mvtServiceController = new MVTServiceController(workspaceBase, db);
-    this.mvtDynamicController = new MVTDynamicController(workspaceBase, db, 10000);
+    this.mvtDynamicController = new MVTDynamicController(mvtDynamicPublisher); // ✅ Use shared publisher
     this.wmsServiceController = new WMSServiceController(workspaceBase, db);
     this.resultController = new ResultController(workspaceBase);
     this.llmConfigController = new LLMConfigController(workspaceBase);
@@ -97,6 +101,7 @@ export class ApiRouter {
     this.router.get('/data-sources/search', (req, res) => this.dataSourceController.searchDataSources(req, res));
     this.router.get('/data-sources/:id', (req, res) => this.dataSourceController.getDataSource(req, res));
     this.router.get('/data-sources/:id/schema', (req, res) => this.dataSourceController.getDataSourceSchema(req, res));
+    this.router.get('/data-sources/:id/service-url', (req, res) => this.dataSourceController.getServiceUrl(req, res));
     this.router.post('/data-sources', (req, res) => this.dataSourceController.registerDataSource(req, res));
     this.router.post('/data-sources/postgis', (req, res) => this.dataSourceController.registerPostGISConnection(req, res));
     this.router.put('/data-sources/:id/metadata', (req, res) => this.dataSourceController.updateMetadata(req, res));
