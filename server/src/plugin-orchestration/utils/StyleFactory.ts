@@ -318,24 +318,43 @@ export class StyleFactory {
     property: string,
     breaks: number[],
     values: string[]
-  ): any[] {
+  ): any {
+    // Check if all breaks are the same value
+    const uniqueBreaks = [...new Set(breaks)];
+    if (uniqueBreaks.length === 1) {
+      // All values are the same, use a medium color from the ramp for better visibility
+      console.warn('[StyleFactory] All break values are identical. Using medium color for visibility.');
+      // Use the middle color instead of the first (lightest) one
+      const middleIndex = Math.floor(values.length / 2);
+      return values[middleIndex];
+    }
+
     const expr: any[] = ['interpolate', ['linear'], ['get', property]];
+
+    // Sort breaks and corresponding values to ensure ascending order
+    const sortedIndices = breaks
+      .map((val, idx) => ({ val, idx }))
+      .sort((a, b) => a.val - b.val)
+      .map(item => item.idx);
+    
+    const sortedBreaks = sortedIndices.map(i => breaks[i]);
+    const sortedValues = sortedIndices.map(i => values[i]);
 
     // If values.length === breaks.length, use breaks[i] -> values[i]
     // If values.length === breaks.length - 1, use ranges between breaks
-    if (values.length === breaks.length) {
-      for (let i = 0; i < breaks.length; i++) {
-        expr.push(breaks[i]);
-        expr.push(values[i]);
+    if (sortedValues.length === sortedBreaks.length) {
+      for (let i = 0; i < sortedBreaks.length; i++) {
+        expr.push(sortedBreaks[i]);
+        expr.push(sortedValues[i]);
       }
-    } else if (values.length === breaks.length - 1) {
-      for (let i = 0; i < breaks.length - 1; i++) {
-        expr.push(breaks[i]);
-        expr.push(values[i]);
+    } else if (sortedValues.length === sortedBreaks.length - 1) {
+      for (let i = 0; i < sortedBreaks.length - 1; i++) {
+        expr.push(sortedBreaks[i]);
+        expr.push(sortedValues[i]);
       }
       // Add the last break with the last color
-      expr.push(breaks[breaks.length - 1]);
-      expr.push(values[values.length - 1]);
+      expr.push(sortedBreaks[sortedBreaks.length - 1]);
+      expr.push(sortedValues[sortedValues.length - 1]);
     } else {
       throw new Error('Invalid breaks/values configuration');
     }

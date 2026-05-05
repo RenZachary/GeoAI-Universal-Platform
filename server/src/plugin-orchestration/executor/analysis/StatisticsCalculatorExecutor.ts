@@ -119,19 +119,26 @@ export class StatisticsCalculatorExecutor {
       console.log(`[StatisticsCalculatorExecutor] Statistics saved to: ${statsPath}`);
 
       // Step 6: Generate result metadata
+      const resultMetadata = {
+        pluginId: 'statistics_calculator',
+        dataSourceId: params.dataSourceId,
+        fieldName: params.fieldName,
+        valueCount: values.length,
+        statisticsRequested: statsToCalculate,
+        statistics: statistics,
+        calculatedAt: new Date(),
+        summary: this.generateSummary(statistics, params.fieldName)
+      };
+      
+      // Add standardized output fields for placeholder resolution
       return {
         id: statsId,
         type: 'geojson',
         reference: `/api/results/geojson/${statsFilename}`,
         metadata: {
-          pluginId: 'statistics_calculator',
-          dataSourceId: params.dataSourceId,
-          fieldName: params.fieldName,
-          valueCount: values.length,
-          statisticsRequested: statsToCalculate,
-          statistics: statistics,
-          calculatedAt: new Date(),
-          summary: this.generateSummary(statistics, params.fieldName)
+          ...resultMetadata,
+          resultValue: statistics,  // Standardized field
+          output: statistics         // Standardized field
         },
         createdAt: new Date()
       };

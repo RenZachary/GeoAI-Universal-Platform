@@ -217,7 +217,6 @@ const isUploading = ref(false)
 const isConnecting = ref(false)
 
 // PostGIS Connection Form
-const postGISFormRef = ref()
 const postGISForm = reactive({
   name: '',
   host: 'localhost',

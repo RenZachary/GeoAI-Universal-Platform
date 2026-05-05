@@ -109,6 +109,25 @@ export class ReportGeneratorExecutor {
   private generateHTMLReport(params: ReportGeneratorParams, reportId: string): string {
     const timestamp = new Date().toLocaleString();
     
+    // Normalize analysis results to handle different input formats from LLM
+    const normalizedResults = params.analysisResults?.map(result => {
+      // If result has 'data' field, use it directly
+      if (result.data !== undefined) {
+        return result;
+      }
+      
+      // If result has 'value' field (LLM format), convert to 'data'
+      if ('value' in result) {
+        return {
+          ...result,
+          data: result.value,
+          description: result.description || (result as any).label
+        };
+      }
+      
+      return result;
+    }) || [];
+    
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -241,10 +260,10 @@ export class ReportGeneratorExecutor {
     </div>
     ` : ''}
 
-    ${params.analysisResults && params.analysisResults.length > 0 ? `
+    ${normalizedResults && normalizedResults.length > 0 ? `
     <div class="section">
       <h2>Analysis Results</h2>
-      ${params.analysisResults.map(result => `
+      ${normalizedResults.map(result => `
         <div class="result-card">
           <span class="result-type">${this.escapeHtml(result.type || 'unknown')}</span>
           ${result.description ? `<p><strong>Description:</strong> ${this.escapeHtml(result.description)}</p>` : ''}

@@ -222,7 +222,6 @@ export const useMapStore = defineStore('map', () => {
       }
 
       const styleJson = await response.json()
-      console.log('[Map Store] Custom style loaded:', styleJson)
 
       // Add vector source
       const tilesUrl = layer.url.startsWith('http')
@@ -360,17 +359,52 @@ export const useMapStore = defineStore('map', () => {
   }
 
   function clearAllLayers() {
-    layers.value.forEach(layer => {
-      if (mapInstance.value) {
-        if (mapInstance.value.getLayer(layer.id)) {
-          mapInstance.value.removeLayer(layer.id)
+    if (!mapInstance.value) return
+    
+    const map = mapInstance.value
+    
+    // Remove dynamically generated service layers (no dataSourceId)
+    // Keep original data layers (have dataSourceId)
+    const layersToRemove = layers.value.filter(layer => !layer.dataSourceId)
+    const layersToKeep = layers.value.filter(layer => layer.dataSourceId)
+    
+    console.log(`[Map Store] Clearing ${layersToRemove.length} service layers, keeping ${layersToKeep.length} data layers`)
+    
+    // First, remove all service layers from the map
+    layersToRemove.forEach(layer => {
+      try {
+        if (map.getLayer(layer.id)) {
+          map.removeLayer(layer.id)
         }
-        if (mapInstance.value.getSource(layer.id)) {
-          mapInstance.value.removeSource(layer.id)
+        if (map.getSource(layer.id)) {
+          map.removeSource(layer.id)
+        }
+      } catch (error) {
+        console.warn(`Failed to remove layer ${layer.id}:`, error)
+      }
+    })
+    
+    // Also remove any custom style layers that might have been added (e.g., choropleth fill/outline)
+    const allLayers = map.getStyle().layers
+    allLayers.forEach((mapLayer: any) => {
+      // Skip basemap layer
+      if (mapLayer.id === 'basemap-layer') return
+      
+      // Check if this is a custom style layer (not in our layers array)
+      const isInOurLayers = layers.value.some(l => l.id === mapLayer.id)
+      if (!isInOurLayers) {
+        try {
+          map.removeLayer(mapLayer.id)
+        } catch (error) {
+          // Ignore errors for layers we can't remove
         }
       }
     })
-    layers.value = []
+    
+    // Remove service layers from the layers array
+    layers.value = layersToKeep
+    
+    console.log(`[Map Store] Remaining layers: ${layers.value.length}`)
   }
 
   /**

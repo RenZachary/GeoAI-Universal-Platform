@@ -90,6 +90,12 @@ export class AggregationExecutor {
     console.log('[AggregationExecutor] Aggregation completed successfully');
     console.log('[AggregationExecutor] Result value:', result.metadata?.aggregatedValue);
 
+    // Add standardized output field for placeholder resolution
+    if (result.metadata) {
+      result.metadata.resultValue = result.metadata.aggregatedValue;
+      result.metadata.output = result.metadata.aggregatedValue;
+    }
+
     return result;
   }
 

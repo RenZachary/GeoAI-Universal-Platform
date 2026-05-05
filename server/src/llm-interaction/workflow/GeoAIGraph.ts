@@ -15,6 +15,7 @@ import { ConversationBufferMemoryWithSQLite } from '../managers/ConversationMemo
 import { ServicePublisher } from './ServicePublisher';
 import { SummaryGenerator } from './SummaryGenerator';
 import { SQLiteManagerInstance } from '../../storage/';
+import { resolvePlaceholders } from './PlaceholderResolver';
 
 // State interface for the GeoAI workflow
 export interface GeoAIState {
@@ -194,9 +195,12 @@ export function createGeoAIGraph(
                 continue;
               }
               
-              // Invoke the tool with parameters
-              console.log(`[Plugin Executor] Invoking tool with parameters:`, step.parameters);
-              const toolResult = await tool.invoke(step.parameters);
+              // Resolve placeholders in parameters using previous execution results
+              const resolvedParameters = resolvePlaceholders(step.parameters, executionResults);
+              
+              // Invoke the tool with resolved parameters
+              console.log(`[Plugin Executor] Invoking tool with parameters:`, resolvedParameters);
+              const toolResult = await tool.invoke(resolvedParameters);
               
               console.log(`[Plugin Executor] Tool execution successful`);
               
