@@ -3,10 +3,10 @@
  */
 
 import { z } from 'zod';
-import type { LLMConfig } from '../adapters/LLMAdapterFactory.js';
-import { LLMAdapterFactory } from '../adapters/LLMAdapterFactory.js';
-import type { PromptManager } from '../managers/PromptManager.js';
-import type { GeoAIStateType, AnalysisGoal } from '../workflow/GeoAIGraph.js';
+import type { LLMConfig } from '../adapters/LLMAdapterFactory';
+import { LLMAdapterFactory } from '../adapters/LLMAdapterFactory';
+import type { PromptManager } from '../managers/PromptManager';
+import type { GeoAIStateType, AnalysisGoal } from '../workflow/GeoAIGraph';
 
 export class GoalSplitterAgent {
   private llmConfig: LLMConfig;

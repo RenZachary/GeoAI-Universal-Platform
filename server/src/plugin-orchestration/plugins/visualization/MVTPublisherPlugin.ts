@@ -33,7 +33,7 @@ export const MVTPublisherPlugin: Plugin = {
       name: 'maxZoom',
       type: 'number',
       required: false,
-      defaultValue: 14,
+      defaultValue: 22,
       description: 'Maximum zoom level',
       validation: {
         min: 0,

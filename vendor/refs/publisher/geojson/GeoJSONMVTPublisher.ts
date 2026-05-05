@@ -49,7 +49,7 @@ export class GeoJSONMVTPublisher {
    * const tileCallback = await publisher.createTileService(
    *   'my-datasource',
    *   async () => await datasource.query({}),
-   *   { maxZoom: 14, tolerance: 3 }
+   *   { maxZoom: 22, tolerance: 3 }
    * );
    * 
    * // Use the callback in an Express route
@@ -70,7 +70,7 @@ export class GeoJSONMVTPublisher {
     options: MVTPublisherOptions = {}
   ): Promise<MVTTileCallback> {
     const {
-      maxZoom = 14,
+      maxZoom = 22,
       tolerance = 3,
       extent = 4096,
       buffer = 64,
@@ -184,7 +184,7 @@ export class GeoJSONMVTPublisher {
     });
     
     const index = geojsonvt(processedGeoJSON, {
-      maxZoom: options.maxZoom || 14,
+      maxZoom: options.maxZoom || 22,
       tolerance: options.tolerance || 3,
       extent: options.extent || 4096,
       buffer: options.buffer || 64,

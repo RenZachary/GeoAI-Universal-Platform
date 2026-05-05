@@ -124,7 +124,7 @@ export class MVTPublisherFactory {
         success: true,
         layerId,
         tileUrl: `/api/mvt/tiles/${layerId}/{z}/{x}/{y}.pbf`,
-        maxZoom: metadata.options?.maxZoom || 14
+        maxZoom: metadata.options?.maxZoom || 22
       };
 
     } catch (error: any) {

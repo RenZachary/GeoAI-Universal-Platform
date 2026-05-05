@@ -11,6 +11,7 @@ export { MVTPublisherPlugin } from './visualization/MVTPublisherPlugin';
 export { StatisticsCalculatorPlugin } from './analysis/StatisticsCalculatorPlugin';
 export { ReportGeneratorPlugin } from './reporting/ReportGeneratorPlugin';
 export { HeatmapPlugin } from './visualization/HeatmapPlugin';
+export { ChoroplethMapPlugin } from './visualization/ChoroplethMapPlugin';
 
 // Aggregate all built-in plugins for easy import
 import { BufferAnalysisPlugin } from './analysis/BufferAnalysisPlugin';
@@ -21,6 +22,7 @@ import { MVTPublisherPlugin } from './visualization/MVTPublisherPlugin';
 import { StatisticsCalculatorPlugin } from './analysis/StatisticsCalculatorPlugin';
 import { ReportGeneratorPlugin } from './reporting/ReportGeneratorPlugin';
 import { HeatmapPlugin } from './visualization/HeatmapPlugin';
+import { ChoroplethMapPlugin } from './visualization/ChoroplethMapPlugin';
 
 export const BUILT_IN_PLUGINS = [
   BufferAnalysisPlugin,
@@ -30,5 +32,6 @@ export const BUILT_IN_PLUGINS = [
   MVTPublisherPlugin,
   StatisticsCalculatorPlugin,
   ReportGeneratorPlugin,
-  HeatmapPlugin
+  HeatmapPlugin,
+  ChoroplethMapPlugin
 ];

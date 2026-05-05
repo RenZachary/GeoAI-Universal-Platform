@@ -17,6 +17,7 @@ import {
   PostGISAggregationOperation,
   PostGISSpatialJoinOperation
 } from './impl/postgis';
+import { PostGISStatisticalOperation } from './impl/postgis/operations/PostGISStatisticalOperation';
 
 // Type for PostgreSQL query result rows
  
@@ -56,6 +57,7 @@ export class PostGISAccessor implements DatabaseAccessor {
   private filterOp: PostGISFilterOperation | null = null;
   private aggOp: PostGISAggregationOperation | null = null;
   private joinOp: PostGISSpatialJoinOperation | null = null;
+  public statisticalOp: PostGISStatisticalOperation | null = null;
   
   constructor(config: PostGISConnectionConfig) {
     this.config = config;
@@ -101,6 +103,7 @@ export class PostGISAccessor implements DatabaseAccessor {
     if (!this.filterOp) this.filterOp = new PostGISFilterOperation(pool, schema);
     if (!this.aggOp) this.aggOp = new PostGISAggregationOperation(pool, schema);
     if (!this.joinOp) this.joinOp = new PostGISSpatialJoinOperation(pool, schema);
+    if (!this.statisticalOp) this.statisticalOp = new PostGISStatisticalOperation(pool, schema);
   }
   
   /**

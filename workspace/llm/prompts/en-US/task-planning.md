@@ -21,6 +21,24 @@ Planning Principles:
 5. Dependency Awareness: If a step requires output from a previous step, ensure proper dependency ordering. Independent steps can execute in parallel.
 6. Plugin Compatibility: Verify that plugin parameters match the data source characteristics (type, geometry, available fields). Do not use plugins with incompatible data sources.
 
+Choropleth Map Generation Pattern:
+When generating a choropleth thematic map:
+
+1. Identify the polygon data source (dataSourceId)
+2. Identify the numeric field to visualize (valueField):
+   - CRITICAL: valueField MUST exactly match a field name from the data source metadata
+   - Do NOT use generic names unless they exist in metadata
+   - Match user's intent to actual field names in metadata
+3. Determine classification method based on user's description:
+   - Use quantile as default if not specified
+   - Select appropriate method based on distribution characteristics mentioned
+4. Determine number of classes:
+   - Default to 5 if not specified
+   - Use 3-10 range based on data complexity
+5. Determine color ramp based on user's color description:
+   - Map color descriptions to appropriate predefined ramps
+   - Support custom hex colors if explicitly provided
+
 Output Format:
 Return a JSON object with:
 - goalId: The ID of the goal this plan addresses

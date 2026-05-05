@@ -4,7 +4,7 @@
  */
 
 import type { Request, Response } from 'express';
-import { WMSPublisher, type WMSGetMapParams } from '../../utils/publishers/WMSPublisher.js';
+import { WMSPublisher, type WMSGetMapParams } from '../../utils/publishers/WMSPublisher';
 import type Database from 'better-sqlite3';
 
 export class WMSServiceController {

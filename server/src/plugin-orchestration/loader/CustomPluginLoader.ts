@@ -6,7 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { Plugin, PluginCategory } from '../../core';
-import { ToolRegistryInstance } from '../registry/ToolRegistry.js';
+import { ToolRegistryInstance } from '../registry/ToolRegistry';
 
 export interface PluginManifest {
   id: string;

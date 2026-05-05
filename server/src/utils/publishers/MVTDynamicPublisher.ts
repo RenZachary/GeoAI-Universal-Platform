@@ -192,7 +192,7 @@ export class MVTDynamicPublisher {
       
       const {
         minZoom = 0,
-        maxZoom = 14,
+        maxZoom = 22,
         extent = 4096,
         tolerance = 3,
         buffer = 64,

@@ -3,8 +3,8 @@
  */
 
 import type { Request, Response } from 'express';
-import type { MVTSource, MVTTileOptions } from '../../utils/publishers/MVTDynamicPublisher.js';
-import type { MVTDynamicPublisher } from '../../utils/publishers/MVTDynamicPublisher.js';
+import type { MVTSource, MVTTileOptions } from '../../utils/publishers/MVTDynamicPublisher';
+import type { MVTDynamicPublisher } from '../../utils/publishers/MVTDynamicPublisher';
 import type Database from 'better-sqlite3';
 
 export class MVTDynamicController {

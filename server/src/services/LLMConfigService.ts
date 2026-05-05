@@ -4,7 +4,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import type { LLMConfig } from '../llm-interaction/index.js';
+import type { LLMConfig } from '../llm-interaction/';
 
 export interface StoredLLMConfig extends LLMConfig {
   updatedAt: string;

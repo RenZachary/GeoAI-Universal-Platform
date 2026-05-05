@@ -4,7 +4,7 @@
 
 import type { DynamicStructuredTool } from '@langchain/core/tools';
 import type { Plugin } from '../../core';
-import { PluginToolWrapper } from '../tools/PluginToolWrapper.js';
+import { PluginToolWrapper } from '../tools/PluginToolWrapper';
 
 class ToolRegistry {
   private constructor() {}

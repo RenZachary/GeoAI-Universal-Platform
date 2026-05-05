@@ -7,12 +7,12 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import { WorkspaceManagerInstance, CleanupScheduler } from './storage/index.js';
-import { SQLiteManagerInstance } from './storage/index.js';
-import { ApiRouter } from './api/routes/index.js';
+import { WorkspaceManagerInstance, CleanupScheduler } from './storage';
+import { SQLiteManagerInstance } from './storage';
+import { ApiRouter } from './api/routes';
 import { CustomPluginLoader } from './plugin-orchestration';
-import { LLMConfigManagerInstance } from './services/LLMConfigService.js';
-import { scanAndRegisterDataFiles } from './utils/DataDirectoryScanner.js';
+import { LLMConfigManagerInstance } from './services/LLMConfigService';
+import { scanAndRegisterDataFiles } from './utils/DataDirectoryScanner';
 
 // Load environment variables
 const __filename = fileURLToPath(import.meta.url);

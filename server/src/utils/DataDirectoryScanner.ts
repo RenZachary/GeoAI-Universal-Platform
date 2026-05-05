@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { DataSourceRepository } from '../data-access/repositories';
-import { DataAccessorFactory } from '../data-access/factories/DataAccessorFactory.js';
+import { DataAccessorFactory } from '../data-access/factories/DataAccessorFactory';
 import type { DataSourceType } from '../core';
 import { SQLiteManagerInstance } from '../storage';
 

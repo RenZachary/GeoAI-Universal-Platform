@@ -5,16 +5,16 @@
 import { StateGraph, Annotation, END, START } from '@langchain/langgraph';
 import type { BaseMessage} from '@langchain/core/messages';
 import { HumanMessage } from '@langchain/core/messages';
-import type { LLMConfig } from '../adapters/LLMAdapterFactory.js';
+import type { LLMConfig } from '../adapters/LLMAdapterFactory';
 import type Database from 'better-sqlite3';
-import { PromptManager } from '../managers/PromptManager.js';
-import { GoalSplitterAgent } from '../agents/GoalSplitterAgent.js';
-import { TaskPlannerAgent } from '../agents/TaskPlannerAgent.js';
+import { PromptManager } from '../managers/PromptManager';
+import { GoalSplitterAgent } from '../agents/GoalSplitterAgent';
+import { TaskPlannerAgent } from '../agents/TaskPlannerAgent';
 import { ToolRegistryInstance } from '../../plugin-orchestration';
-import { ConversationBufferMemoryWithSQLite } from '../managers/ConversationMemoryManager.js';
-import { ServicePublisher } from './ServicePublisher.js';
-import { SummaryGenerator } from './SummaryGenerator.js';
-import { SQLiteManagerInstance } from '../../storage/index.js';
+import { ConversationBufferMemoryWithSQLite } from '../managers/ConversationMemoryManager';
+import { ServicePublisher } from './ServicePublisher';
+import { SummaryGenerator } from './SummaryGenerator';
+import { SQLiteManagerInstance } from '../../storage/';
 
 // State interface for the GeoAI workflow
 export interface GeoAIState {

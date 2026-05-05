@@ -256,9 +256,13 @@ export class ResultController {
     try {
       const { subdir, filename } = req.params;
       
+      // Ensure subdir is a string
+      const subdirStr = Array.isArray(subdir) ? subdir[0] : subdir;
+      const filenameStr = Array.isArray(filename) ? filename[0] : filename;
+      
       // Validate subdir to prevent directory traversal attacks
-      const allowedSubdirs = ['reports', 'geojson', 'mvt', 'wms', 'images', 'stats'];
-      if (!allowedSubdirs.includes(subdir)) {
+      const allowedSubdirs = ['reports', 'geojson', 'mvt', 'wms', 'images', 'stats', 'styles'];
+      if (!allowedSubdirs.includes(subdirStr)) {
         res.status(400).json({
           success: false,
           error: 'Invalid subdirectory',
@@ -268,7 +272,7 @@ export class ResultController {
       }
       
       // Construct file path
-      const filePath = path.join(this.workspaceBase, 'results', subdir, filename);
+      const filePath = path.join(this.workspaceBase, 'results', subdirStr, filenameStr);
       
       console.log(`[Result Controller] Serving generic file: ${filePath}`);
       
@@ -283,7 +287,7 @@ export class ResultController {
       }
       
       // Determine content type based on file extension
-      const ext = path.extname(filename).toLowerCase();
+      const ext = path.extname(filenameStr).toLowerCase();
       let contentType = 'application/octet-stream';
       
       switch (ext) {

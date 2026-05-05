@@ -3,13 +3,13 @@
  * Runs periodic cleanup jobs to prevent disk space exhaustion
  */
 
-import { WorkspaceManagerInstance } from './WorkspaceManager.js';
-import { MVTPublisher } from '../../utils/publishers/MVTPublisher.js';
-import { WMSPublisher } from '../../utils/publishers/WMSPublisher.js';
+import { WorkspaceManagerInstance } from './WorkspaceManager';
+import { MVTPublisher } from '../../utils/publishers/MVTPublisher';
+import { WMSPublisher } from '../../utils/publishers/WMSPublisher';
 import type Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
-import { SQLiteManagerInstance } from '../database/SQLiteManager.js';
+import { SQLiteManagerInstance } from '../database/SQLiteManager';
 
 export interface CleanupConfig {
   tempFileMaxAge: number;        // Max age for temp files in milliseconds (default: 24 hours)

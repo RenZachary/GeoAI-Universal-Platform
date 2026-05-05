@@ -186,6 +186,94 @@ export const useMapStore = defineStore('map', () => {
       map.removeSource(layer.id)
     }
 
+    // Check if this is a choropleth/thematic map with custom style
+    const styleUrl = layer.metadata?.styleUrl
+    console.log('[Map Store] addMVTLayer - layer:', layer.id)
+    console.log('[Map Store] addMVTLayer - metadata:', layer.metadata)
+    console.log('[Map Store] addMVTLayer - styleUrl:', styleUrl)
+    
+    if (styleUrl) {
+      console.log('[Map Store] Detected custom style, applying...')
+      // Apply custom style from backend
+      applyCustomStyleFromURL(map, layer, styleUrl)
+    } else {
+      console.log('[Map Store] No custom style, using default')
+      // Use default styling for regular MVT layers
+      applyDefaultMVTStyle(map, layer)
+    }
+  }
+
+  /**
+   * Apply custom Mapbox Style JSON from URL
+   */
+  async function applyCustomStyleFromURL(map: any, layer: Omit<MapLayer, 'createdAt'>, styleUrl: string) {
+    try {
+      // Convert relative URL to absolute
+      const fullStyleUrl = styleUrl.startsWith('http')
+        ? styleUrl
+        : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${styleUrl}`
+
+      console.log(`[Map Store] Loading custom style from: ${fullStyleUrl}`)
+
+      // Fetch the style JSON
+      const response = await fetch(fullStyleUrl)
+      if (!response.ok) {
+        throw new Error(`Failed to load style: ${response.status} ${response.statusText}`)
+      }
+
+      const styleJson = await response.json()
+      console.log('[Map Store] Custom style loaded:', styleJson)
+
+      // Add vector source
+      const tilesUrl = layer.url.startsWith('http')
+        ? layer.url
+        : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${layer.url}`
+
+      map.addSource(layer.id, {
+        type: 'vector',
+        tiles: [tilesUrl],
+        minzoom: layer.minZoom || 0,
+        maxzoom: layer.maxZoom || 22
+      })
+
+      // Add layers from style JSON
+      if (styleJson.layers && Array.isArray(styleJson.layers)) {
+        styleJson.layers.forEach((styleLayer: any) => {
+          const layerToAdd: any = {
+            id: styleLayer.id,
+            type: styleLayer.type,
+            source: layer.id,
+            'source-layer': styleLayer['source-layer'] || 'default',
+            paint: styleLayer.paint
+          }
+          
+          if (styleLayer.minzoom !== undefined) layerToAdd.minzoom = styleLayer.minzoom
+          if (styleLayer.maxzoom !== undefined) layerToAdd.maxzoom = styleLayer.maxzoom
+          if (styleLayer.layout) layerToAdd.layout = styleLayer.layout
+          if (styleLayer.filter) layerToAdd.filter = styleLayer.filter
+          
+          if (!map.getLayer(layerToAdd.id)) {
+            try {
+              map.addLayer(layerToAdd)
+            } catch (error) {
+              console.error(`[Map Store] Failed to add layer ${layerToAdd.id}:`, error)
+            }
+          }
+        })
+      }
+
+      console.log('[Map Store] Custom style applied successfully')
+    } catch (error) {
+      console.error('[Map Store] Failed to apply custom style:', error)
+      // Fallback to default style
+      applyDefaultMVTStyle(map, layer)
+    }
+  }
+
+  /**
+   * Apply default MVT styling (backward compatibility)
+   */
+  function applyDefaultMVTStyle(map: any, layer: Omit<MapLayer, 'createdAt'>) {
     // Convert relative URL to absolute URL for Mapbox GL JS
     const tilesUrl = layer.url.startsWith('http')
       ? layer.url

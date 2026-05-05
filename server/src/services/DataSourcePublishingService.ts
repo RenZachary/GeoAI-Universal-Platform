@@ -189,7 +189,7 @@ export class DataSourcePublishingService {
     // Publish with default options, using data source ID as tileset ID
     const options: MVTTileOptions = {
       minZoom: 0,
-      maxZoom: 14,
+      maxZoom: 22,
       extent: 4096,
       tolerance: 3,
       buffer: 64,

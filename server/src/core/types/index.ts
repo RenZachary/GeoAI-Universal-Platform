@@ -46,8 +46,8 @@ export interface DataMetadata {
   /** Feature count (for vector data) */
   featureCount?: number;
   
-  /** Field/column names */
-  fields?: string[];
+  /** Field/column names with type information */
+  fields?: Array<{name: string; type: string}> | string[];
   
   /** File size in bytes (for file-based data) */
   fileSize?: number;

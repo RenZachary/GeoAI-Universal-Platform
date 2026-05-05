@@ -101,18 +101,15 @@ export class GeoJSONAccessor extends GeoJSONBasedAccessor implements DataAccesso
    */
   async getMetadata(reference: string): Promise<DataMetadata> {
     const stats = fs.statSync(reference);
-    const content = fs.readFileSync(reference, 'utf-8');
-    const geojson = JSON.parse(content);
+    const geojson = await this.loadGeoJSON(reference);
     
-    const metadata: DataMetadata = {
+    // Use parent class's extractMetadata to get consistent format
+    const baseMetadata = this.extractMetadata(geojson, reference);
+    
+    return {
       fileSize: stats.size,
-      crs: geojson.crs?.properties?.name || 'EPSG:4326',
-      bbox: geojson.bbox,
-      featureCount: this.countFeatures(geojson),
-      fields: this.extractGeoJSONFields(geojson),
+      ...baseMetadata
     };
-    
-    return metadata;
   }
   
   /**

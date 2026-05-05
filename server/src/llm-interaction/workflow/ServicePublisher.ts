@@ -3,7 +3,7 @@
  * Separates service publishing logic from output analysis
  */
 
-import type { AnalysisResult, VisualizationService } from './GeoAIGraph.js';
+import type { AnalysisResult, VisualizationService } from './GeoAIGraph';
 
 export interface ServicePublishingContext {
     stepId: string;
@@ -42,7 +42,9 @@ export class ServicePublisher {
             ttl: 3600000, // 1 hour default
             expiresAt: new Date(Date.now() + 3600000),
             metadata: {
-                ...result.metadata,
+                // Merge data.metadata (from executor) with result.metadata (from plugin execution)
+                ...result.data?.metadata,  // Contains styleUrl, tilesetId, etc.
+                ...result.metadata,        // Contains pluginId, parameters, executedAt
                 resultType: result.data.type || 'unknown',
                 generatedAt: new Date().toISOString()
             }

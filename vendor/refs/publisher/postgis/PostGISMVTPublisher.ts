@@ -37,7 +37,7 @@ export type PostGISMVTTileCallback = (
  * Configuration options for PostGIS MVT tile generation
  */
 export interface PostGISMVTPublisherOptions {
-  /** Maximum zoom level (default: 14) */
+  /** Maximum zoom level (default: 22) */
   maxZoom?: number;
   /** Tile extent in pixels (default: 4096) */
   extent?: number;
@@ -70,7 +70,7 @@ export class PostGISMVTPublisher {
    * ```typescript
    * const publisher = new PostGISMVTPublisher();
    * const tileCallback = await publisher.createPostGISTileService(pool, {
-   *   maxZoom: 14,
+   *   maxZoom: 22,
    *   extent: 4096,
    *   buffer: 64
    * });
@@ -97,7 +97,7 @@ export class PostGISMVTPublisher {
     customSql?: string
   ): Promise<PostGISMVTTileCallback> {
     const {
-      maxZoom = 14,
+      maxZoom = 22,
       extent = 4096,
       buffer = 64,
       simplify = true

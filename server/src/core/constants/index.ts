@@ -22,6 +22,7 @@ export const WORKSPACE_DIRS = {
   RESULTS_MVT: 'results/mvt',
   RESULTS_WMS: 'results/wms',
   RESULTS_REPORTS: 'results/reports',
+  RESULTS_STYLE: 'results/styles',
 } as const;
 
 // ============================================================================

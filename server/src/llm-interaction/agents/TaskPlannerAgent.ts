@@ -3,13 +3,13 @@
  */
 
 import { z } from 'zod';
-import type { LLMConfig } from '../adapters/LLMAdapterFactory.js';
-import { LLMAdapterFactory } from '../adapters/LLMAdapterFactory.js';
-import type { PromptManager } from '../managers/PromptManager.js';
-import type { GeoAIStateType, ExecutionPlan} from '../workflow/GeoAIGraph.js';
+import type { LLMConfig } from '../adapters/LLMAdapterFactory';
+import { LLMAdapterFactory } from '../adapters/LLMAdapterFactory';
+import type { PromptManager } from '../managers/PromptManager';
+import type { GeoAIStateType, ExecutionPlan} from '../workflow/GeoAIGraph';
 import { ToolRegistryInstance } from '../../plugin-orchestration';
 import { DataSourceRepository } from '../../data-access/repositories';
-import { SQLiteManagerInstance } from '../../storage/index.js';
+import { SQLiteManagerInstance } from '../../storage/';
 
 export class TaskPlannerAgent {
   private llmConfig: LLMConfig;
@@ -212,12 +212,28 @@ export class TaskPlannerAgent {
         // Add field information if available
         if (ds.metadata?.fields && Array.isArray(ds.metadata.fields)) {
           const sampleValues = ds.metadata.sampleValues || {};
-          const fieldInfo = ds.metadata.fields.slice(0, 8).map((field: string) => {
-            const info = sampleValues[field];
-            if (info?.isNumeric) {
-              return `${field} (numeric)`;
+          
+          // Support both formats: string[] or Array<{name: string; type: string}>
+          const fieldInfo = ds.metadata.fields.slice(0, 8).map((field: any) => {
+            // If field is an object with name and type
+            if (typeof field === 'object' && field.name) {
+              const fieldName = field.name;
+              const fieldType = field.type || 'unknown';
+              const info = sampleValues[fieldName];
+              if (info?.isNumeric || fieldType === 'number' || fieldType === 'integer') {
+                return `${fieldName} (${fieldType})`;
+              }
+              return `${fieldName} (${fieldType})`;
             }
-            return field;
+            // If field is a string (legacy format)
+            else if (typeof field === 'string') {
+              const info = sampleValues[field];
+              if (info?.isNumeric) {
+                return `${field} (numeric)`;
+              }
+              return field;
+            }
+            return String(field);
           });
           lines.push(`  Fields: ${fieldInfo.join(', ')}`);
         }

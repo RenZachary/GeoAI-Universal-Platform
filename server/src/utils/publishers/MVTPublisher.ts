@@ -8,7 +8,7 @@ import vtPbf from 'vt-pbf';
 import fs from 'fs';
 import path from 'path';
 import type { DataSourceType, NativeData } from '../../core/index';
-import { DataAccessorFactory } from '../../data-access/factories/DataAccessorFactory.js';
+import { DataAccessorFactory } from '../../data-access/factories/DataAccessorFactory';
 import type Database from 'better-sqlite3';
 
 
@@ -67,7 +67,7 @@ class GeoJSONMVTTStrategy implements MVTTileGenerationStrategy {
   ): Promise<string> {
     const {
       minZoom = 0,
-      maxZoom = 14,
+      maxZoom = 22,
       extent = 4096,
       tolerance = 3,
       buffer = 64,
@@ -211,7 +211,7 @@ class GeoJSONMVTTStrategy implements MVTTileGenerationStrategy {
     tilesetDir: string,
     options: MVTTileOptions
   ): Promise<void> {
-    const { minZoom = 0, maxZoom = 14, extent = 4096 } = options;
+    const { minZoom = 0, maxZoom = 22, extent = 4096 } = options;
     let tileCount = 0;
     
     for (let z = minZoom; z <= maxZoom; z++) {
@@ -340,7 +340,7 @@ class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
     
     const {
       minZoom = 0,
-      maxZoom = 14,
+      maxZoom = 22,
       extent = 4096,
       tolerance = 3,
       buffer = 64,

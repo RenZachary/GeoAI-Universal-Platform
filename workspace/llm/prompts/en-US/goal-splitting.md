@@ -4,10 +4,18 @@ Identify and split the user's request into independent goals.
 User input: {{userInput}}
 
 Goal Type Classification:
-- visualization: Display, show, view, map, render spatial data on a map interface
-- analysis: Calculate, compute, measure, compare, aggregate, statistics, spatial operations
+- visualization: Display, show, view, map, render spatial data on a map interface, thematic mapping, choropleth, heatmap, contour map
+- analysis: Calculate, compute, measure, compare, aggregate, statistics, spatial operations (buffer, overlay, intersection)
 - report: Generate document, summary, export, create formatted output
 - query: Search, find, filter, select specific features or records based on criteria
+
+Visualization Scenarios:
+When user requests thematic mapping or visualization, classify as "visualization" type.
+
+Key indicators: terms related to map rendering, thematic visualization, color gradients, distribution maps, heatmaps, contour lines, etc.
+
+Important Note for Task Planner:
+When planning visualization tasks, ensure all parameters (especially field names) exactly match the data source metadata. Do not infer or guess field names.
 
 Classification Principles:
 1. Literal Interpretation: Classify based on explicit action verbs in the user request. "Show" or "display" indicates visualization, not analysis.

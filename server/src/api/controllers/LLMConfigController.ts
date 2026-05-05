@@ -3,8 +3,8 @@
  */
 
 import type { Request, Response } from 'express';
-import { LLMConfigManagerInstance } from '../../services/LLMConfigService.js';
-import type { LLMConfig } from '../../llm-interaction/index.js';
+import { LLMConfigManagerInstance } from '../../services/LLMConfigService';
+import type { LLMConfig } from '../../llm-interaction/';
 
 export class LLMConfigController {
   private configManager = LLMConfigManagerInstance;
@@ -124,7 +124,7 @@ export class LLMConfigController {
       const config: LLMConfig = req.body;
 
       // Import dynamically to avoid circular dependency
-      const { LLMAdapterFactory } = await import('../../llm-interaction/adapters/LLMAdapterFactory.js');
+      const { LLMAdapterFactory } = await import('../../llm-interaction/adapters/LLMAdapterFactory');
 
       console.log('[LLMConfigController] Testing connection...');
       const isConnected = await LLMAdapterFactory.testConnection(config);

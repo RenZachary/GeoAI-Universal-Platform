@@ -14,6 +14,7 @@ import { GeoJSONFilterOperation } from './operations/GeoJSONFilterOperation';
 import { GeoJSONBufferOperation } from './operations/GeoJSONBufferOperation';
 import { GeoJSONOverlayOperation } from './operations/GeoJSONOverlayOperation';
 import { GeoJSONSpatialJoinOperation } from './operations/GeoJSONSpatialJoinOperation';
+import { GeoJSONStatisticalOperation } from './operations/GeoJSONStatisticalOperation';
 
 export interface GeoJSONFeatureCollection {
   type: 'FeatureCollection';
@@ -29,6 +30,7 @@ export abstract class GeoJSONBasedAccessor {
   private bufferOp = new GeoJSONBufferOperation();
   private overlayOp = new GeoJSONOverlayOperation();
   private spatialJoinOp = new GeoJSONSpatialJoinOperation();
+  public readonly statisticalOp = new GeoJSONStatisticalOperation();
 
   constructor(workspaceBase: string) {
     this.workspaceBase = workspaceBase;
@@ -58,7 +60,7 @@ export abstract class GeoJSONBasedAccessor {
       geometryType: geometryTypes.size === 1 ? Array.from(geometryTypes)[0] : 'Mixed',
       crs: this.extractCRS(geojson),
       bbox: this.calculateBbox(geojson),
-      fields: this.extractFields(geojson),
+      fields: this.extractFields(geojson) as Array<{name: string; type: string}> | string[],
       sampleValues: this.extractSampleValues(geojson)
     };
   }
@@ -290,19 +292,57 @@ export abstract class GeoJSONBasedAccessor {
     return coords;
   }
 
-  protected extractFields(geojson: GeoJSONFeatureCollection): string[] {
+  protected extractFields(geojson: GeoJSONFeatureCollection): Array<{name: string; type: string}> {
     if (!geojson.features || geojson.features.length === 0) {
       return [];
     }
 
-    const fields = new Set<string>();
+    // Collect field types from first 10 features
+    const fieldTypes = new Map<string, Set<string>>();
+    
     for (const feature of geojson.features.slice(0, 10)) {
       if (feature.properties) {
-        Object.keys(feature.properties).forEach(key => fields.add(key));
+        for (const [key, value] of Object.entries(feature.properties)) {
+          if (!fieldTypes.has(key)) {
+            fieldTypes.set(key, new Set());
+          }
+          
+          // Determine type
+          let fieldType = 'string';
+          if (typeof value === 'number') {
+            fieldType = Number.isInteger(value) ? 'integer' : 'number';
+          } else if (typeof value === 'boolean') {
+            fieldType = 'boolean';
+          } else if (value instanceof Date) {
+            fieldType = 'date';
+          }
+          
+          fieldTypes.get(key)!.add(fieldType);
+        }
       }
     }
 
-    return Array.from(fields);
+    // Resolve final type for each field (use most common or prefer numeric)
+    const fields: Array<{name: string; type: string}> = [];
+    for (const [fieldName, types] of fieldTypes) {
+      const typeArray = Array.from(types);
+      
+      // If any sample is numeric, mark as numeric
+      let finalType = 'string';
+      if (typeArray.includes('integer')) {
+        finalType = 'integer';
+      } else if (typeArray.includes('number')) {
+        finalType = 'number';
+      } else if (typeArray.includes('boolean')) {
+        finalType = 'boolean';
+      } else if (typeArray.includes('date')) {
+        finalType = 'date';
+      }
+      
+      fields.push({ name: fieldName, type: finalType });
+    }
+
+    return fields;
   }
 
   protected extractSampleValues(geojson: GeoJSONFeatureCollection): Record<string, any> {

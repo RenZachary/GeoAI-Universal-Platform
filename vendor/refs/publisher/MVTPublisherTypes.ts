@@ -32,7 +32,7 @@ export type MVTTileCallback = (
  * Configuration options for MVT tile generation (unified)
  */
 export interface MVTPublisherOptions {
-  /** Maximum zoom level (default: 14) */
+  /** Maximum zoom level (default: 22) */
   maxZoom?: number;
   /** Simplification tolerance (default: 3 for GeoJSON, true for PostGIS) */
   tolerance?: number;

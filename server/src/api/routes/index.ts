@@ -3,22 +3,22 @@
  */
 
 import { Router } from 'express';
-import { ChatController } from '../controllers/ChatController.js';
-import { ToolController } from '../controllers/ToolController.js';
-import { DataSourceController } from '../controllers/DataSourceController.js';
-import { FileUploadController, upload, handleMultipartEncoding } from '../controllers/FileUploadController.js';
-import { PromptTemplateController } from '../controllers/PromptTemplateController.js';
-import { PluginManagementController } from '../controllers/PluginManagementController.js';
-import { MVTServiceController } from '../controllers/MVTServiceController.js';
-import { MVTDynamicController } from '../controllers/MVTDynamicController.js';
-import { WMSServiceController } from '../controllers/WMSServiceController.js';
-import { ResultController } from '../controllers/ResultController.js';
-import { LLMConfigController } from '../controllers/LLMConfigController.js';
+import { ChatController } from '../controllers/ChatController';
+import { ToolController } from '../controllers/ToolController';
+import { DataSourceController } from '../controllers/DataSourceController';
+import { FileUploadController, upload, handleMultipartEncoding } from '../controllers/FileUploadController';
+import { PromptTemplateController } from '../controllers/PromptTemplateController';
+import { PluginManagementController } from '../controllers/PluginManagementController';
+import { MVTServiceController } from '../controllers/MVTServiceController';
+import { MVTDynamicController } from '../controllers/MVTDynamicController';
+import { WMSServiceController } from '../controllers/WMSServiceController';
+import { ResultController } from '../controllers/ResultController';
+import { LLMConfigController } from '../controllers/LLMConfigController';
 import { DataSourceService, FileUploadService, PromptTemplateService, getMVTPublisher, ConversationService } from '../../services';
 import { DataSourceRepository } from '../../data-access/repositories';
 import type { LLMConfig } from '../../llm-interaction';
 import { ToolRegistryInstance, type CustomPluginLoader } from '../../plugin-orchestration';
-import { SQLiteManagerInstance } from '../../storage/index.js';
+import { SQLiteManagerInstance } from '../../storage/';
 
 export class ApiRouter {
   private router: Router;

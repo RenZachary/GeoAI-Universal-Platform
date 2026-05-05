@@ -9,7 +9,7 @@
  */
 
 import type { DataSourceRepository } from '../data-access/repositories';
-import { DataAccessorFactory } from '../data-access/factories/DataAccessorFactory.js';
+import { DataAccessorFactory } from '../data-access/factories/DataAccessorFactory';
 import type { DataSourceType, NativeData } from '../core';
 import path from 'path';
 import fs from 'fs';

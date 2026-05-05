@@ -3,7 +3,7 @@
  */
 
 import type { Request, Response } from 'express';
-import { MVTPublisher } from '../../utils/publishers/MVTPublisher.js';
+import { MVTPublisher } from '../../utils/publishers/MVTPublisher';
 import type Database from 'better-sqlite3';
 
 

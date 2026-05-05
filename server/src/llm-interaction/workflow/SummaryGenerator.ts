@@ -3,10 +3,10 @@
  * Supports multi-language and customizable summary styles
  */
 
-import { PromptManager } from '../managers/PromptManager.js';
-import { LLMAdapterFactory } from '../adapters/LLMAdapterFactory.js';
-import type { LLMConfig } from '../adapters/LLMAdapterFactory.js';
-import type { GeoAIStateType, AnalysisGoal, AnalysisResult, VisualizationService } from './GeoAIGraph.js';
+import { PromptManager } from '../managers/PromptManager';
+import { LLMAdapterFactory } from '../adapters/LLMAdapterFactory';
+import type { LLMConfig } from '../adapters/LLMAdapterFactory';
+import type { GeoAIStateType, AnalysisGoal, AnalysisResult, VisualizationService } from './GeoAIGraph';
 
 export interface SummaryOptions {
   language?: string;

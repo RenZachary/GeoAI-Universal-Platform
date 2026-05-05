@@ -217,18 +217,7 @@ function shouldShowStreaming(msg: any, index: number): boolean {
   const isLastMessage = index === messages.length - 1
   const isAssistant = msg.role === 'assistant'
   const isStreaming = chatStore.isStreaming
-  
-  console.log('[ChatView] shouldShowStreaming:', {
-    messageId: msg.id,
-    role: msg.role,
-    index,
-    lastIndex: messages.length - 1,
-    isLastMessage,
-    isAssistant,
-    isStreaming,
-    shouldShow: isStreaming && isAssistant && isLastMessage
-  })
-  
+    
   return isStreaming && isAssistant && isLastMessage
 }
 

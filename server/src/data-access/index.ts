@@ -19,9 +19,7 @@ export type {
 export { DataAccessorFactory } from './factories/DataAccessorFactory';
 
 // Accessors (for direct instantiation if needed)
-export { GeoJSONAccessor } from './accessors/GeoJSONAccessor';
 export { ShapefileAccessor } from './accessors/ShapefileAccessor';
-export { PostGISAccessor, type PostGISConnectionConfig } from './accessors/PostGISAccessor';
 export { GeoTIFFAccessor } from './accessors/GeoTIFFAccessor';
 
 // Utilities

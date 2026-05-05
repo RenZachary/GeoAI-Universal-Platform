@@ -5,21 +5,23 @@
 import type { DynamicStructuredTool } from '@langchain/core/tools';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
-import type { Plugin, ParameterSchema } from '../../core/index.js';
-import type { BufferAnalysisParams } from '../executor/analysis/BufferAnalysisExecutor.js';
-import { BufferAnalysisExecutor } from '../executor/analysis/BufferAnalysisExecutor.js';
-import type { OverlayAnalysisParams } from '../executor/analysis/OverlayAnalysisExecutor.js';
-import { OverlayAnalysisExecutor } from '../executor/analysis/OverlayAnalysisExecutor.js';
-import type { MVTPublisherParams } from '../executor/visualization/MVTPublisherExecutor.js';
-import { MVTPublisherExecutor } from '../executor/visualization/MVTPublisherExecutor.js';
-import type { StatisticsCalculatorParams } from '../executor/analysis/StatisticsCalculatorExecutor.js';
-import { StatisticsCalculatorExecutor } from '../executor/analysis/StatisticsCalculatorExecutor.js';
-import type { FilterParams } from '../executor/analysis/FilterExecutor.js';
-import { FilterExecutor } from '../executor/analysis/FilterExecutor.js';
-import type { AggregationParams } from '../executor/analysis/AggregationExecutor.js';
-import { AggregationExecutor } from '../executor/analysis/AggregationExecutor.js';
-import type { ReportGeneratorParams } from '../executor/reporting/ReportGeneratorExecutor.js';
-import { ReportGeneratorExecutor } from '../executor/reporting/ReportGeneratorExecutor.js';
+import type { Plugin, ParameterSchema } from '../../core/';
+import type { BufferAnalysisParams } from '../executor/analysis/BufferAnalysisExecutor';
+import { BufferAnalysisExecutor } from '../executor/analysis/BufferAnalysisExecutor';
+import type { OverlayAnalysisParams } from '../executor/analysis/OverlayAnalysisExecutor';
+import { OverlayAnalysisExecutor } from '../executor/analysis/OverlayAnalysisExecutor';
+import type { MVTPublisherParams } from '../executor/visualization/MVTPublisherExecutor';
+import { MVTPublisherExecutor } from '../executor/visualization/MVTPublisherExecutor';
+import type { StatisticsCalculatorParams } from '../executor/analysis/StatisticsCalculatorExecutor';
+import { StatisticsCalculatorExecutor } from '../executor/analysis/StatisticsCalculatorExecutor';
+import type { FilterParams } from '../executor/analysis/FilterExecutor';
+import { FilterExecutor } from '../executor/analysis/FilterExecutor';
+import type { AggregationParams } from '../executor/analysis/AggregationExecutor';
+import { AggregationExecutor } from '../executor/analysis/AggregationExecutor';
+import type { ReportGeneratorParams } from '../executor/reporting/ReportGeneratorExecutor';
+import { ReportGeneratorExecutor } from '../executor/reporting/ReportGeneratorExecutor';
+import type { ChoroplethMVTParams } from '../executor/visualization/ChoroplethMVTExecutor';
+import { ChoroplethMVTExecutor } from '../executor/visualization/ChoroplethMVTExecutor';
 import type Database from 'better-sqlite3';
 
 export class PluginToolWrapper {
@@ -94,6 +96,13 @@ export class PluginToolWrapper {
               {
                 const reportExecutor = new ReportGeneratorExecutor(this.db, this.workspaceBase);
                 result = await reportExecutor.execute(input as ReportGeneratorParams);
+                break;
+              }
+
+            case 'choropleth_map':
+              {
+                const choroplethExecutor = new ChoroplethMVTExecutor(this.db, this.workspaceBase);
+                result = await choroplethExecutor.execute(input as ChoroplethMVTParams);
                 break;
               }
 

@@ -146,7 +146,7 @@ onMounted(async () => {
       // Check if layer already exists to prevent duplicates
       const existingLayer = mapStore.layers.find(l => l.id === layerId)
       if (existingLayer) {
-        console.log(`Layer ${layerId} already exists, skipping...`)
+        // console.log(`Layer ${layerId} already exists, skipping...`)
         continue
       }
       
