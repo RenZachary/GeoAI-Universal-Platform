@@ -457,6 +457,7 @@ export class SummaryGenerator {
     switch (type) {
       case 'mvt': return '🗺️';
       case 'image': return '🖼️';
+      case 'report': return '📄';
       default: return '📄';
     }
   }

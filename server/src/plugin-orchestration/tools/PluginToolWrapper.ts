@@ -109,11 +109,14 @@ export class PluginToolWrapper {
               };
           }
 
-          // Return JSON string (LangChain requirement)
+          // Return complete NativeData object (not just simplified JSON)
+          // This ensures ServicePublisher can access result.data.type correctly
           return JSON.stringify({
             success: true,
             pluginId: plugin.id,
             resultId: result.id,
+            type: result.type,  // Include data type for service publishing
+            reference: result.reference,
             metadata: result.metadata,
             message: 'Plugin executed successfully'
           });

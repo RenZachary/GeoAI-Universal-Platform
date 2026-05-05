@@ -7,7 +7,7 @@
         @change="() => $emit('toggleVisibility', layer.id)"
         class="layer-checkbox"
       >
-        <span class="layer-name">{{ dataSource?.name || layer.id }}</span>
+        <span class="layer-name">{{ layer.name || dataSource?.name || layer.id }}</span>
       </el-checkbox>
       
       <div class="card-actions">

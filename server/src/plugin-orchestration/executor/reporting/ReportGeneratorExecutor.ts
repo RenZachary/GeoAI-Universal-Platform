@@ -74,7 +74,7 @@ export class ReportGeneratorExecutor {
       // Step 4: Return NativeData with report metadata
       return {
         id: reportId,
-        type: 'geojson', // Using geojson as generic type for report results
+        type: 'report', // Report type for proper service handling
         reference: `/api/results/reports/${reportFilename}`,
         metadata: {
           pluginId: 'report_generator',

@@ -30,7 +30,7 @@
             class="service-link-item"
           >
             <el-icon>
-              <Document v-if="service.type === 'geojson'" />
+              <Document v-if="service.type === 'geojson' || service.type === 'report'" />
               <MapLocation v-else />
             </el-icon>
             <span class="service-name">{{ getServiceName(service) }}</span>
@@ -74,6 +74,7 @@ import type { ChatMessage, VisualizationService } from '@/types'
 import { User, ChatDotRound, DocumentCopy, RefreshRight, Link, Document, MapLocation } from '@element-plus/icons-vue'
 import { marked } from 'marked'
 import { useChatStore } from '@/stores/chat'
+import { ElMessage } from 'element-plus'
 
 const chatStore = useChatStore()
 
@@ -110,24 +111,46 @@ function getServiceName(service: VisualizationService): string {
 }
 
 function getActionText(service: VisualizationService): string {
-  if (service.type === 'mvt' || service.type === 'wms') {
+  if (service.type === 'mvt' || service.type === 'wms' || service.type === 'image') {
     return 'View on Map'
   } else if (service.type === 'geojson') {
     return 'Download'
   } else if (service.type === 'heatmap') {
     return 'View Heatmap'
+  } else if (service.type === 'report') {
+    return 'View Report'
   }
   return 'View'
 }
 
 function handleViewService(service: VisualizationService) {
-  // For MVT/WMS, emit event to add layer to map
-  if (service.type === 'mvt' || service.type === 'wms') {
-    // TODO: Implement map integration
+  // For MVT/WMS/Image (map services), navigate to map page with layer info
+  if (service.type === 'mvt' || service.type === 'wms' || service.type === 'image') {
+    // Navigate to map view and add layer
+    const layerInfo = {
+      id: service.id,
+      type: service.type,
+      url: service.url,
+      name: getServiceName(service),
+      metadata: service.metadata
+    }
+    
+    // Use router to navigate to map page with layer parameter
+    // This will be handled by the MapView component
+    window.location.href = `/map?addLayer=${encodeURIComponent(JSON.stringify(layerInfo))}`
+    
+    ElMessage.success(`Adding ${service.type} layer to map...`)
+  } else if (service.type === 'report') {
+    // For reports, open in new tab
     window.open(service.url, '_blank')
+    ElMessage.success('Opening report...')
   } else {
-    // For file-based services, open in new tab
-    window.open(service.url, '_blank')
+    // For file-based services (geojson), trigger download
+    const link = document.createElement('a')
+    link.href = service.url
+    link.download = `${service.stepId || 'result'}.${service.type}`
+    link.click()
+    ElMessage.success(`Downloading ${service.type} file`)
   }
 }
 

@@ -14,7 +14,7 @@ export class ChatController {
   private workspaceBase: string;
   private conversationService: ConversationService;
 
-  constructor( llmConfig: LLMConfig, workspaceBase: string, conversationService: ConversationService) {
+  constructor(llmConfig: LLMConfig, workspaceBase: string, conversationService: ConversationService) {
     this.llmConfig = llmConfig;
     this.workspaceBase = workspaceBase;
     this.conversationService = conversationService;
@@ -155,6 +155,11 @@ export class ChatController {
         },
         timestamp: Date.now()
       })}\n\n`);
+
+      // Save visualization services to the last assistant message
+      if (finalServices && finalServices.length > 0) {
+        this.conversationService.saveServicesToLastMessage(convId, finalServices);
+      }
 
       res.end();
       console.log(`[Chat API] Conversation completed: ${convId}`);

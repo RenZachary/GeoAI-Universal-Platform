@@ -23,7 +23,8 @@ export interface BasemapConfig {
 
 export interface MapLayer {
   id: string
-  type: 'geojson' | 'mvt' | 'wms' | 'heatmap'
+  name?: string  // Display name for the layer
+  type: 'geojson' | 'mvt' | 'wms' | 'heatmap' | 'image'
   url: string
   visible: boolean
   opacity?: number
@@ -32,6 +33,7 @@ export interface MapLayer {
   minZoom?: number
   maxZoom?: number
   dataSourceId?: string  // Link to data source for metadata
+  metadata?: Record<string, any>  // Additional metadata
   createdAt: string
 }
 
@@ -56,7 +58,7 @@ export interface ChatMessage {
 
 export interface VisualizationService {
   id: string
-  type: 'geojson' | 'mvt' | 'wms' | 'heatmap'
+  type: 'geojson' | 'mvt' | 'wms' | 'heatmap' | 'image' | 'report'
   url: string
   goalId?: string
   stepId?: string

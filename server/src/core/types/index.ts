@@ -30,7 +30,8 @@ export type DataSourceType =
   | 'postgis'
   | 'tif'
   | 'mvt'
-  | 'wms';
+  | 'wms'
+  | 'report';
 
 export interface DataMetadata {
   /** Coordinate reference system (e.g., EPSG:4326) */

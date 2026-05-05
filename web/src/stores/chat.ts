@@ -108,68 +108,80 @@ export const useChatStore = defineStore('chat', () => {
         
       case 'tool_start':
         // Show tool usage with more detail
-        // input is at top level of event
-        if (event.input) {
-          try {
-            const input = JSON.parse(event.input)
-            const toolName = input.pluginId || input.tool || 'Unknown tool'
-            activeTools.value.push(toolName)
-            
-            // Map tool names to user-friendly descriptions
-            const toolDescriptions: Record<string, string> = {
-              'buffer_analysis': '🔵 Creating buffer zones...',
-              'overlay_analysis': '🔀 Performing overlay analysis...',
-              'data_filter': '🔍 Filtering data...',
-              'data_aggregation': '📊 Calculating statistics...',
-              'mvt_publisher': '🗺️ Publishing map tiles...',
-              'statistics_calculator': '📈 Computing statistics...',
-              'report_generator': '📄 Generating report...'
-            }
-            
-            workflowStatus.value = toolDescriptions[toolName] || `Using ${toolName}...`
-            console.log('[Chat Store] Tool started:', toolName)
-          } catch (e) {
-            console.warn('[Chat Store] Failed to parse tool input', e)
-          }
+        // Get tool name from event.tool field (set by GeoAIStreamingHandler)
+        const toolName = event.tool || 'Unknown tool'
+        activeTools.value.push(toolName)
+        
+        // Map tool names to user-friendly descriptions
+        const toolDescriptions: Record<string, string> = {
+          'buffer_analysis': '🔵 Creating buffer zones...',
+          'overlay_analysis': '🔀 Performing overlay analysis...',
+          'data_filter': '🔍 Filtering data...',
+          'data_aggregation': '📊 Calculating statistics...',
+          'mvt_publisher': '🗺️ Publishing map tiles...',
+          'statistics_calculator': '📈 Computing statistics...',
+          'report_generator': '📄 Generating report...'
         }
+        
+        workflowStatus.value = toolDescriptions[toolName] || `Using ${toolName}...`
+        console.log('[Chat Store] Tool started:', toolName)
         break
         
       case 'tool_complete':
         // Remove from active tools with detailed status
+        // Try to get tool name from output first, then fall back to activeTools
+        let completedToolName = 'Unknown tool'
         if (data?.output) {
           try {
             const output = JSON.parse(data.output)
-            const toolName = output.pluginId || 'Unknown tool'
-            activeTools.value = activeTools.value.filter(t => t !== toolName)
-            
-            if (output.success) {
-              // Show success with emoji based on tool type
-              const successMessages: Record<string, string> = {
-                'buffer_analysis': '✅ Buffer analysis completed',
-                'overlay_analysis': '✅ Overlay analysis completed',
-                'data_filter': '✅ Data filtered successfully',
-                'data_aggregation': '✅ Statistics calculated',
-                'mvt_publisher': '✅ Map tiles published',
-                'statistics_calculator': '✅ Statistics computed',
-                'report_generator': '✅ Report generated'
-              }
-              
-              workflowStatus.value = successMessages[toolName] || `${toolName} completed ✓`
-            } else {
-              workflowStatus.value = `❌ ${toolName} failed: ${output.error}`
-              console.warn('[Chat Store] Tool failed:', output.error)
-            }
-            
-            // Clear status after 2 seconds
-            setTimeout(() => {
-              if (workflowStatus.value.includes(toolName) || workflowStatus.value.includes('completed') || workflowStatus.value.includes('failed')) {
-                workflowStatus.value = ''
-              }
-            }, 2000)
+            completedToolName = output.pluginId || completedToolName
           } catch (e) {
             console.warn('[Chat Store] Failed to parse tool output', e)
           }
         }
+        
+        // If we couldn't get it from output, use the last active tool
+        if (completedToolName === 'Unknown tool' && activeTools.value.length > 0) {
+          completedToolName = activeTools.value[activeTools.value.length - 1]
+        }
+        
+        activeTools.value = activeTools.value.filter(t => t !== completedToolName)
+        
+        // Check if the tool succeeded by parsing output
+        let toolSucceeded = true
+        if (data?.output) {
+          try {
+            const output = JSON.parse(data.output)
+            toolSucceeded = output.success !== false
+          } catch (e) {
+            // If can't parse, assume success
+          }
+        }
+        
+        if (toolSucceeded) {
+          // Show success with emoji based on tool type
+          const successMessages: Record<string, string> = {
+            'buffer_analysis': '✅ Buffer analysis completed',
+            'overlay_analysis': '✅ Overlay analysis completed',
+            'data_filter': '✅ Data filtered successfully',
+            'data_aggregation': '✅ Statistics calculated',
+            'mvt_publisher': '✅ Map tiles published',
+            'statistics_calculator': '✅ Statistics computed',
+            'report_generator': '✅ Report generated'
+          }
+          
+          workflowStatus.value = successMessages[completedToolName] || `${completedToolName} completed ✓`
+        } else {
+          workflowStatus.value = `❌ ${completedToolName} failed`
+          console.warn('[Chat Store] Tool failed')
+        }
+        
+        // Clear status after 2 seconds
+        setTimeout(() => {
+          if (workflowStatus.value.includes(completedToolName) || workflowStatus.value.includes('completed') || workflowStatus.value.includes('failed')) {
+            workflowStatus.value = ''
+          }
+        }, 2000)
         break
         
       case 'partial_result':

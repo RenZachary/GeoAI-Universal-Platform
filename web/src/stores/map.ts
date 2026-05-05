@@ -11,33 +11,33 @@ export const useMapStore = defineStore('map', () => {
   const basemap = ref<BasemapType>('esriStreet')
   const center = ref<[number, number]>([104.0, 35.0])
   const zoom = ref(3)
-  
+
   // Map instance reference
-  const mapInstance = ref<maplibregl.Map | null>(null)
+  const mapInstance = ref<any>(null)
   const mapContainer = ref<HTMLElement | null>(null)
-  
+
   // Computed
   const visibleLayers = computed<MapLayer[]>(() => layers.value.filter(l => l.visible))
-  
+
   // Actions
   function initializeMap(containerId: string) {
     if (mapInstance.value) {
       mapInstance.value.remove()
     }
-    
+
     const style = createStyleFromBasemap(basemap.value)
-    
+
     mapInstance.value = new maplibregl.Map({
       container: containerId,
       style: style,
       center: center.value,
       zoom: zoom.value
     })
-    
+
     // Add navigation controls
     mapInstance.value.addControl(new maplibregl.NavigationControl(), 'top-right')
     mapInstance.value.addControl(new maplibregl.ScaleControl(), 'bottom-left')
-    
+
     // Listen for map events
     mapInstance.value.on('move', () => {
       if (mapInstance.value) {
@@ -46,19 +46,19 @@ export const useMapStore = defineStore('map', () => {
         zoom.value = mapInstance.value.getZoom()
       }
     })
-    
+
     return mapInstance.value
   }
-  
+
   function setBasemap(type: BasemapType) {
     basemap.value = type
-    
+
     if (mapInstance.value) {
       const style = createStyleFromBasemap(type)
       mapInstance.value.setStyle(style)
     }
   }
-  
+
   function flyTo(location: { center: [number, number]; zoom?: number }) {
     if (mapInstance.value) {
       mapInstance.value.flyTo({
@@ -68,7 +68,7 @@ export const useMapStore = defineStore('map', () => {
       })
     }
   }
-  
+
   function addLayer(layer: Omit<MapLayer, 'createdAt'>) {
     const existing = layers.value.find(l => l.id === layer.id)
     if (existing) {
@@ -80,16 +80,16 @@ export const useMapStore = defineStore('map', () => {
         createdAt: new Date().toISOString()
       })
     }
-    
+
     // Note: Layer won't be added to map initially since visible is false
     // User must manually toggle visibility to show the layer
   }
-  
+
   function removeLayer(layerId: string) {
     const index = layers.value.findIndex(l => l.id === layerId)
     if (index !== -1) {
       layers.value.splice(index, 1)
-      
+
       // Remove from map
       if (mapInstance.value) {
         if (mapInstance.value.getLayer(layerId)) {
@@ -101,12 +101,12 @@ export const useMapStore = defineStore('map', () => {
       }
     }
   }
-  
+
   function toggleLayerVisibility(layerId: string) {
     const layer = layers.value.find(l => l.id === layerId)
     if (layer) {
       layer.visible = !layer.visible
-      
+
       if (mapInstance.value) {
         if (layer.visible) {
           addLayerToMap(layer)
@@ -118,24 +118,24 @@ export const useMapStore = defineStore('map', () => {
       }
     }
   }
-  
+
   function setLayerOpacity(layerId: string, opacity: number) {
     const layer = layers.value.find(l => l.id === layerId)
     if (layer && mapInstance.value) {
       layer.opacity = opacity
-      
+
       if (mapInstance.value.getLayer(layerId)) {
         mapInstance.value.setPaintProperty(layerId, 'raster-opacity', opacity)
       }
     }
   }
-  
+
   // Private helper to add layer to map based on type
   function addLayerToMap(layer: Omit<MapLayer, 'createdAt'>) {
     if (!mapInstance.value) return
-    
+
     const map = mapInstance.value as any
-    
+
     switch (layer.type) {
       case 'geojson':
         addGeoJSONLayer(map, layer)
@@ -144,6 +144,7 @@ export const useMapStore = defineStore('map', () => {
         addMVTLayer(map, layer)
         break
       case 'wms':
+      case 'image':
         addWMSLayer(map, layer)
         break
       case 'heatmap':
@@ -151,23 +152,23 @@ export const useMapStore = defineStore('map', () => {
         break
     }
   }
-  
+
   function addGeoJSONLayer(map: any, layer: Omit<MapLayer, 'createdAt'>) {
     if (map.getSource(layer.id)) {
       map.removeLayer(layer.id)
       map.removeSource(layer.id)
     }
-    
+
     // Convert relative URL to absolute URL for Mapbox GL JS
-    const dataUrl = layer.url.startsWith('http') 
-      ? layer.url 
+    const dataUrl = layer.url.startsWith('http')
+      ? layer.url
       : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${layer.url}`
-    
+
     map.addSource(layer.id, {
       type: 'geojson',
       data: dataUrl
     })
-    
+
     map.addLayer({
       id: layer.id,
       type: 'fill',
@@ -178,25 +179,25 @@ export const useMapStore = defineStore('map', () => {
       }
     })
   }
-  
+
   function addMVTLayer(map: any, layer: Omit<MapLayer, 'createdAt'>) {
     if (map.getSource(layer.id)) {
       map.removeLayer(layer.id)
       map.removeSource(layer.id)
     }
-    
+
     // Convert relative URL to absolute URL for Mapbox GL JS
-    const tilesUrl = layer.url.startsWith('http') 
-      ? layer.url 
+    const tilesUrl = layer.url.startsWith('http')
+      ? layer.url
       : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${layer.url}`
-    
+
     map.addSource(layer.id, {
       type: 'vector',
       tiles: [tilesUrl],
       minzoom: layer.minZoom || 0,
       maxzoom: layer.maxZoom || 22
     })
-    
+
     map.addLayer({
       id: layer.id,
       type: 'fill',
@@ -208,24 +209,24 @@ export const useMapStore = defineStore('map', () => {
       }
     })
   }
-  
+
   function addWMSLayer(map: any, layer: Omit<MapLayer, 'createdAt'>) {
     if (map.getSource(layer.id)) {
       map.removeLayer(layer.id)
       map.removeSource(layer.id)
     }
-    
+
     // Convert relative URL to absolute URL for Mapbox GL JS
-    const tilesUrl = layer.url.startsWith('http') 
-      ? layer.url 
+    const tilesUrl = layer.url.startsWith('http')
+      ? layer.url
       : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${layer.url}`
-    
+
     map.addSource(layer.id, {
       type: 'raster',
       tiles: [tilesUrl],
       tileSize: 256
     })
-    
+
     map.addLayer({
       id: layer.id,
       type: 'raster',
@@ -235,18 +236,18 @@ export const useMapStore = defineStore('map', () => {
       }
     })
   }
-  
+
   function addHeatmapLayer(map: any, layer: Omit<MapLayer, 'createdAt'>) {
     if (map.getSource(layer.id)) {
       map.removeLayer(layer.id)
       map.removeSource(layer.id)
     }
-    
+
     map.addSource(layer.id, {
       type: 'geojson',
       data: layer.url
     })
-    
+
     map.addLayer({
       id: layer.id,
       type: 'heatmap',
@@ -269,7 +270,7 @@ export const useMapStore = defineStore('map', () => {
       }
     })
   }
-  
+
   function clearAllLayers() {
     layers.value.forEach(layer => {
       if (mapInstance.value) {
@@ -283,7 +284,7 @@ export const useMapStore = defineStore('map', () => {
     })
     layers.value = []
   }
-  
+
   return {
     layers,
     basemap,

@@ -108,6 +108,7 @@ class SQLiteManager {
         role TEXT NOT NULL,
         content TEXT NOT NULL,
         timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+        services TEXT,
         FOREIGN KEY (conversation_id) REFERENCES conversations(id)
       )
     `);

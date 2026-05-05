@@ -126,16 +126,20 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed } from 'vue'
+import { onMounted, onUnmounted, ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import { useMapStore } from '@/stores/map'
 import { useDataSourceStore } from '@/stores/dataSources'
 import { MapLocation, List, Connection, Document, Picture } from '@element-plus/icons-vue'
 import type { DataSource } from '@/types'
 import LayerItemCard from '@/components/map/LayerItemCard.vue'
 import { getDataSourceServiceUrl } from '@/services/dataSource'
+import { ElMessage } from 'element-plus'
 
 const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
 const mapStore = useMapStore()
 const dataSourceStore = useDataSourceStore()
 const mapContainerRef = ref<HTMLElement>()
@@ -202,7 +206,7 @@ onMounted(async () => {
       // Get the appropriate service URL (MVT or WMS)
       const serviceInfo = await getDataSourceServiceUrl(ds.id)
       
-      let layerType: 'geojson' | 'mvt' | 'wms' | 'heatmap'
+      let layerType: 'geojson' | 'mvt' | 'wms' | 'heatmap' | 'image'
       let url: string
       
       if (serviceInfo.serviceType === 'wms') {
@@ -230,7 +234,65 @@ onMounted(async () => {
       console.error(`Failed to add layer for data source ${ds.id}:`, error)
     }
   }
+  
+  // Check if there's a layer parameter in the route query
+  handleRouteQueryLayer()
 })
+
+// Watch for route changes to handle layer additions
+watch(() => route.query.addLayer, (layerJson) => {
+  if (layerJson) {
+    handleRouteQueryLayer()
+  }
+})
+
+// Handle adding layer from route query parameter
+function handleRouteQueryLayer() {
+  const layerJson = route.query.addLayer
+  if (!layerJson) return
+  
+  try {
+    const layerInfo = JSON.parse(decodeURIComponent(layerJson as string))
+    console.log('[MapView] Adding layer from query:', layerInfo)
+    
+    // Convert service type to map layer type
+    let layerType: 'geojson' | 'mvt' | 'wms' | 'heatmap' | 'image'
+    
+    if (layerInfo.type === 'mvt') {
+      layerType = 'mvt'
+    } else if (layerInfo.type === 'wms' || layerInfo.type === 'image') {
+      layerType = 'image' // Use 'image' type for both WMS and image services
+    } else {
+      console.warn(`[MapView] Unsupported layer type: ${layerInfo.type}`)
+      ElMessage.warning(`Unsupported layer type: ${layerInfo.type}`)
+      return
+    }
+    
+    // Add layer to map store
+    mapStore.addLayer({
+      id: layerInfo.id,
+      type: layerType,
+      url: layerInfo.url,
+      visible: true, // Auto-show layers added from chat
+      opacity: 0.8,
+      metadata: layerInfo.metadata,
+      name: layerInfo.name,
+      style: {
+        fillColor: '#409eff',
+        fillOpacity: 0.6
+      }
+    })
+    
+    ElMessage.success(`Layer "${layerInfo.name}" added to map`)
+    
+    // Clear the query parameter to avoid re-adding on refresh
+    router.replace({ query: {} })
+    
+  } catch (error) {
+    console.error('[MapView] Failed to parse layer info:', error)
+    ElMessage.error('Failed to add layer to map')
+  }
+}
 
 function handleBasemapChange(basemapType: string) {
   mapStore.setBasemap(basemapType as any)

@@ -64,7 +64,7 @@ export interface VisualizationService {
   id: string;
   stepId?: string;
   goalId?: string;
-  type: 'mvt' | 'geojson' | 'image';
+  type: 'mvt' | 'geojson' | 'image' | 'report';
   url: string;
   ttl: number;
   expiresAt: Date;
@@ -196,22 +196,39 @@ export function createGeoAIGraph(
               
               // Invoke the tool with parameters
               console.log(`[Plugin Executor] Invoking tool with parameters:`, step.parameters);
-              const result = await tool.invoke(step.parameters);
+              const toolResult = await tool.invoke(step.parameters);
               
               console.log(`[Plugin Executor] Tool execution successful`);
               
-              // Store successful result
-              executionResults.set(step.stepId, {
+              // Parse tool result (it's a JSON string)
+              let parsedResult: any;
+              try {
+                parsedResult = typeof toolResult === 'string' ? JSON.parse(toolResult) : toolResult;
+              } catch (error) {
+                console.error(`[Plugin Executor] Failed to parse tool result:`, error);
+                parsedResult = { success: false, error: 'Invalid tool result format' };
+              }
+              
+              // Construct proper result object with NativeData
+              const analysisResult: AnalysisResult = {
                 id: step.stepId,
                 goalId,
-                status: 'success',
-                data: result,
+                status: parsedResult.success ? 'success' : 'failed',
+                data: parsedResult.success ? {
+                  id: parsedResult.resultId,
+                  type: parsedResult.type || 'geojson',  // Use type from tool result
+                  reference: parsedResult.reference || '',
+                  metadata: parsedResult.metadata || {}
+                } : undefined,
+                error: parsedResult.error,
                 metadata: {
                   pluginId: step.pluginId,
                   parameters: step.parameters,
                   executedAt: new Date().toISOString()
                 }
-              });
+              };
+              
+              executionResults.set(step.stepId, analysisResult);
               
             } catch (error) {
               console.error(`[Plugin Executor] Step ${step.stepId} failed:`, error);

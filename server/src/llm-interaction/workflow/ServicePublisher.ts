@@ -52,7 +52,7 @@ export class ServicePublisher {
     /**
      * Determine service type from data type
      */
-    private determineServiceType(dataType?: string): 'geojson' | 'mvt' | 'image' {
+    private determineServiceType(dataType?: string): 'geojson' | 'mvt' | 'image' | 'report' {
         if (!dataType) {
             return 'geojson'; // Default fallback
         }
@@ -64,7 +64,11 @@ export class ServicePublisher {
             case 'tif':
             case 'geotiff':
             case 'wms':
-                return 'image';
+                return 'image'; // WMS/Image service for map viewing
+
+            case 'report':
+            case 'html':
+                return 'report'; // Report service
 
             case 'geojson':
             case 'shapefile':
@@ -78,7 +82,7 @@ export class ServicePublisher {
      * Generate service URL based on type and data
      */
     private generateServiceUrl(
-        serviceType: 'geojson' | 'mvt' | 'image',
+        serviceType: 'geojson' | 'mvt' | 'image' | 'report',
         stepId: string,
         data: any
     ): string {
@@ -93,6 +97,10 @@ export class ServicePublisher {
             case 'image':
                 // WMS or image service
                 return `/api/services/wms/${stepId}`;
+
+            case 'report':
+                // Report HTML file
+                return `/api/results/reports/${stepId}.html`;
 
             case 'geojson':
             default:
