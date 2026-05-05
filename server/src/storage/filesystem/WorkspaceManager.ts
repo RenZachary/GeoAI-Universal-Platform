@@ -5,8 +5,7 @@
 import fs from 'fs';
 import path from 'path';
 import { 
-  WORKSPACE_DIRS, 
-  DEFAULT_PROMPT_TEMPLATES} from '../../core';
+  WORKSPACE_DIRS} from '../../core';
 import type { WorkspaceInfo, WorkspaceDirectories } from '../../core';
 import { formatBytes } from '../../core';
 
@@ -34,9 +33,6 @@ class WorkspaceManager {
     
     // Ensure all directories exist
     this.ensureDirectories();
-    
-    // Initialize default prompt templates
-    this.initializeDefaultPrompts();
     
     // Get workspace info
     const info = this.getWorkspaceInfo();
@@ -79,47 +75,9 @@ class WorkspaceManager {
         fs.mkdirSync(fullPath, { recursive: true });
       }
     });
-    
-    // Initialize default prompt templates (if not exist)
-    this.initializeDefaultPrompts();
   }
   
-  /**
-   * Initialize default prompt templates
-   */
-  private initializeDefaultPrompts(): void {
-    if (!this.baseDir) {
-      console.warn('Base directory not set. Please call init() first.');
-      return;
-    }
-    const promptsDir = path.join(this.baseDir, WORKSPACE_DIRS.LLM_PROMPTS_EN_US);
-    const defaultTemplates = [...DEFAULT_PROMPT_TEMPLATES];
-    
-    for (const template of defaultTemplates) {
-      const templatePath = path.join(promptsDir, template);
-      if (!fs.existsSync(templatePath)) {
-        this.createDefaultTemplate(templatePath, template);
-      }
-    }
-  }
-  
-  /**
-   * Create default template file
-   */
-  private createDefaultTemplate(filePath: string, templateName: string): void {
-    const templates: Record<string, string> = {
-      'goal-splitting.md': `Identify and split the user's request into independent goals.\n\nUser input: {{userInput}}\n\nReturn a JSON array of goals:\n[\n  {\n    "id": "goal_1",\n    "description": "string",\n    "type": "visualization" | "analysis" | "report" | "query"\n  }\n]\n\nRules:\n- Each goal should be independently achievable\n- Don't plan execution steps yet, just identify goals\n- If only one goal, return array with single element\n`,
-      
-      'task-planning.md': `Create an execution plan for the given goal using available plugins and data sources.\n\nGoal: {{goalDescription}}\nGoal Type: {{goalType}}\n\nAvailable Data Sources:\n{{dataSourcesMetadata}}\n\nAvailable Plugins:\n{{availablePlugins}}\n\nContext from Previous Steps (if any):\n{{previousResults}}\n\nCreate a step-by-step execution plan. For each step specify:\n- pluginName: Which plugin to use\n- parameters: Parameters for the plugin\n- outputType: Expected output type\n\nConsiderations:\n- Choose appropriate plugins based on data source type\n- Respect NativeData principle (keep original format)\n- Handle errors gracefully\n- Return plan as JSON array of steps\n`,
-      
-      'response-summary.md': `Generate a friendly summary of the analysis results.\n\nGoals completed: {{completedGoals}}\nGoals failed: {{failedGoals}}\n\nResults:\n{{resultsSummary}}\n\nProvide a concise, helpful summary in natural language. Be clear about what succeeded and what failed.\n`,
-    };
-    
-    const content = templates[templateName] || `# ${templateName}\n\nAdd your prompt template here.\n`;
-    fs.writeFileSync(filePath, content, 'utf-8');
-    console.log(`Created default template: ${templateName}`);
-  }
-  
+
   /**
    * Get workspace information
    */

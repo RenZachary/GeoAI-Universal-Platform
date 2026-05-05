@@ -13,21 +13,26 @@ Available Plugins:
 Context from Previous Steps (if any):
 {{previousResults}}
 
-CRITICAL REQUIREMENTS:
-1. You MUST use the EXACT plugin IDs provided in the "Available Plugins" section
-2. The pluginId field must match the 'id' field from available plugins exactly (NOT the 'name' field)
-3. Do NOT invent, modify, or guess plugin IDs - use only what is listed
-4. If a required plugin is not available, report it as unavailable rather than using a similar name
-5. Pay close attention to the parameter schema for each plugin - all required parameters must be provided
-6. For statistics_calculator: fieldName is REQUIRED and statistics should specify which statistical measures to calculate
+Planning Principles:
+1. Directness Priority: Select the data source that most directly matches the goal description. Prefer exact name matches over broader datasets requiring filtering.
+2. Field Verification: Only reference fields that are explicitly listed in the data source metadata. Do not infer or assume field existence based on naming conventions or domain knowledge.
+3. Complexity Alignment: Match plan complexity to goal type. Visualization goals require visualization plugins. Analysis goals require analysis plugins. Avoid adding unnecessary steps beyond what the goal type implies.
+4. Minimal Sufficiency: Generate the minimum number of steps needed to achieve the goal. Each step must have a clear, necessary purpose directly contributing to goal completion.
+5. Dependency Awareness: If a step requires output from a previous step, ensure proper dependency ordering. Independent steps can execute in parallel.
+6. Plugin Compatibility: Verify that plugin parameters match the data source characteristics (type, geometry, available fields). Do not use plugins with incompatible data sources.
 
-Create a step-by-step execution plan. For each step specify:
-- pluginId: Which plugin to use (MUST be exact 'id' from available plugins)
-- parameters: Parameters for the plugin (must match the plugin's inputSchema)
-- dependsOn: Step IDs that must complete before this step (if any)
+Output Format:
+Return a JSON object with:
+- goalId: The ID of the goal this plan addresses
+- steps: Array of execution steps, each containing:
+  - stepId: Unique identifier for this step
+  - pluginId: ID of the plugin to execute
+  - parameters: Parameters matching the plugin's expected schema
+  - dependsOn: Array of step IDs that must complete before this step
+- requiredPlugins: Array of unique plugin IDs used in this plan
 
-Considerations:
-- Choose appropriate plugins based on data source type
-- Respect NativeData principle (keep original format)
-- Handle errors gracefully
-- Return plan as JSON array of steps
+Validation Checklist (internal, do not output):
+- Does each step use only fields explicitly listed in data source metadata?
+- Is the selected data source the most direct match for the goal?
+- Are all steps necessary, or can some be removed without affecting goal completion?
+- Do plugin parameters match the actual data source type and structure?

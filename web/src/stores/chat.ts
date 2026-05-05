@@ -31,7 +31,10 @@ export const useChatStore = defineStore('chat', () => {
   async function loadConversation(conversationId: string) {
     try {
       const msgs = await chatService.getConversation(conversationId)
-      messages.value.set(conversationId, msgs)
+      // Force Vue reactivity by creating a new Map
+      const newMap = new Map(messages.value)
+      newMap.set(conversationId, msgs)
+      messages.value = newMap
       currentConversationId.value = conversationId
       // Clear services when loading existing conversation (they may have expired)
       partialServices.value = []
@@ -44,6 +47,38 @@ export const useChatStore = defineStore('chat', () => {
   
   async function sendMessage(message: string, onEvent?: (event: any) => void) {
     isStreaming.value = true
+    
+    // Immediately create user and empty assistant messages for better UX
+    const conversationId = currentConversationId.value || `conv_${Date.now()}`
+    if (!currentConversationId.value) {
+      currentConversationId.value = conversationId
+    }
+    
+    console.log('[Chat Store] Creating initial messages for conversation:', conversationId)
+    
+    const currentMsgs = messages.value.get(conversationId) || []
+    const updatedMsgs: ChatMessage[] = [
+      ...currentMsgs,
+      {
+        id: `user-${Date.now()}`,
+        role: 'user',
+        content: message,
+        timestamp: new Date().toISOString()
+      },
+      {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: '',  // Empty initially, will be filled by tokens
+        timestamp: new Date().toISOString()
+      }
+    ]
+    
+    console.log('[Chat Store] Initial messages count:', updatedMsgs.length)
+    
+    // Force Vue reactivity
+    const newMap = new Map(messages.value)
+    newMap.set(conversationId, updatedMsgs)
+    messages.value = newMap
     
     try {
       await chatService.sendMessageStream(
@@ -205,14 +240,10 @@ export const useChatStore = defineStore('chat', () => {
         break
         
       case 'message_start':
-        // Add user message
-        currentMsgs.push({
-          id: `user-${Date.now()}`,
-          role: 'user',
-          content: data.content,
-          timestamp: new Date().toISOString()
-        })
-        messages.value.set(conversationId, currentMsgs)
+        // User message already created in sendMessage, just ensure conversationId is set
+        if (data?.conversationId && !currentConversationId.value) {
+          currentConversationId.value = data.conversationId
+        }
         break
         
       case 'token':
@@ -250,7 +281,10 @@ export const useChatStore = defineStore('chat', () => {
         }
         
         // Update the Map with new array reference
-        messages.value.set(conversationId, updatedMsgs)
+        // Force Vue reactivity by creating a new Map
+        const newMap = new Map(messages.value)
+        newMap.set(conversationId, updatedMsgs)
+        messages.value = newMap
         break
         
       case 'message_complete':
@@ -268,7 +302,10 @@ export const useChatStore = defineStore('chat', () => {
             content: data?.summary || 'Analysis completed',
             timestamp: new Date().toISOString()
           })
-          messages.value.set(conversationId, [...currentMsgs])
+          // Force Vue reactivity by creating a new Map
+          const completeMap1 = new Map(messages.value)
+          completeMap1.set(conversationId, [...currentMsgs])
+          messages.value = completeMap1
         }
         
         // Store visualization services if provided
@@ -279,7 +316,10 @@ export const useChatStore = defineStore('chat', () => {
           const lastAssistantMsg = [...currentMsgs].reverse().find((m: any) => m.role === 'assistant')
           if (lastAssistantMsg) {
             lastAssistantMsg.services = data.services
-            messages.value.set(conversationId, [...currentMsgs])
+            // Force Vue reactivity by creating a new Map
+            const completeMap2 = new Map(messages.value)
+            completeMap2.set(conversationId, [...currentMsgs])
+            messages.value = completeMap2
             console.log('[Chat Store] Attached services to last assistant message')
           }
           
@@ -309,7 +349,10 @@ export const useChatStore = defineStore('chat', () => {
           content: `⚠️ Error: ${errorMessage}`,
           timestamp: new Date().toISOString()
         })
-        messages.value.set(conversationId, [...currentMsgs])
+        // Force Vue reactivity by creating a new Map
+        const errorMap = new Map(messages.value)
+        errorMap.set(conversationId, [...currentMsgs])
+        messages.value = errorMap
         
         isStreaming.value = false
         break
