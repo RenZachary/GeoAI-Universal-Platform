@@ -1,15 +1,28 @@
 <template>
   <div class="chat-view">
     <!-- Conversation Sidebar -->
-    <div class="conversation-sidebar" :class="{ collapsed: sidebarCollapsed }">
+    <aside class="conversation-sidebar" :class="{ collapsed: sidebarCollapsed }">
       <div class="sidebar-header">
-        <el-button type="primary" @click="handleNewChat" :icon="Plus">
+        <el-button 
+          v-if="!sidebarCollapsed"
+          type="primary" 
+          @click="handleNewChat" 
+          :icon="Plus"
+        >
           {{ $t('chat.newChat') }}
+        </el-button>
+        <el-button 
+          class="sidebar-toggle-btn"
+          text
+          @click="sidebarCollapsed = !sidebarCollapsed"
+          :title="sidebarCollapsed ? 'Expand' : 'Collapse'"
+        >
+          {{ sidebarCollapsed ? '▶' : '◀' }}
         </el-button>
       </div>
       
       <!-- Data Sources Toggle -->
-      <div class="data-sources-toggle">
+      <div v-if="!sidebarCollapsed" class="data-sources-toggle">
         <el-button 
           text 
           size="small" 
@@ -22,7 +35,7 @@
       </div>
       
       <!-- Data Sources List -->
-      <div v-if="showDataSources" class="data-sources-section">
+      <div v-if="!sidebarCollapsed && showDataSources" class="data-sources-section">
         <div class="section-title">{{ t('chat.availableData') }}</div>
         <div 
           v-for="ds in dataSourceStore.dataSources" 
@@ -49,7 +62,7 @@
         </el-empty>
       </div>
       
-      <div class="conversation-list">
+      <div v-if="!sidebarCollapsed" class="conversation-list">
         <div
           v-for="conv in chatStore.conversations"
           :key="conv.id"
@@ -72,61 +85,81 @@
           :image-size="80"
         />
       </div>
-    </div>
+    </aside>
     
-    <!-- Main Chat Area -->
-    <div class="chat-main">
-      <!-- Workflow Status Indicator -->
-      <WorkflowStatusIndicator 
-        :status="chatStore.workflowStatus"
-        :active-tools="chatStore.activeTools"
-      />
-      
-      <!-- Messages Container -->
-      <div class="messages-container" ref="messagesContainerRef">
-        <div v-if="chatStore.currentMessages.length === 0" class="empty-state">
-          <el-icon :size="64" color="#409eff"><ChatDotRound /></el-icon>
-          <p>{{ $t('chat.noMessages') }}</p>
-          
-          <!-- Quick Actions -->
-          <div class="quick-actions">
-            <el-button @click="handleQuickAction('buffer')">Buffer Analysis</el-button>
-            <el-button @click="handleQuickAction('overlay')">Overlay Analysis</el-button>
-            <el-button @click="handleQuickAction('statistics')">Statistics</el-button>
+    <!-- Main Content Area: Split Layout -->
+    <main class="chat-main split-layout">
+      <!-- Left Panel: Chat -->
+      <div 
+        class="chat-panel" 
+        :style="{ width: chatPanelWidth + '%' }"
+      >
+        <!-- Workflow Status Indicator -->
+        <WorkflowStatusIndicator 
+          :status="chatStore.workflowStatus"
+          :active-tools="chatStore.activeTools"
+        />
+        
+        <!-- Messages Container -->
+        <div class="messages-container" ref="messagesContainerRef">
+          <div v-if="chatStore.currentMessages.length === 0" class="empty-state">
+            <el-icon :size="64" color="#409eff"><ChatDotRound /></el-icon>
+            <p>{{ $t('chat.noMessages') }}</p>
+            
+            <!-- Quick Actions -->
+            <div class="quick-actions">
+              <el-button @click="handleQuickAction('buffer')">Buffer Analysis</el-button>
+              <el-button @click="handleQuickAction('overlay')">Overlay Analysis</el-button>
+              <el-button @click="handleQuickAction('statistics')">Statistics</el-button>
+            </div>
           </div>
+          
+          <MessageBubble
+            v-for="msg in chatStore.currentMessages"
+            :key="msg.id"
+            :message="msg"
+            :is-streaming="chatStore.isStreaming && msg.role === 'assistant'"
+          />
         </div>
         
-        <MessageBubble
-          v-for="msg in chatStore.currentMessages"
-          :key="msg.id"
-          :message="msg"
-          :is-streaming="chatStore.isStreaming && msg.role === 'assistant'"
-        />
-      </div>
-      
-      <!-- Input Area -->
-      <div class="input-area">
-        <el-input
-          v-model="inputMessage"
-          type="textarea"
-          :placeholder="$t('chat.placeholder')"
-          :rows="3"
-          :disabled="chatStore.isStreaming"
-          @keydown.enter.ctrl="handleSendMessage"
-        />
-        <div class="input-actions">
-          <el-button 
-            type="primary" 
-            :loading="chatStore.isStreaming"
-            :disabled="!inputMessage.trim()"
-            @click="handleSendMessage"
-          >
-            <el-icon><Promotion /></el-icon>
-            Send
-          </el-button>
+        <!-- Input Area -->
+        <div class="input-area">
+          <el-input
+            v-model="inputMessage"
+            type="textarea"
+            :placeholder="$t('chat.placeholder')"
+            :rows="3"
+            :disabled="chatStore.isStreaming"
+            @keydown.enter.ctrl="handleSendMessage"
+          />
+          <div class="input-actions">
+            <el-button 
+              type="primary" 
+              :loading="chatStore.isStreaming"
+              :disabled="!inputMessage.trim()"
+              @click="handleSendMessage"
+            >
+              <el-icon><Promotion /></el-icon>
+              Send
+            </el-button>
+          </div>
         </div>
       </div>
-    </div>
+
+      <!-- Split Pane Resizer -->
+      <SplitPane 
+        :initial-ratio="0.4"
+        @resize="handleSplitResize"
+      />
+
+      <!-- Right Panel: Map -->
+      <div 
+        class="map-panel"
+        :style="{ width: mapPanelWidth + '%' }"
+      >
+        <MapWorkspace />
+      </div>
+    </main>
   </div>
 </template>
 
@@ -137,6 +170,8 @@ import { useDataSourceStore } from '@/stores/dataSources'
 import { useI18n } from 'vue-i18n'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
 import WorkflowStatusIndicator from '@/components/chat/WorkflowStatusIndicator.vue'
+import SplitPane from '@/components/chat-map/SplitPane.vue'
+import MapWorkspace from '@/components/chat-map/MapWorkspace.vue'
 import { Plus, Delete, ChatDotRound, Promotion, Folder } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 
@@ -145,8 +180,15 @@ const chatStore = useChatStore()
 const dataSourceStore = useDataSourceStore()
 const inputMessage = ref('')
 const messagesContainerRef = ref<HTMLElement>()
-const sidebarCollapsed = ref(false)
+
+// Load sidebar state from localStorage
+const SIDERBAR_COLLAPSED_KEY = 'chat-sidebar-collapsed'
+const savedSidebarState = localStorage.getItem(SIDERBAR_COLLAPSED_KEY)
+const sidebarCollapsed = ref(savedSidebarState === 'true')
+
 const showDataSources = ref(false)
+const chatPanelWidth = ref(40)
+const mapPanelWidth = ref(60)
 
 // Debug: Watch partialServices changes
 watch(() => chatStore.partialServices, (newVal) => {
@@ -155,6 +197,12 @@ watch(() => chatStore.partialServices, (newVal) => {
     console.log('[ChatView] First service:', newVal[0])
   }
 }, { deep: true })
+
+// Watch sidebar collapsed state and save to localStorage
+watch(sidebarCollapsed, (newValue) => {
+  localStorage.setItem(SIDERBAR_COLLAPSED_KEY, newValue.toString())
+  console.log('[ChatView] Sidebar state saved:', newValue ? 'collapsed' : 'expanded')
+})
 
 // Lifecycle
 import { onMounted } from 'vue'
@@ -232,6 +280,11 @@ function scrollToBottom() {
   })
 }
 
+function handleSplitResize(ratio: number) {
+  chatPanelWidth.value = ratio * 100
+  mapPanelWidth.value = (1 - ratio) * 100
+}
+
 // Service handlers
 function handleServicePreview(service: any) {
   // Open service URL in new tab or show preview dialog
@@ -278,16 +331,24 @@ function handleViewOnMap(service: any) {
   display: flex;
   flex-direction: column;
   transition: width 0.3s;
+  overflow: hidden;
   
   &.collapsed {
-    width: 0;
-    overflow: hidden;
+    width: 40px;
   }
 }
 
 .sidebar-header {
   padding: 16px;
   border-bottom: 1px solid var(--el-border-color);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.sidebar-toggle-btn {
+  min-width: 32px;
+  padding: 4px 8px;
 }
 
 .conversation-list {
@@ -388,8 +449,30 @@ function handleViewOnMap(service: any) {
 .chat-main {
   flex: 1;
   display: flex;
-  flex-direction: column;
   background: var(--el-bg-color);
+  overflow: hidden;
+}
+
+.split-layout {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 30%;
+  max-width: 70%;
+  background: var(--el-bg-color);
+}
+
+.map-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 30%;
+  max-width: 70%;
+  background: var(--el-bg-color-page);
 }
 
 .messages-container {

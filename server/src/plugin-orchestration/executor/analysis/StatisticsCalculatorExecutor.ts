@@ -8,6 +8,7 @@ import { DataAccessorFactory } from '../../../data-access/factories/DataAccessor
 import { DataSourceRepository } from '../../../data-access/repositories';
 import type Database from 'better-sqlite3';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 
@@ -84,13 +85,44 @@ export class StatisticsCalculatorExecutor {
 
       console.log('[StatisticsCalculatorExecutor] Statistics calculated:', statistics);
 
-      // Step 5: Generate result metadata
+      // Step 5: Generate stats ID and save result as GeoJSON file
       const statsId = `stats_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+      
+      const workspaceBase = (this.accessorFactory as any).workspaceBase || path.join(__dirname, '..', '..', '..', '..', 'workspace');
+      const statsDir = path.join(workspaceBase, 'results', 'geojson');
+      if (!fs.existsSync(statsDir)) {
+        fs.mkdirSync(statsDir, { recursive: true });
+      }
 
+      const statsFilename = `${statsId}.geojson`;
+      const statsPath = path.join(statsDir, statsFilename);
+      
+      // Create a simple GeoJSON Feature with statistics in properties
+      const statsGeoJSON = {
+        type: 'FeatureCollection',
+        features: [{
+          type: 'Feature',
+          geometry: null,
+          properties: {
+            pluginId: 'statistics_calculator',
+            dataSourceId: params.dataSourceId,
+            fieldName: params.fieldName,
+            valueCount: values.length,
+            ...statistics,
+            summary: this.generateSummary(statistics, params.fieldName),
+            calculatedAt: new Date().toISOString()
+          }
+        }]
+      };
+      
+      fs.writeFileSync(statsPath, JSON.stringify(statsGeoJSON, null, 2), 'utf-8');
+      console.log(`[StatisticsCalculatorExecutor] Statistics saved to: ${statsPath}`);
+
+      // Step 6: Generate result metadata
       return {
         id: statsId,
         type: 'geojson',
-        reference: '',
+        reference: `/api/results/geojson/${statsFilename}`,
         metadata: {
           pluginId: 'statistics_calculator',
           dataSourceId: params.dataSourceId,

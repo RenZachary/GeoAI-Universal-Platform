@@ -285,6 +285,58 @@ export const useMapStore = defineStore('map', () => {
     layers.value = []
   }
 
+  /**
+   * Add layer from visualization service (MVT/WMS/Image)
+   * This is the main entry point for chat-to-map integration
+   */
+  function addLayerFromService(service: any) {
+    // Validate service data
+    if (!service.url || !service.type) {
+      console.error('[Map Store] Invalid service:', service)
+      return
+    }
+
+    // Check if layer already exists
+    if (layers.value.some(l => l.id === service.id)) {
+      console.warn(`[Map Store] Layer ${service.id} already exists`)
+      return
+    }
+
+    // Convert service type to map layer type
+    let layerType: 'geojson' | 'mvt' | 'wms' | 'heatmap' | 'image'
+    
+    if (service.type === 'mvt') {
+      layerType = 'mvt'
+    } else if (service.type === 'wms' || service.type === 'image') {
+      layerType = 'image'
+    } else {
+      console.warn(`[Map Store] Unsupported service type: ${service.type}`)
+      return
+    }
+
+    const layer: Omit<MapLayer, 'createdAt'> = {
+      id: service.id,
+      type: layerType,
+      url: service.url,
+      visible: true, // Auto-show layers added from chat
+      opacity: 0.8,
+      metadata: service.metadata,
+      name: service.metadata?.name || service.id,
+      style: {
+        fillColor: '#409eff',
+        fillOpacity: 0.6
+      }
+    }
+
+    // Add to store
+    addLayer(layer)
+
+    // If layer should be visible, add it to map immediately
+    if (layer.visible && mapInstance.value) {
+      addLayerToMap(layer)
+    }
+  }
+
   return {
     layers,
     basemap,
@@ -300,6 +352,7 @@ export const useMapStore = defineStore('map', () => {
     removeLayer,
     toggleLayerVisibility,
     setLayerOpacity,
-    clearAllLayers
+    clearAllLayers,
+    addLayerFromService
   }
 })

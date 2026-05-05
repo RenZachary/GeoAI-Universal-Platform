@@ -60,7 +60,8 @@ export class MVTPublisherExecutor {
       
       // Step 3: Generate MVT tiles using MVTPublisher with strategy pattern
       // MVTPublisher will automatically select the appropriate strategy based on nativeData.type
-      const mvtPublisher = new MVTPublisher(this.workspaceBase);
+      // Use singleton instance to share tile cache with MVTServiceController
+      const mvtPublisher = MVTPublisher.getInstance(this.workspaceBase);
       const tilesetId = await mvtPublisher.generateTiles(nativeData, {
         minZoom,
         maxZoom,

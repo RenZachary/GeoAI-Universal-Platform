@@ -74,9 +74,11 @@ import type { ChatMessage, VisualizationService } from '@/types'
 import { User, ChatDotRound, DocumentCopy, RefreshRight, Link, Document, MapLocation } from '@element-plus/icons-vue'
 import { marked } from 'marked'
 import { useChatStore } from '@/stores/chat'
+import { useMapStore } from '@/stores/map'
 import { ElMessage } from 'element-plus'
 
 const chatStore = useChatStore()
+const mapStore = useMapStore()
 
 const props = defineProps<{
   message: ChatMessage
@@ -126,28 +128,24 @@ function getActionText(service: VisualizationService): string {
 function handleViewService(service: VisualizationService) {
   // For MVT/WMS/Image (map services), navigate to map page with layer info
   if (service.type === 'mvt' || service.type === 'wms' || service.type === 'image') {
-    // Navigate to map view and add layer
-    const layerInfo = {
-      id: service.id,
-      type: service.type,
-      url: service.url,
-      name: getServiceName(service),
-      metadata: service.metadata
-    }
+    // Unidirectional flow: chat → map, no callback
+    mapStore.addLayerFromService(service)
     
-    // Use router to navigate to map page with layer parameter
-    // This will be handled by the MapView component
-    window.location.href = `/map?addLayer=${encodeURIComponent(JSON.stringify(layerInfo))}`
-    
-    ElMessage.success(`Adding ${service.type} layer to map...`)
+    ElMessage.success(`Layer "${service.metadata?.name || service.id}" added to map`)
   } else if (service.type === 'report') {
-    // For reports, open in new tab
-    window.open(service.url, '_blank')
+    // For reports, open in new tab - convert relative URL to absolute
+    const reportUrl = service.url.startsWith('http') 
+      ? service.url 
+      : `${window.location.origin}${service.url}`
+    window.open(reportUrl, '_blank')
     ElMessage.success('Opening report...')
   } else {
-    // For file-based services (geojson), trigger download
+    // For file-based services (geojson), trigger download - convert relative URL to absolute
+    const downloadUrl = service.url.startsWith('http') 
+      ? service.url 
+      : `${window.location.origin}${service.url}`
     const link = document.createElement('a')
-    link.href = service.url
+    link.href = downloadUrl
     link.download = `${service.stepId || 'result'}.${service.type}`
     link.click()
     ElMessage.success(`Downloading ${service.type} file`)

@@ -23,11 +23,6 @@
         <template #title>{{ $t('chat.conversations') }}</template>
       </el-menu-item>
       
-      <el-menu-item index="/map">
-        <el-icon><MapLocation /></el-icon>
-        <template #title>{{ $t('map.title') || 'Map' }}</template>
-      </el-menu-item>
-      
       <el-menu-item index="/data">
         <el-icon><Folder /></el-icon>
         <template #title>{{ $t('data.title') }}</template>
@@ -55,7 +50,7 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUIStore } from '@/stores/ui'
-import { ChatDotRound, MapLocation, Folder, Tools, Document, Connection, Setting } from '@element-plus/icons-vue'
+import { ChatDotRound, Folder, Tools, Document, Connection, Setting } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const uiStore = useUIStore()

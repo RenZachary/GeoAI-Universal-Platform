@@ -11,7 +11,8 @@ export class MVTServiceController {
   private mvtPublisher: MVTPublisher;
 
   constructor(workspaceBase: string, db?: Database.Database) {
-    this.mvtPublisher = new MVTPublisher(workspaceBase, db);
+    // Use singleton instance to share tile cache with MVTPublisherExecutor
+    this.mvtPublisher = MVTPublisher.getInstance(workspaceBase, db);
   }
 
   /**
@@ -52,7 +53,8 @@ export class MVTServiceController {
       
       // Set appropriate headers for MVT tiles
       res.setHeader('Content-Type', 'application/x-protobuf');
-      res.setHeader('Content-Encoding', 'gzip');
+      // Note: Do NOT set Content-Encoding unless actually compressing the data
+      // The PBF buffer from MVTPublisher is uncompressed
       res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
       
       // Send tile data

@@ -151,6 +151,10 @@ export class ApiRouter {
     this.router.get('/results/:id/heatmap.geojson', (req, res) => this.resultController.serveHeatmap(req, res));
     this.router.get('/results/:id/report.html', (req, res) => this.resultController.serveReport(req, res));
     this.router.get('/results/:id/metadata', (req, res) => this.resultController.getResultMetadata(req, res));
+    
+    // Generic file serving for direct access to result files
+    // Handles: /api/results/reports/*.html, /api/results/geojson/*.geojson, etc.
+    this.router.get('/results/:subdir/:filename', (req, res) => this.resultController.serveGenericFile(req, res));
 
     // LLM configuration endpoints
     this.router.get('/llm/config', (req, res) => this.llmConfigController.getConfig(req, res));

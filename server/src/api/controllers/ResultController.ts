@@ -245,4 +245,89 @@ export class ResultController {
       });
     }
   }
+
+  /**
+   * GET /api/results/:subdir/:filename - Generic file serving for any result type
+   * Handles paths like:
+   * - /api/results/reports/report_*.html
+   * - /api/results/geojson/stats_*.geojson
+   */
+  async serveGenericFile(req: Request, res: Response): Promise<void> {
+    try {
+      const { subdir, filename } = req.params;
+      
+      // Validate subdir to prevent directory traversal attacks
+      const allowedSubdirs = ['reports', 'geojson', 'mvt', 'wms', 'images', 'stats'];
+      if (!allowedSubdirs.includes(subdir)) {
+        res.status(400).json({
+          success: false,
+          error: 'Invalid subdirectory',
+          message: `Subdirectory '${subdir}' is not allowed`
+        });
+        return;
+      }
+      
+      // Construct file path
+      const filePath = path.join(this.workspaceBase, 'results', subdir, filename);
+      
+      console.log(`[Result Controller] Serving generic file: ${filePath}`);
+      
+      // Check if file exists
+      if (!fs.existsSync(filePath)) {
+        res.status(404).json({
+          success: false,
+          error: 'File not found',
+          message: `No file found at: ${subdir}/${filename}`
+        });
+        return;
+      }
+      
+      // Determine content type based on file extension
+      const ext = path.extname(filename).toLowerCase();
+      let contentType = 'application/octet-stream';
+      
+      switch (ext) {
+        case '.html':
+          contentType = 'text/html; charset=utf-8';
+          break;
+        case '.geojson':
+        case '.json':
+          contentType = 'application/json';
+          break;
+        case '.pbf':
+          contentType = 'application/x-protobuf';
+          break;
+        case '.png':
+          contentType = 'image/png';
+          break;
+        case '.jpg':
+        case '.jpeg':
+          contentType = 'image/jpeg';
+          break;
+        case '.tif':
+        case '.tiff':
+          contentType = 'image/tiff';
+          break;
+      }
+      
+      // Read and serve file
+      const content = fs.readFileSync(filePath);
+      
+      // Set appropriate headers
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      
+      res.send(content);
+      console.log(`[Result Controller] File served successfully: ${subdir}/${filename}`);
+      
+    } catch (error) {
+      console.error('[Result Controller] Error serving generic file:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
 }

@@ -6,6 +6,7 @@ import type Database from 'better-sqlite3';
 
 export interface ConversationSummary {
   id: string;
+  title?: string;  // Add title field
   created_at: string;
   updated_at: string;
   message_count: number;
@@ -30,6 +31,7 @@ export class ConversationService {
    */
   listConversations(): ConversationSummary[] {
     try {
+      // Get conversation summaries
       const conversations = this.db.prepare(`
         SELECT DISTINCT conversation_id as id, 
                MIN(timestamp) as created_at,
@@ -38,9 +40,31 @@ export class ConversationService {
         FROM conversation_messages
         GROUP BY conversation_id
         ORDER BY updated_at DESC
-      `).all() as ConversationSummary[];
+      `).all() as Array<{ id: string; created_at: string; updated_at: string; message_count: number }>;
 
-      return conversations;
+      // Enrich with titles from first user message
+      return conversations.map(conv => {
+        // Get the first user message as the title
+        const firstUserMessage = this.db.prepare(`
+          SELECT content
+          FROM conversation_messages
+          WHERE conversation_id = ? AND role = 'user'
+          ORDER BY timestamp ASC
+          LIMIT 1
+        `).get(conv.id) as { content: string } | undefined;
+
+        let title = 'Untitled';
+        if (firstUserMessage && firstUserMessage.content) {
+          // Use first 50 characters of the first user message as title
+          const content = firstUserMessage.content.trim();
+          title = content.length > 50 ? content.substring(0, 50) + '...' : content;
+        }
+
+        return {
+          ...conv,
+          title
+        };
+      });
     } catch (error) {
       console.error('[ConversationService] Error listing conversations:', error);
       throw error;

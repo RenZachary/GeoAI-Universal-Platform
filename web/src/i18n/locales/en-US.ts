@@ -58,6 +58,10 @@ export default {
     created: 'Created',
     url: 'URL',
     layerInformation: 'Layer Information',
+    clearAllLayers: 'Clear All Layers',
+    allLayersCleared: 'All layers cleared',
+    fullscreen: 'Fullscreen',
+    exitFullscreen: 'Exit Fullscreen',
     basemap: {
       cartoDark: 'CARTO Dark',
       cartoLight: 'CARTO Light',

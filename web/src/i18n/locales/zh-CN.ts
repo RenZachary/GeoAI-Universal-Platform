@@ -58,6 +58,10 @@ export default {
     created: '创建时间',
     url: 'URL',
     layerInformation: '图层信息',
+    clearAllLayers: '清空所有图层',
+    allLayersCleared: '已清空所有图层',
+    fullscreen: '全屏',
+    exitFullscreen: '退出全屏',
     basemap: {
       cartoDark: 'CARTO 深色',
       cartoLight: 'CARTO 浅色',

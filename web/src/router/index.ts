@@ -15,12 +15,6 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'chat.conversations' }
       },
       {
-        path: 'map',
-        name: 'map',
-        component: () => import('@/views/MapView.vue'),
-        meta: { title: 'map.title' }
-      },
-      {
         path: 'data',
         name: 'data',
         component: () => import('@/views/DataManagementView.vue'),
