@@ -36,7 +36,12 @@ export class ShapefileAccessor extends GeoJSONBasedAccessor implements DataAcces
       id: generateId(),
       type: 'shapefile',
       reference,
-      metadata,
+      metadata: {
+        ...metadata,
+        // StandardizedOutput fields - for data reading, result is the file reference
+        result: reference,
+        description: `Shapefile data source: ${path.basename(reference)}`
+      },
       createdAt: new Date(),
     };
   }
@@ -80,7 +85,7 @@ export class ShapefileAccessor extends GeoJSONBasedAccessor implements DataAcces
   /**
    * Write shapefile data (copy to workspace)
    */
-  async write(data: any, metadata?: Partial<DataMetadata>): Promise<string> {
+  async write(_data: unknown, _metadata?: Partial<DataMetadata>): Promise<string> {
     throw new Error('Shapefile write operation not yet implemented');
   }
   

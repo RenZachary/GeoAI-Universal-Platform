@@ -4,7 +4,7 @@
  */
 
 import type { Pool } from 'pg';
-import type { FieldStatistics, ClassificationMethod } from '../../geojson/operations/types';
+import type { FieldStatistics, ClassificationMethod } from '../../../../interfaces';
 
 export class PostGISStatisticalOperation {
   constructor(private pool: Pool, private schema: string) {}

@@ -4,7 +4,7 @@
  */
 
 import type { GeoJSONFeatureCollection } from '../GeoJSONBasedAccessor';
-import type { FieldStatistics, ClassificationMethod } from './types';
+import type { FieldStatistics, ClassificationMethod } from '../../../../interfaces';
 
 export class GeoJSONStatisticalOperation {
   
