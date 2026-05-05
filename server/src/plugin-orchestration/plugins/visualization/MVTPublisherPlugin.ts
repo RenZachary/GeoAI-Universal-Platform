@@ -50,7 +50,27 @@ export const MVTPublisherPlugin: Plugin = {
   ],
   outputSchema: {
     type: 'native_data',
-    description: 'MVT service URL and metadata'
+    description: 'MVT service URL and metadata',
+    outputFields: [
+      {
+        name: 'result',
+        type: 'string',
+        description: 'MVT tile service URL template',
+        example: '/api/services/mvt/tileset_123/{z}/{x}/{y}.pbf'
+      },
+      {
+        name: 'tilesetId',
+        type: 'string',
+        description: 'Unique identifier for the tileset',
+        example: 'tileset_123'
+      },
+      {
+        name: 'serviceUrl',
+        type: 'string',
+        description: 'Full MVT service URL',
+        example: '/api/services/mvt/tileset_123/{z}/{x}/{y}.pbf'
+      }
+    ]
   },
   capabilities: ['visualization', 'tile_generation'],
   isBuiltin: true,

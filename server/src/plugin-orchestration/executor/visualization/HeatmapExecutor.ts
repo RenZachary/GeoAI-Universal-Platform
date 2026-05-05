@@ -97,7 +97,9 @@ export class HeatmapExecutor {
           gridCells: grid.length,
           minDensity: statistics.min,
           maxDensity: statistics.max,
-          meanDensity: statistics.mean
+          meanDensity: statistics.mean,
+          // REQUIRED: Standardized output field - the heatmap file path
+          result: resultPath
         },
         createdAt: new Date()
       };

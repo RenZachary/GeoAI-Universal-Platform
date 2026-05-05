@@ -72,7 +72,27 @@ export const ReportGeneratorPlugin: Plugin = {
   ],
   outputSchema: {
     type: 'native_data',
-    description: 'Generated report file path and metadata'
+    description: 'Generated report file path and metadata',
+    outputFields: [
+      {
+        name: 'result',
+        type: 'string',
+        description: 'File path to the generated report',
+        example: '/workspace/results/reports/report_123456.html'
+      },
+      {
+        name: 'format',
+        type: 'string',
+        description: 'Report format (html or pdf)',
+        example: 'html'
+      },
+      {
+        name: 'filePath',
+        type: 'string',
+        description: 'Absolute file path of the report',
+        example: 'E:\\codes\\GeoAI-UP\\workspace\\results\\reports\\report_123456.html'
+      }
+    ]
   },
   capabilities: ['reporting', 'html_generation', 'pdf_generation', 'chart_embedding'],
   isBuiltin: true,

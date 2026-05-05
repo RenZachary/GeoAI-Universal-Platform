@@ -127,19 +127,16 @@ export class StatisticsCalculatorExecutor {
         statisticsRequested: statsToCalculate,
         statistics: statistics,
         calculatedAt: new Date(),
-        summary: this.generateSummary(statistics, params.fieldName)
+        summary: this.generateSummary(statistics, params.fieldName),
+        // REQUIRED: Standardized output field
+        result: statistics  // The complete statistics object
       };
       
-      // Add standardized output fields for placeholder resolution
       return {
         id: statsId,
         type: 'geojson',
         reference: `/api/results/geojson/${statsFilename}`,
-        metadata: {
-          ...resultMetadata,
-          resultValue: statistics,  // Standardized field
-          output: statistics         // Standardized field
-        },
+        metadata: resultMetadata,
         createdAt: new Date()
       };
 

@@ -79,6 +79,12 @@ export class BufferAnalysisExecutor {
     console.log('[BufferAnalysisExecutor] Buffer completed successfully');
     console.log('[BufferAnalysisExecutor] Result:', result);
 
+    // Ensure standardized output field exists (REQUIRED by type system)
+    if (result.metadata && result.metadata.result === undefined) {
+      // For buffer analysis, result is the buffered geometry reference
+      result.metadata.result = result.reference;
+    }
+
     return result;
   }
 }

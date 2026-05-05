@@ -89,7 +89,9 @@ export class ReportGeneratorExecutor {
           includesMaps: params.includeMaps !== false,
           resultsCount: params.analysisResults?.length || 0,
           servicesCount: params.visualizationServices?.length || 0,
-          summary: params.summary
+          summary: params.summary,
+          // REQUIRED: Standardized output field - the file path
+          result: reportPath
         },
         createdAt: new Date()
       };

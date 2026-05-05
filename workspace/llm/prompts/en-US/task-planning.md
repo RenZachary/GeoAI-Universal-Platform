@@ -20,6 +20,19 @@ Planning Principles:
 4. Minimal Sufficiency: Generate the minimum number of steps needed to achieve the goal. Each step must have a clear, necessary purpose directly contributing to goal completion.
 5. Dependency Awareness: If a step requires output from a previous step, ensure proper dependency ordering. Independent steps can execute in parallel.
 6. Plugin Compatibility: Verify that plugin parameters match the data source characteristics (type, geometry, available fields). Do not use plugins with incompatible data sources.
+7. **CRITICAL: Plugin ID Accuracy**: You MUST use the EXACT `id` field from the Available Plugins list. DO NOT invent, modify, or guess plugin IDs. The `pluginId` field in your execution plan must exactly match a plugin's `id` from the available list.
+
+Referencing Previous Step Results:
+When a step needs to use results from a previous step, you MUST use this EXACT syntax:
+  {step_id.result}
+
+Rules:
+- ALWAYS use curly braces {} around the reference
+- ALWAYS use .result to access the primary output value
+- The step_id must exactly match the stepId from a previous step
+- For nested fields, use dot notation: {step_id.result.fieldName}
+
+Each plugin's outputSchema defines what fields are available in .result. Check the plugin documentation for details.
 
 Choropleth Map Generation Pattern:
 When generating a choropleth thematic map:
@@ -54,3 +67,4 @@ Validation Checklist (internal, do not output):
 - Is the selected data source the most direct match for the goal?
 - Are all steps necessary, or can some be removed without affecting goal completion?
 - Do plugin parameters match the actual data source type and structure?
+- **CRITICAL**: Does every `pluginId` EXACTLY match an `id` from the Available Plugins list?

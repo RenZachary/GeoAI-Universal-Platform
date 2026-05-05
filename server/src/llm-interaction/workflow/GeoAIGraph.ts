@@ -37,6 +37,7 @@ export interface AnalysisGoal {
   description: string;
   type: 'spatial_analysis' | 'data_processing' | 'visualization' | 'general';
   priority: number;
+  parameters?: Record<string, any>; // Optional extracted parameters (e.g., colorRamp, valueField)
 }
 
 export interface ExecutionPlan {

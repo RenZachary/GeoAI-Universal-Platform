@@ -158,13 +158,61 @@ class GeoJSONMVTTStrategy implements MVTTileGenerationStrategy {
   async getTile(tilesetId: string, z: number, x: number, y: number): Promise<Buffer | null> {
     console.log(`[GeoJSON MVT Strategy] getTile called: ${tilesetId}/${z}/${x}/${y}`);
     console.log(`[GeoJSON MVT Strategy] Cache size: ${this.tileIndexCache.size}`);
-    console.log(`[GeoJSON MVT Strategy] Cache keys: ${Array.from(this.tileIndexCache.keys()).join(', ')}`);
     
-    const cached = this.tileIndexCache.get(tilesetId);
+    let cached = this.tileIndexCache.get(tilesetId);
     
+    // If not in cache, load from source file
     if (!cached) {
-      console.warn(`[GeoJSON MVT Strategy] Tileset not found in cache: ${tilesetId}`);
-      return null;
+      console.log(`[GeoJSON MVT Strategy] Tileset not in cache, loading from source...`);
+      
+      // Read metadata to get source file path
+      const tilesetDir = path.join(this.mvtOutputDir, tilesetId);
+      const metadataPath = path.join(tilesetDir, 'metadata.json');
+      
+      if (!fs.existsSync(metadataPath)) {
+        console.warn(`[GeoJSON MVT Strategy] Metadata not found: ${metadataPath}`);
+        return null;
+      }
+      
+      const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
+      const sourceFile = metadata.sourceFile;
+      
+      if (!sourceFile || !fs.existsSync(sourceFile)) {
+        console.warn(`[GeoJSON MVT Strategy] Source file not found: ${sourceFile}`);
+        return null;
+      }
+      
+      console.log(`[GeoJSON MVT Strategy] Loading GeoJSON from: ${sourceFile}`);
+      
+      try {
+        // Read and parse GeoJSON
+        const fileContent = fs.readFileSync(sourceFile, 'utf-8');
+        const featureCollection = JSON.parse(fileContent);
+        
+        if (!featureCollection || featureCollection.type !== 'FeatureCollection') {
+          console.warn('[GeoJSON MVT Strategy] Invalid GeoJSON format');
+          return null;
+        }
+        
+        console.log(`[GeoJSON MVT Strategy] Creating tileIndex for ${featureCollection.features?.length || 0} features`);
+        
+        // Create tile index
+        const tileIndex = geojsonvt(featureCollection, {
+          maxZoom: metadata.maxZoom || 22,
+          extent: metadata.extent || 4096,
+          tolerance: 3,
+          buffer: 64
+        });
+        
+        // Cache the tile index
+        cached = { tileIndex, options: metadata };
+        this.tileIndexCache.set(tilesetId, cached);
+        
+        console.log(`[GeoJSON MVT Strategy] TileIndex created and cached for: ${tilesetId}`);
+      } catch (error) {
+        console.error('[GeoJSON MVT Strategy] Failed to load source file:', error);
+        return null;
+      }
     }
     
     console.log(`[GeoJSON MVT Strategy] Found cached tileIndex for: ${tilesetId}`);
@@ -286,35 +334,34 @@ class ShapefileMVTTStrategy implements MVTTileGenerationStrategy {
     
     console.log(`[Shapefile MVT Strategy] Converted to GeoJSON with ${geojson.features?.length || 0} features`);
     
-    // Now delegate to GeoJSON strategy
+    // Generate tilesetId first so we can save the converted GeoJSON in its directory
+    const tilesetId = `mvt_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    const tilesetDir = path.join(this.mvtOutputDir, tilesetId);
+    
+    if (!fs.existsSync(tilesetDir)) {
+      fs.mkdirSync(tilesetDir, { recursive: true });
+    }
+    
+    // Save the converted GeoJSON in the tileset directory (persistent, needed for on-demand generation)
+    const convertedGeoJsonPath = path.join(tilesetDir, 'source.geojson');
+    fs.writeFileSync(convertedGeoJsonPath, JSON.stringify(geojson), 'utf-8');
+    console.log(`[Shapefile MVT Strategy] Saved converted GeoJSON to: ${convertedGeoJsonPath}`);
+    
+    // Delegate to GeoJSON strategy
     const geojsonStrategy = new GeoJSONMVTTStrategy(this.mvtOutputDir);
     
-    // Create a temporary NativeData-like object for the GeoJSON strategy
-    const tempNativeData = {
-      id: `temp_${Date.now()}`,
-      type: 'geojson' as DataSourceType,
-      reference: '', // Not needed since we're passing geojson directly
-      metadata: {},
-      createdAt: new Date()
-    };
-    
-    // Save the converted GeoJSON to a temporary file
-    const tempGeoJsonPath = path.join(
-      this.mvtOutputDir,
-      `temp_${Date.now()}.geojson`
-    );
-    fs.writeFileSync(tempGeoJsonPath, JSON.stringify(geojson), 'utf-8');
-    
     try {
-      // Generate tiles from the temporary GeoJSON file
-      return await geojsonStrategy.generateTiles(tempGeoJsonPath, 'geojson', options);
-    } finally {
-      // Clean up temporary file
-      if (fs.existsSync(tempGeoJsonPath)) {
-        fs.unlinkSync(tempGeoJsonPath);
-        console.log('[Shapefile MVT Strategy] Cleaned up temporary GeoJSON file');
+      // Generate tiles from the converted GeoJSON file
+      return await geojsonStrategy.generateTiles(convertedGeoJsonPath, 'geojson', options);
+    } catch (error) {
+      // Only clean up if tile generation failed
+      if (fs.existsSync(convertedGeoJsonPath)) {
+        fs.unlinkSync(convertedGeoJsonPath);
+        console.log('[Shapefile MVT Strategy] Cleaned up converted GeoJSON file after error');
       }
+      throw error;
     }
+    // Note: Do NOT delete convertedGeoJsonPath on success - it's needed for on-demand tile generation
   }
 }
 

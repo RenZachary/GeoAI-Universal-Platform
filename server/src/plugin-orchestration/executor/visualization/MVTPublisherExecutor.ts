@@ -114,7 +114,9 @@ export class MVTPublisherExecutor {
         dataSourceId,
         originalDataType,
         ...options,
-        generatedAt: new Date().toISOString()
+        generatedAt: new Date().toISOString(),
+        // REQUIRED: Standardized output field - the MVT service URL
+        result: `/api/services/mvt/${tilesetId}/{z}/{x}/{y}.pbf`
       },
       createdAt: new Date()
     };

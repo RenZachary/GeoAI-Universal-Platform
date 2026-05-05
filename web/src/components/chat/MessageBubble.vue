@@ -35,6 +35,7 @@
             </el-icon>
             <span class="service-name">{{ getServiceName(service) }}</span>
             <el-button 
+              v-if="service.type !== 'geojson'"
               link 
               type="primary" 
               size="small"

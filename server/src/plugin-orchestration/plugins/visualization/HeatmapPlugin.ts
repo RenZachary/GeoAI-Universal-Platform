@@ -69,7 +69,27 @@ export const HeatmapPlugin: Plugin = {
   ],
   outputSchema: {
     type: 'native_data',
-    description: 'Generated heatmap as GeoJSON contours with density values'
+    description: 'Generated heatmap as GeoJSON contours with density values',
+    outputFields: [
+      {
+        name: 'result',
+        type: 'string',
+        description: 'File path to the generated heatmap GeoJSON',
+        example: '/workspace/results/geojson/heatmap_123456.geojson'
+      },
+      {
+        name: 'pointCount',
+        type: 'number',
+        description: 'Number of input points used for heatmap generation',
+        example: 1000
+      },
+      {
+        name: 'maxDensity',
+        type: 'number',
+        description: 'Maximum density value in the heatmap',
+        example: 15.5
+      }
+    ]
   },
   capabilities: ['point_density_analysis', 'kernel_density_estimation', 'spatial_pattern_visualization'],
   isBuiltin: true,

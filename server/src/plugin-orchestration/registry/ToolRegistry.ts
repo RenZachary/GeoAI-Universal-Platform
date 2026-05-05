@@ -140,7 +140,8 @@ class ToolRegistry {
         category: plugin?.category,
         version: plugin?.version,
         isBuiltin: plugin?.isBuiltin,
-        parameters: plugin?.inputSchema
+        parameters: plugin?.inputSchema,
+        outputSchema: plugin?.outputSchema  // Include for LLM placeholder reference
       });
     }
     

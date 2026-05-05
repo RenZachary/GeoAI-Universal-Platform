@@ -75,6 +75,11 @@ export class FilterExecutor {
     console.log('[FilterExecutor] Filter completed successfully');
     console.log('[FilterExecutor] Result feature count:', result.metadata?.featureCount);
 
+    // Ensure standardized output field exists (REQUIRED by type system)
+    if (result.metadata && result.metadata.result === undefined) {
+      result.metadata.result = result.metadata.featureCount || 0;
+    }
+
     return result;
   }
 

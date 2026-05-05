@@ -37,7 +37,21 @@ export const OverlayAnalysisPlugin: Plugin = {
   ],
   outputSchema: {
     type: 'native_data',
-    description: 'Result of overlay operation as NativeData reference'
+    description: 'Result of overlay operation as NativeData reference',
+    outputFields: [
+      {
+        name: 'result',
+        type: 'string',
+        description: 'File path or URL to the overlay result geometry',
+        example: '/workspace/results/geojson/overlay_123456.geojson'
+      },
+      {
+        name: 'featureCount',
+        type: 'number',
+        description: 'Number of features in the overlay result',
+        example: 30
+      }
+    ]
   },
   capabilities: ['spatial_analysis', 'overlay_operations'],
   isBuiltin: true,

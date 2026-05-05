@@ -144,8 +144,8 @@ export class PluginToolWrapper {
         }
       },
       {
-        // Tool metadata
-        name: this.sanitizeName(plugin.name),
+        // Tool metadata - use plugin.id as the tool name for consistency
+        name: plugin.id,
         description: this.enrichDescription(plugin),
         schema: this.convertToZodSchema(plugin.inputSchema)
       }

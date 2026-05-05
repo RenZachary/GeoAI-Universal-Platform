@@ -89,7 +89,8 @@ export class TaskPlannerAgent {
               id: t.id,
               name: t.name,
               description: t.description,
-              parameters: t.parameters
+              parameters: t.parameters,
+              outputSchema: t.outputSchema  // Include output schema for placeholder reference
             })), null, 2),
             previousResults: '',  // TODO: Add previous results context
             timestamp: new Date().toISOString()

@@ -17,11 +17,31 @@ export interface NativeData {
   /** Reference to actual data (file path, table name, etc.) */
   reference: string;
   
-  /** Metadata about the data */
-  metadata: DataMetadata;
+  /** Metadata about the data - MUST include standardized output fields */
+  metadata: DataMetadata & StandardizedOutput;
   
   /** Creation timestamp */
   createdAt: Date;
+}
+
+/**
+ * Standardized Output Fields - ALL computation results MUST include these
+ * This ensures consistent placeholder resolution across all Executors
+ */
+export interface StandardizedOutput {
+  /**
+   * The primary result value - REQUIRED for all computation plugins
+   * Examples:
+   * - Aggregation: number (count, sum, etc.)
+   * - Statistics: object { count, mean, sum, ... }
+   * - Filter: number (filtered feature count)
+   */
+  result: any;
+  
+  /**
+   * Human-readable description of the result (optional)
+   */
+  description?: string;
 }
 
 export type DataSourceType = 
@@ -138,6 +158,26 @@ export interface ResultSchema {
   
   /** Expected structure */
   structure?: any;
+  
+  /**
+   * Output fields specification - defines what fields are available in metadata.result
+   * This is used by TaskPlanner to inform LLM about available placeholder references
+   */
+  outputFields?: OutputFieldDefinition[];
+}
+
+export interface OutputFieldDefinition {
+  /** Field name (e.g., "count", "mean", "geometry") */
+  name: string;
+  
+  /** Field type */
+  type: 'number' | 'string' | 'boolean' | 'object' | 'array' | 'geojson';
+  
+  /** Field description for LLM understanding */
+  description: string;
+  
+  /** Example value */
+  example?: any;
 }
 
 // ============================================================================

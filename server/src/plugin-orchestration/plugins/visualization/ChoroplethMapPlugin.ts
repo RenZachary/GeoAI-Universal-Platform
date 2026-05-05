@@ -76,7 +76,33 @@ export const ChoroplethMapPlugin: Plugin = {
   ],
   outputSchema: {
     type: 'native_data',
-    description: 'MVT service with embedded choropleth style rules in metadata'
+    description: 'MVT service with embedded choropleth style rules in metadata',
+    outputFields: [
+      {
+        name: 'result',
+        type: 'string',
+        description: 'MVT tile service URL for the choropleth map',
+        example: '/api/services/mvt/choropleth_123/{z}/{x}/{y}.pbf'
+      },
+      {
+        name: 'styleUrl',
+        type: 'string',
+        description: 'Mapbox Style JSON URL with choropleth styling',
+        example: '/workspace/results/styles/choropleth_123.json'
+      },
+      {
+        name: 'valueField',
+        type: 'string',
+        description: 'The field used for thematic coloring',
+        example: 'population'
+      },
+      {
+        name: 'classification',
+        type: 'string',
+        description: 'Classification method used (quantile, equal_interval, etc.)',
+        example: 'quantile'
+      }
+    ]
   },
   capabilities: ['thematic_mapping', 'mvt_publishing', 'statistical_classification'],
   isBuiltin: true,

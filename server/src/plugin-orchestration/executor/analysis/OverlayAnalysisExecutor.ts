@@ -82,6 +82,12 @@ export class OverlayAnalysisExecutor {
     console.log('[OverlayAnalysisExecutor] Overlay completed successfully');
     console.log('[OverlayAnalysisExecutor] Result:', result);
 
+    // Ensure standardized output field exists (REQUIRED by type system)
+    if (result.metadata && result.metadata.result === undefined) {
+      // For overlay analysis, result is the overlayed geometry reference
+      result.metadata.result = result.reference;
+    }
+
     return result;
   }
 }

@@ -45,7 +45,27 @@ export const AggregationPlugin: Plugin = {
   ],
   outputSchema: {
     type: 'native_data',
-    description: 'Aggregation result with value and optionally the feature with max/min value'
+    description: 'Aggregation result with value and optionally the feature with max/min value',
+    outputFields: [
+      {
+        name: 'result',
+        type: 'number',
+        description: 'The aggregation result value (count, sum, avg, min, max, or top_n count)',
+        example: 10
+      },
+      {
+        name: 'operation',
+        type: 'string',
+        description: 'The aggregation operation performed',
+        example: 'COUNT'
+      },
+      {
+        name: 'field',
+        type: 'string',
+        description: 'The field that was aggregated (empty for COUNT)',
+        example: 'population'
+      }
+    ]
   },
   capabilities: ['data_aggregation', 'statistical_analysis', 'feature_selection'],
   isBuiltin: true,

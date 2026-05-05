@@ -27,7 +27,27 @@ export const FilterPlugin: Plugin = {
   ],
   outputSchema: {
     type: 'native_data',
-    description: 'Filtered data as NativeData reference'
+    description: 'Filtered data as NativeData reference',
+    outputFields: [
+      {
+        name: 'result',
+        type: 'number',
+        description: 'Number of features after filtering',
+        example: 50
+      },
+      {
+        name: 'originalCount',
+        type: 'number',
+        description: 'Original feature count before filtering',
+        example: 100
+      },
+      {
+        name: 'filteredCount',
+        type: 'number',
+        description: 'Feature count after filtering',
+        example: 50
+      }
+    ]
   },
   capabilities: ['data_filtering', 'attribute_query', 'spatial_filter'],
   isBuiltin: true,

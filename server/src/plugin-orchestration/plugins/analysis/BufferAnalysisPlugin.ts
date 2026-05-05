@@ -48,7 +48,21 @@ export const BufferAnalysisPlugin: Plugin = {
   ],
   outputSchema: {
     type: 'native_data',
-    description: 'Buffered geometry as NativeData reference'
+    description: 'Buffered geometry as NativeData reference',
+    outputFields: [
+      {
+        name: 'result',
+        type: 'string',
+        description: 'File path or URL to the buffered geometry',
+        example: '/workspace/results/geojson/buffer_123456.geojson'
+      },
+      {
+        name: 'featureCount',
+        type: 'number',
+        description: 'Number of buffered features',
+        example: 50
+      }
+    ]
   },
   capabilities: ['spatial_analysis', 'geometry_operations'],
   isBuiltin: true,

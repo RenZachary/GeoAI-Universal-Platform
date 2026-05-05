@@ -122,7 +122,7 @@ export const useChatStore = defineStore('chat', () => {
         
         // Map step names to user-friendly descriptions
         const stepDescriptions: Record<string, string> = {
-          'memoryLoader': '💾 Loading conversation history...',
+          'memoryLoader': '💡 Loading conversation history...',
           'goalSplitter': '🎯 Analyzing your request...',
           'taskPlanner': '📋 Planning analysis tasks...',
           'pluginExecutor': '⚙️ Executing analysis...',
