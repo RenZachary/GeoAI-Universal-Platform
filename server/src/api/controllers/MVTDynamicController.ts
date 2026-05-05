@@ -1,21 +1,21 @@
 /**
- * MVT Dynamic Publisher Controller - REST API for dynamic MVT services
+ * MVT On-Demand Publisher Controller - REST API for on-demand MVT services
  */
 
 import type { Request, Response } from 'express';
-import type { MVTSource, MVTTileOptions } from '../../utils/publishers/MVTDynamicPublisher';
-import type { MVTDynamicPublisher } from '../../utils/publishers/MVTDynamicPublisher';
+import type { MVTSource, MVTTileOptions } from '../../utils/publishers/base/MVTPublisherTypes';
+import type { MVTOnDemandPublisher } from '../../utils/publishers/MVTOnDemandPublisher';
 import type Database from 'better-sqlite3';
 
-export class MVTDynamicController {
-  private publisher: MVTDynamicPublisher;
+export class MVTOnDemandController {
+  private publisher: MVTOnDemandPublisher;
   private db?: Database.Database;
 
-  constructor(publisher: MVTDynamicPublisher, db?: Database.Database) {
+  constructor(publisher: MVTOnDemandPublisher, db?: Database.Database) {
     this.publisher = publisher;
     this.db = db;
     
-    console.log('[MVT Dynamic Controller] Initialized');
+    console.log('[MVT On-Demand Controller] Initialized');
   }
 
   /**

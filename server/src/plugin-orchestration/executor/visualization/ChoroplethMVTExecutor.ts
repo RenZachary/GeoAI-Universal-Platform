@@ -6,7 +6,7 @@
 
 import fs from 'fs';
 import type { NativeData } from '../../../core/index';
-import { MVTPublisher } from '../../../utils/publishers/MVTPublisher';
+import { MVTStrategyPublisher } from '../../../utils/publishers/MVTStrategyPublisher';
 import { MVTPublisherExecutor, type MVTPublisherParams } from './MVTPublisherExecutor';
 import { StyleFactory } from '../../utils/StyleFactory';
 
@@ -68,7 +68,7 @@ export class ChoroplethMVTExecutor extends MVTPublisherExecutor {
 
       // Step 6: Generate MVT tiles using base class logic
       console.log('[ChoroplethMVTExecutor] Generating MVT tiles...');
-      const mvtPublisher = MVTPublisher.getInstance(this.workspaceBase);
+      const mvtPublisher = MVTStrategyPublisher.getInstance(this.workspaceBase);
       const tilesetId = await mvtPublisher.generateTiles(nativeData, {
         minZoom,
         maxZoom,

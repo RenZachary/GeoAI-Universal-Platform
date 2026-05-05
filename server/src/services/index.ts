@@ -29,4 +29,4 @@ export { ConversationService } from './ConversationService';
 export type { ConversationSummary, ChatMessage } from './ConversationService';
 
 // MVTDynamicPublisher Singleton (re-export from utils)
-export { getMVTPublisher, resetMVTPublisher, MVTDynamicPublisher } from '../utils/publishers/MVTDynamicPublisher';
+export { getMVTOnDemandPublisher, resetMVTOnDemandPublisher, MVTOnDemandPublisher } from '../utils/publishers/MVTOnDemandPublisher';

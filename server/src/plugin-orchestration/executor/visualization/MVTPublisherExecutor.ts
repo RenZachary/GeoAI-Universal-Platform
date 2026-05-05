@@ -5,7 +5,7 @@
 
 import type { NativeData, DataSourceType } from '../../../core/index';
 import { DataAccessorFactory } from '../../../data-access/factories/DataAccessorFactory';
-import { MVTPublisher } from '../../../utils/publishers/MVTPublisher';
+import { MVTStrategyPublisher } from '../../../utils/publishers/MVTStrategyPublisher';
 import { DataSourceRepository } from '../../../data-access/repositories';
 import type Database from 'better-sqlite3';
 import path from 'path';
@@ -48,10 +48,10 @@ export class MVTPublisherExecutor {
       console.log(`[MVTPublisherExecutor] Data source reference: ${dataSource.reference}`);
       console.log(`[MVTPublisherExecutor] Loaded NativeData: id=${nativeData.id}, type=${nativeData.type}`);
       
-      // Step 2: Generate MVT tiles using MVTPublisher with strategy pattern
-      // MVTPublisher will automatically select the appropriate strategy based on nativeData.type
+      // Step 2: Generate MVT tiles using MVTStrategyPublisher with strategy pattern
+      // MVTStrategyPublisher will automatically select the appropriate strategy based on nativeData.type
       // Use singleton instance to share tile cache with MVTServiceController
-      const mvtPublisher = MVTPublisher.getInstance(this.workspaceBase);
+      const mvtPublisher = MVTStrategyPublisher.getInstance(this.workspaceBase);
       const tilesetId = await mvtPublisher.generateTiles(nativeData, {
         minZoom,
         maxZoom,

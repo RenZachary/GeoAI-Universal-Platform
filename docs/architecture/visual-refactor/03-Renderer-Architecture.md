@@ -83,15 +83,16 @@
 | Category | Input | Output | Terminal? | Examples |
 |----------|-------|--------|-----------|----------|
 | **Statistical** | NativeData | JSON | No | StatisticsCalculator, Aggregation |
-| **Computational** | NativeData | NativeData (single or multiple) | No | BufferAnalysis, OverlayAnalysis, Filter |
+| **Computational** | NativeData | NativeData (single) | No | BufferAnalysis, OverlayAnalysis, Filter |
 | **Visualization** | NativeData | MVT/WMS/GeoJSON | **Yes** | ChoroplethRenderer, HeatmapRenderer, UniformColorRenderer |
 | **Textual** | ExecutionResults (from predecessors) | HTML/PDF | **Yes** | ReportGenerator |
 
 **关键约束：**
-1. ✅ **终端节点必须是最后一步**：Visualization和Textual类Plugin只能是Goal的最后一个Executor
+1. ✅ **终端节点必须是最后一步**：Visualization和Textual类Plugin只能是Goal的最后一个Executor（由LLM保证）
 2. ✅ **统计类和运算类可串联**：形成pipeline，如 `Filter → Statistics → Choropleth`
-3. ✅ **运算类支持多输出**：OverlayAnalysis可输出多个NativeData（交集、并集、差集）
+3. ✅ **所有Plugin均为单输出**：每次执行只返回一个NativeData或JSON结果
 4. ❌ **不支持分支执行**：一个步骤的输出不作为多个后续步骤的输入（通过重复执行实现）
+5. ❌ **不支持循环依赖**：Step A依赖Step B，Step B又依赖Step A的场景不被支持
 
 ---
 
@@ -122,7 +123,7 @@ interface PluginCapability {
     // 根据executionCategory有不同的输出类型
     outputType: 
       | 'json'         // Statistical: 统计结果JSON
-      | 'native_data'  // Computational: 新的NativeData（可多个）
+      | 'native_data'  // Computational: 新的NativeData（单个）
       | 'mvt'          // Visualization: MVT服务
       | 'wms'          // Visualization: WMS服务
       | 'geojson'      // Visualization: GeoJSON文件（如热力图）
@@ -131,9 +132,6 @@ interface PluginCapability {
     
     // 是否为终端节点（Visualization/Textual为true）
     isTerminalNode: boolean;
-    
-    // 是否支持多输出（仅Computational类可能为true）
-    supportsMultipleOutputs?: boolean;
   };
   
   // ========== 适用场景（供LLM匹配）==========
@@ -184,14 +182,45 @@ class DataAccessorFactory {
       case 'postgis':
         return 'vector';
       case 'geotiff':
-      case 'wms':
         return 'raster';
+      // 注意：WMS不需要Accessor，因为WMS是服务而非本地数据
       default:
         throw new Error(`Unknown data source type: ${type}`);
     }
   }
 }
 ```
+
+**特殊场景处理：**
+
+1. **WMS服务**：
+   - WMS是远程地图服务，不是本地数据文件
+   - 不需要WMS Accessor（WMS直接由前端Mapbox GL JS加载）
+   - Plugin如果需要使用WMS，应该通过MVT Publisher转换为矢量瓦片
+
+2. **PostGIS Raster**：
+   - 当前架构不考虑PostGIS的raster类型
+   - 如果需要处理栅格数据，使用GeoTIFF格式
+
+3. **Plugin对特定数据源的限制**：
+   - 如果某个Plugin只支持GeoJSON不支持PostGIS，在capability中声明：
+   ```typescript
+   {
+     inputRequirements: {
+       supportedDataFormats: ['vector'],
+       supportedDataSourceTypes: ['geojson']  // 额外约束
+     }
+   }
+   ```
+   - 如果LLM选择了不兼容的数据源，PluginExecutor执行时会报错：
+   ```typescript
+   if (!isDataSourceCompatible(dataSource.type, plugin.capability)) {
+     throw new ValidationError(
+       `Plugin ${plugin.id} does not support ${dataSource.type} data sources. `
+       + `Please use a compatible data source or convert the data first.`
+     );
+   }
+   ```
 
 **优势：**
 - ✅ Plugin capability更简洁
@@ -306,7 +335,7 @@ class DataAccessorFactory {
 }
 ```
 
-**OverlayAnalysis（运算类 - 多输出）:**
+**OverlayAnalysis（运算类 - 单输出）:**
 ```typescript
 {
   executionCategory: 'computational',
@@ -316,13 +345,15 @@ class DataAccessorFactory {
     requiredFields: []
   },
   outputCapabilities: {
-    outputType: 'native_data',
+    outputType: 'native_data',  // 输出单个NativeData（根据operation参数决定是交集/并集/差集）
     isTerminalNode: false,
-    supportsMultipleOutputs: true  // 可输出intersection, union, difference等多个结果
   },
   scenarios: ['spatial_overlay', 'intersection_analysis', 'union_operation'],
   priority: 5
 }
+```
+
+**说明：** 如果需要多种叠加结果（交集、并集、差集），需要分别调用三次OverlayAnalysis，每次使用不同的operation参数。
 ```
 
 **ReportGenerator（文本类）:**
@@ -347,66 +378,149 @@ class DataAccessorFactory {
 
 ---
 
-#### 3.1.6 Capability Registry
+#### 3.1.6 Capability Registry设计规范
+
+**存储策略：内存存储**
+
+根据架构决策，Capability信息**全部存储在内存中**：
+- ✅ 内置Plugin：从代码中的Plugin定义直接读取capability
+- ✅ 自定义Plugin：从plugin.json (pluginManifest)中读取capability
+- ❌ 不需要数据库持久化（Plugin定义本身就是代码/配置文件）
+
+**注册时机：启动时一次性注册 + 热加载支持**
 
 ```typescript
-class PluginCapabilityRegistry {
-  private registry: Map<string, PluginCapability> = new Map();
+// server/src/index.ts - 系统初始化
+async function initializeSystem() {
+  // 1. 注册内置Plugin
+  console.log('[System] Registering built-in plugins...');
+  await ToolRegistryInstance.registerPlugins(BUILT_IN_PLUGINS);
   
-  // 注册plugin capability
-  register(pluginId: string, capability: PluginCapability): void {
-    this.registry.set(pluginId, capability);
+  for (const plugin of BUILT_IN_PLUGINS) {
+    PluginCapabilityRegistry.register(plugin.id, plugin.capability);
   }
   
-  // 根据执行类别过滤
-  filterByCategory(category: PluginExecutionCategory): string[] {
-    return Array.from(this.registry.entries())
-      .filter(([_, cap]) => cap.executionCategory === category)
-      .map(([id, _]) => id);
-  }
-  
-  // 根据条件过滤兼容的plugin
-  filterByCapability(criteria: CapabilityCriteria): string[] {
-    return Array.from(this.registry.entries())
-      .filter(([_, cap]) => this.matchesCriteria(cap, criteria))
-      .map(([id, _]) => id);
-  }
-  
-  // 获取plugin的capability
-  getCapability(pluginId: string): PluginCapability | undefined {
-    return this.registry.get(pluginId);
-  }
-  
-  private matchesCriteria(cap: PluginCapability, criteria: CapabilityCriteria): boolean {
-    // Check data format compatibility
-    if (criteria.dataFormat && !cap.inputRequirements.supportedDataFormats?.includes(criteria.dataFormat)) {
-      return false;
-    }
-    
-    // Check geometry type compatibility
-    if (criteria.geometryType && !cap.inputRequirements.supportedGeometryTypes?.includes(criteria.geometryType)) {
-      return false;
-    }
-    
-    // Check execution category
-    if (criteria.expectedCategory && cap.executionCategory !== criteria.expectedCategory) {
-      return false;
-    }
-    
-    return true;
-  }
-}
-
-interface CapabilityCriteria {
-  dataFormat?: 'vector' | 'raster';
-  geometryType?: GeometryType;
-  expectedCategory?: PluginExecutionCategory;
-  hasNumericField?: boolean;
-  hasCategoricalField?: boolean;
+  // 2. 加载并注册自定义Plugin（支持热加载）
+  console.log('[System] Loading custom plugins...');
+  await customPluginLoader.loadAllPlugins();
 }
 ```
 
-#### 3.1.2 Capability Registry
+**热加载机制：**
+
+```typescript
+class CustomPluginLoader {
+  async loadPlugin(pluginPath: string): Promise<void> {
+    try {
+      // 1. 读取plugin.json manifest
+      const manifest = this.readManifest(pluginPath);
+      
+      // 2. 验证manifest
+      this.validateManifest(manifest);
+      
+      // 3. 注册到ToolRegistry
+      ToolRegistryInstance.registerPlugin(manifest);
+      
+      // 4. 注册到CapabilityRegistry
+      PluginCapabilityRegistry.register(manifest.id, manifest.capability);
+      
+      // 5. 标记为enabled
+      this.pluginStatuses.set(manifest.id, {
+        id: manifest.id,
+        status: 'enabled',
+        loadedAt: new Date()
+      });
+      
+      console.log(`[CustomPluginLoader] Plugin ${manifest.id} loaded and enabled`);
+    } catch (error) {
+      console.error(`[CustomPluginLoader] Failed to load plugin:`, error);
+      
+      // 降级策略：标记为disabled，但不影响其他plugin
+      this.pluginStatuses.set(manifest?.id || 'unknown', {
+        id: manifest?.id || 'unknown',
+        status: 'disabled',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+  
+  async disablePlugin(pluginId: string): Promise<void> {
+    // 1. 从ToolRegistry注销
+    ToolRegistryInstance.unregisterPlugin(pluginId);
+    
+    // 2. 从CapabilityRegistry移除（可选，保留用于审计）
+    // PluginCapabilityRegistry.unregister(pluginId);
+    
+    // 3. 更新状态
+    this.pluginStatuses.set(pluginId, {
+      ...this.pluginStatuses.get(pluginId),
+      status: 'disabled'
+    });
+  }
+  
+  async enablePlugin(pluginId: string): Promise<void> {
+    const pluginPath = path.join(this.customPluginsDir, pluginId);
+    await this.loadPlugin(pluginPath);  // 重新加载
+  }
+}
+```
+
+**容错机制：**
+
+```typescript
+interface PluginStatus {
+  id: string;
+  status: 'enabled' | 'disabled' | 'error';
+  error?: string;
+  loadedAt?: Date;
+}
+
+// 注册失败时的降级策略
+try {
+  registerPlugin(plugin);
+} catch (error) {
+  // 1. 记录错误日志
+  console.error(`[Registry] Plugin ${plugin.id} registration failed:`, error);
+  
+  // 2. 标记为disabled
+  PluginStatusRegistry.markAsDisabled(plugin.id, error.message);
+  
+  // 3. 继续加载其他plugin（不中断系统启动）
+  console.warn(`[Registry] Continuing with remaining plugins...`);
+}
+```
+
+**Capability来源：**
+
+```typescript
+// 内置Plugin：从代码定义
+export const ChoroplethRendererPlugin: Plugin = {
+  id: 'choropleth_renderer',
+  name: 'Choropleth Renderer',
+  capability: {  // ← 直接在Plugin定义中包含capability
+    executionCategory: 'visualization',
+    inputRequirements: { ... },
+    outputCapabilities: { ... },
+    scenarios: [...],
+    priority: 5
+  },
+  // ...
+};
+
+// 自定义Plugin：从plugin.json
+{
+  "id": "custom_analysis",
+  "name": "Custom Analysis",
+  "version": "1.0.0",
+  "capability": {  // ← 在manifest中声明capability
+    "executionCategory": "computational",
+    "inputRequirements": { ... },
+    "outputCapabilities": { ... },
+    "scenarios": [...],
+    "priority": 6
+  }
+}
+```
 
 ```typescript
 class PluginCapabilityRegistry {
@@ -579,112 +693,56 @@ class TaskPlannerAgent {
 
 ---
 
-#### 3.2.2 Stage 2: Terminal Node Constraint Validation
+#### 3.2.2 Stage 2: LLM负责终端节点约束
 
-**规则1：终端节点必须是最后一步**
+**设计决策：由LLM保证终端节点约束**
 
-```typescript
-private validateTerminalConstraints(
-  plugins: PluginMetadata[],
-  existingPlan?: ExecutionPlan
-): PluginMetadata[] {
-  if (!existingPlan || existingPlan.steps.length === 0) {
-    // No existing steps, all plugins are valid
-    return plugins;
-  }
-  
-  // Check if plan already has a terminal node
-  const hasTerminalNode = existingPlan.steps.some(step => {
-    const plugin = this.registry.getPlugin(step.pluginId);
-    return plugin.capability.outputCapabilities.isTerminalNode;
-  });
-  
-  if (hasTerminalNode) {
-    // Cannot add any more plugins after terminal node
-    console.warn('[TaskPlanner] Plan already has terminal node, cannot add more steps');
-    return [];
-  }
-  
-  // Filter out terminal nodes if there are existing non-terminal steps
-  // (This is a soft constraint - LLM can still choose terminal node as the last step)
-  return plugins;
-}
+根据架构决策，终端节点约束（Visualization/Textual必须是最后一步）**完全由LLM在生成执行计划时保证**，不需要在TaskPlanner中进行额外的规则验证。
+
+**理由：**
+1. ✅ LLM已经具备理解约束的能力（通过Prompt教育）
+2. ✅ 简化TaskPlanner实现，避免复杂的验证逻辑
+3. ✅ 如果LLM违反约束，会在PluginExecutor执行时报错，此时可以重试或反馈给用户
+
+**LLM Prompt中的约束说明：**
+```markdown
+Important Constraints:
+1. Terminal Node Rules:
+   - Visualization plugins (uniform_color_renderer, categorical_renderer, choropleth_renderer) MUST be the LAST step in a goal's execution plan
+   - Textual plugins (report_generator) MUST be the LAST step and MUST have at least one predecessor step
+   - A goal can have AT MOST ONE terminal node
+   
+2. Dependency Rules:
+   - Each step can only depend on previous steps (no circular dependencies)
+   - If step B depends on step A, step A must appear before step B in the plan
+   
+3. Single Output Rule:
+   - Each plugin execution produces exactly ONE output (NativeData or JSON)
+   - If you need multiple results (e.g., intersection AND union), create separate goals or repeat the plugin with different parameters
 ```
 
-**规则2：文本类Plugin需要前序结果**
+**错误处理策略：**
+
+如果LLM生成了违反约束的计划，系统会在PluginExecutor阶段检测并报错：
 
 ```typescript
-private validateTextualPluginRequirements(
-  plugin: PluginMetadata,
-  existingPlan?: ExecutionPlan
-): boolean {
-  if (plugin.capability.executionCategory !== 'textual') {
-    return true;  // Non-textual plugins don't have this requirement
-  }
+// PluginExecutor执行时检查
+async function executeStep(step: ExecutionStep, context: ExecutionContext) {
+  const capability = getPluginCapability(step.pluginId);
   
-  if (!existingPlan || existingPlan.steps.length === 0) {
-    console.warn('[TaskPlanner] Textual plugin requires at least one predecessor');
-    return false;
-  }
-  
-  // Check if predecessors are of valid types
-  const predecessors = existingPlan.steps.slice(0, -1);
-  const hasValidPredecessor = predecessors.some(step => {
-    const predPlugin = this.registry.getPlugin(step.pluginId);
-    return ['statistical', 'computational', 'visualization'].includes(
-      predPlugin.capability.executionCategory
+  // 检查终端节点是否在最后
+  if (capability.isTerminalNode && !isLastStep(step, context.plan)) {
+    throw new ValidationError(
+      `Plugin ${step.pluginId} is a terminal node and must be the last step. ` +
+      `This is likely an LLM planning error. Please retry or rephrase your request.`
     );
-  });
-  
-  if (!hasValidPredecessor) {
-    console.warn('[TaskPlanner] Textual plugin requires valid predecessor');
-    return false;
   }
   
-  return true;
+  // ... 继续执行
 }
 ```
 
-**规则3：执行计划验证**
-
-```typescript
-function validateExecutionPlan(plan: ExecutionPlan, registry: PluginRegistry): ValidationResult {
-  const errors: string[] = [];
-  
-  // Find terminal nodes
-  const terminalSteps = plan.steps.filter(step => {
-    const plugin = registry.getPlugin(step.pluginId);
-    return plugin.capability.outputCapabilities.isTerminalNode;
-  });
-  
-  // Rule: At most one terminal node
-  if (terminalSteps.length > 1) {
-    errors.push('Plan can have at most one terminal node');
-  }
-  
-  // Rule: Terminal node must be the last step
-  if (terminalSteps.length === 1) {
-    const lastStep = plan.steps[plan.steps.length - 1];
-    const terminalStep = terminalSteps[0];
-    
-    if (lastStep.stepId !== terminalStep.stepId) {
-      errors.push(`Terminal node ${terminalStep.pluginId} must be the last step`);
-    }
-  }
-  
-  // Rule: Textual plugin must have predecessors
-  const textualSteps = plan.steps.filter(step => {
-    const plugin = registry.getPlugin(step.pluginId);
-    return plugin.capability.executionCategory === 'textual';
-  });
-  
-  if (textualSteps.length > 0 && plan.steps.length < 2) {
-    errors.push('Textual plugins require at least one predecessor step');
-  }
-  
-  return { valid: errors.length === 0, errors };
-}
-```
+**注意：** 当前设计中不实现自动重试机制，错误直接返回给用户。
 
 ---
 
@@ -809,6 +867,76 @@ abstract class BaseRendererExecutor {
   protected abstract getRendererSpecificMetadata(params: any): any;
 }
 ```
+
+#### 3.3.1.5 Visualization Executor架构 ⏳ 待分析和设计
+
+> **⚠️ 状态：** 本节内容需要进一步分析和设计，当前方案尚未最终确定。
+
+**现状分析：**
+
+当前系统中存在两个MVT发布器：
+1. `utils/publishers/MVTPublisher.ts` - 旧版预生成瓦片（Strategy Pattern）
+2. `utils/publishers/MVTDynamicPublisher.ts` - 新版按需生成瓦片（推荐）
+
+同时存在 `MVTPublisherExecutor` 作为Plugin执行器基类，但造成了不必要的抽象层。
+
+**待决策问题：**
+
+- [ ] 是否完全删除 `MVTPublisherExecutor`？
+- [ ] 是否弃用 `MVTPublisher.ts`？
+- [ ] 新的 Executor 如何组织（独立实现 vs 继承基类）？
+- [ ] 如何确保向后兼容性？
+
+**初步考虑方案（需验证）：**
+
+```
+Layer 1: utils/publishers/MVTDynamicPublisher.ts  // 统一的MVT发布引擎
+         ├── 支持 GeoJSON (内存/文件)
+         ├── 支持 PostGIS (表名/SQL查询)
+         ├── 按需生成瓦片（on-demand）
+         └── 内置缓存机制
+
+Layer 2: plugin-orchestration/executor/visualization/
+├── MVTServiceExecutor.ts          // MVT服务执行器（直接调用MVTDynamicPublisher）
+├── ChoroplethMapExecutor.ts       // 分级统计图执行器（MVTDynamicPublisher + StyleFactory）
+└── HeatmapExecutor.ts             // 热力图执行器（MVTDynamicPublisher）
+
+❓ 待定: MVTPublisherExecutor.ts (是否需要删除？)
+❓ 待定: MVTPublisher.ts (是否标记为deprecated？)
+```
+
+**待分析要点：**
+
+1. **现有代码依赖分析**
+   - [ ] 检查哪些模块依赖 `MVTPublisherExecutor`
+   - [ ] 检查哪些模块依赖 `MVTPublisher`
+   - [ ] 评估迁移成本
+
+2. **功能对比分析**
+   - [ ] `MVTPublisher` vs `MVTDynamicPublisher` 功能差异
+   - [ ] 性能对比（预生成 vs 按需生成）
+   - [ ] 适用场景分析
+
+3. **兼容性评估**
+   - [ ] Plugin ID 是否需要变更
+   - [ ] API schema 是否需要调整
+   - [ ] 前端调用方式是否需要修改
+
+4. **实施方案设计**
+   - [ ] 迁移步骤规划
+   - [ ] 回滚方案设计
+   - [ ] 测试策略制定
+
+**下一步行动：**
+
+- 📋 创建详细的迁移分析报告
+- 🔍 进行代码依赖扫描
+- 📊 完成功能对比矩阵
+- ✅ 召开技术评审会议确定最终方案
+
+---
+
+> **📝 注：** 具体的实现代码、迁移步骤和影响范围分析将在完成上述待办事项后补充。
 
 #### 3.3.2 Uniform Color Executor
 
@@ -1229,6 +1357,216 @@ Frontend receives MVT URL + Style URL
     ├─ Add vector source with MVT URL
     └─ Render choropleth map with red gradient
 ```
+
+---
+
+## 🔒 Placeholder解析规范
+
+### 设计决策：简单直接的Placeholder语法
+
+根据架构决策，Placeholder解析采用**简单直接**的语法，不支持复杂嵌套和跨步骤引用。
+
+### 支持的语法
+
+**1. 引用前序步骤的输出：**
+```typescript
+// ✅ 支持：引用上一个步骤的result
+"{{step_1.result}}"
+
+// ✅ 支持：引用metadata中的字段
+"{{step_1.metadata.featureCount}}"
+"{{step_1.metadata.result}}"
+```
+
+**2. 不支持的语法：**
+```typescript
+// ❌ 不支持：深层嵌套（超过2层）
+"{{step_1.metadata.fields[0].name}}"
+
+// ❌ 不支持：跨步骤链式引用
+"{{step_1.output.step_2.result}}"
+
+// ❌ 不支持：循环依赖
+// Step A depends on Step B, Step B depends on Step A
+```
+
+### Placeholder解析实现
+
+```typescript
+/**
+ * 解析placeholder字符串
+ * @param placeholder - 如 "{{step_1.result}}"
+ * @param executionResults - 已执行步骤的结果Map
+ * @returns 解析后的值
+ */
+function resolvePlaceholder(
+  placeholder: string,
+  executionResults: Map<string, AnalysisResult>
+): any {
+  // 1. 匹配placeholder格式
+  const match = placeholder.match(/^\{\{(.+?)\}\}$/);
+  if (!match) {
+    return placeholder;  // 不是placeholder，直接返回
+  }
+  
+  const expression = match[1];  // "step_1.result"
+  const parts = expression.split('.');  // ["step_1", "result"]
+  
+  // 2. 限制深度（最多2层：stepId.property）
+  if (parts.length > 2) {
+    throw new Error(
+      `Placeholder too deep: ${placeholder}. ` +
+      `Maximum depth is 2 (e.g., {{step_id.property}}).`
+    );
+  }
+  
+  // 3. 获取step结果
+  const stepId = parts[0];
+  const result = executionResults.get(stepId);
+  
+  if (!result) {
+    throw new Error(
+      `Step ${stepId} not found or not executed yet. ` +
+      `Available steps: ${Array.from(executionResults.keys()).join(', ')}`
+    );
+  }
+  
+  if (result.status !== 'success') {
+    throw new Error(
+      `Step ${stepId} failed: ${result.error}`
+    );
+  }
+  
+  // 4. 访问属性
+  if (parts.length === 1) {
+    // {{step_1}} → 返回整个result对象
+    return result.data;
+  }
+  
+  const propertyName = parts[1];
+  
+  if (propertyName === 'result') {
+    // {{step_1.result}} → 返回metadata.result
+    return result.data?.metadata?.result;
+  }
+  
+  if (propertyName === 'metadata') {
+    // {{step_1.metadata}} → 返回整个metadata
+    return result.data?.metadata;
+  }
+  
+  // {{step_1.metadata.xxx}} → 不支持，需要自定义解析逻辑
+  throw new Error(
+    `Property ${propertyName} not directly accessible. ` +
+    `Use {{step_1.result}} or {{step_1.metadata}} instead.`
+  );
+}
+```
+
+### 使用示例
+
+**场景1：统计分析后可视化**
+```typescript
+// Step 1: 计算统计信息
+{
+  stepId: "step_1",
+  pluginId: "statistics_calculator",
+  parameters: {
+    dataSourceId: "population_data",
+    field: "population"
+  }
+}
+
+// Step 2: 生成报告，引用统计结果
+{
+  stepId: "step_2",
+  pluginId: "report_generator",
+  parameters: {
+    title: "人口统计报告",
+    statistics: "{{step_1.result}}"  // ← 引用统计结果的JSON
+  }
+}
+```
+
+**场景2：空间分析后可视化**
+```typescript
+// Step 1: 缓冲区分析
+{
+  stepId: "step_1",
+  pluginId: "buffer_analysis",
+  parameters: {
+    dataSourceId: "rivers",
+    distance: 500,
+    unit: "meters"
+  }
+}
+
+// Step 2: 用红色显示缓冲区
+{
+  stepId: "step_2",
+  pluginId: "uniform_color_renderer",
+  parameters: {
+    dataSourceId: "{{step_1.result}}",  // ← 引用缓冲区的NativeData
+    color: "red"
+  }
+}
+```
+
+### 循环依赖检测
+
+**设计决策：不支持循环依赖**
+
+如果用户尝试创建循环依赖，系统会在TaskPlanner阶段报错：
+
+```typescript
+function detectCircularDependencies(plan: ExecutionPlan): boolean {
+  const visited = new Set<string>();
+  const inStack = new Set<string>();
+  
+  function dfs(stepId: string): boolean {
+    if (inStack.has(stepId)) {
+      return true;  // 找到循环
+    }
+    
+    if (visited.has(stepId)) {
+      return false;
+    }
+    
+    visited.add(stepId);
+    inStack.add(stepId);
+    
+    const step = plan.steps.find(s => s.stepId === stepId);
+    if (step) {
+      for (const dep of step.dependsOn || []) {
+        if (dfs(dep)) {
+          return true;
+        }
+      }
+    }
+    
+    inStack.delete(stepId);
+    return false;
+  }
+  
+  for (const step of plan.steps) {
+    if (dfs(step.stepId)) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+// 在TaskPlanner生成计划后检查
+if (detectCircularDependencies(plan)) {
+  throw new ValidationError(
+    'Circular dependency detected in execution plan. ' +
+    'Please ensure each step only depends on previous steps.'
+  );
+}
+```
+
+**注意：** 由于当前设计中每个步骤只能依赖前序步骤（线性执行），循环依赖实际上不可能发生。此检测作为防御性编程保留。
 
 ---
 

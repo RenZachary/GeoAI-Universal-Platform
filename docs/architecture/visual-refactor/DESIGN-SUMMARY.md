@@ -29,16 +29,17 @@
 
 | Category | Input | Output | Terminal? | Examples |
 |----------|-------|--------|-----------|----------|
-| **Statistical** | NativeData | JSON | No | StatisticsCalculator, Aggregation |
-| **Computational** | NativeData | NativeData (single/multiple) | No | BufferAnalysis, OverlayAnalysis, Filter |
-| **Visualization** | NativeData | MVT/WMS/GeoJSON | **Yes** | ChoroplethRenderer, UniformColorRenderer, CategoricalRenderer |
-| **Textual** | ExecutionResults | HTML/PDF | **Yes** | ReportGenerator |
+| Statistical | NativeData | JSON | No | StatisticsCalculator, Aggregation |
+| Computational | NativeData | NativeData (single) | No | BufferAnalysis, OverlayAnalysis, Filter |
+| Visualization | NativeData | MVT/WMS/GeoJSON | **Yes** | ChoroplethRenderer, UniformColorRenderer, CategoricalRenderer |
+| Textual | ExecutionResults | HTML/PDF | **Yes** | ReportGenerator |
 
 **关键约束：**
-- ✅ 终端节点（Visualization/Textual）必须是Goal的最后一个Executor
+- ✅ 终端节点（Visualization/Textual）必须是Goal的最后一个Executor（**由LLM保证**）
 - ✅ 统计类和运算类可串联形成pipeline
-- ✅ 运算类支持多输出（如OverlayAnalysis输出多个NativeData）
+- ✅ **所有Plugin均为单输出**：每次执行只返回一个NativeData或JSON结果
 - ❌ 不支持分支执行（通过重复执行实现）
+- ❌ 不支持循环依赖
 
 ---
 
@@ -55,6 +56,11 @@ inputRequirements: {
 
 // Accessor层负责映射具体DataSourceType到DataFormat
 ```
+
+**特殊场景处理：**
+- **WMS服务**：不需要WMS Accessor，WMS是远程服务而非本地数据
+- **PostGIS Raster**：当前架构不考虑，使用GeoTIFF处理栅格数据
+- **Plugin数据源限制**：可在capability中声明supportedDataSourceTypes进行额外约束
 
 **优势：**
 - Plugin capability更简洁
@@ -86,35 +92,57 @@ outputCapabilities: {
 
 ---
 
-### 4. 运算类多输出支持
+### 4. 运算类单输出设计
 
-**决策：** 支持多输出，如OverlayAnalysis可输出intersection、union、difference。
+**决策：** 所有Plugin均为单输出，包括运算类。
 
 ```typescript
+// OverlayAnalysis每次只返回一个结果（根据operation参数）
 outputCapabilities: {
   outputType: 'native_data',
   isTerminalNode: false,
-  supportsMultipleOutputs: true  // OverlayAnalysis特有
 }
+
+// 如果需要多种叠加结果，需分别调用三次：
+// - operation: 'intersect' → 交集
+// - operation: 'union' → 并集
+// - operation: 'difference' → 差集
 ```
+
+**理由：**
+- ✅ 简化Executor实现和返回值处理
+- ✅ Placeholder解析更简单（`{{step.result}}`）
+- ✅ 避免复杂的多输出管理逻辑
 
 ---
 
 ### 5. 终端节点约束
+
+**决策：** 由LLM在生成执行计划时保证终端节点约束，不在TaskPlanner中进行规则验证。
 
 **规则：**
 1. Visualization和Textual类Plugin必须是Goal的最后一个Executor
 2. 一个Plan最多只能有一个终端节点
 3. Textual类Plugin必须有前序步骤（statistical/computational/visualization）
 
-**验证逻辑：**
+**实现方式：**
+- ✅ 在Prompt中明确说明约束规则
+- ✅ LLM通过Chain of Thought推理遵守约束
+- ✅ PluginExecutor执行时检测违反约束的情况并报错
+- ❌ 不在TaskPlanner中实现复杂的验证逻辑
+
+**错误处理：**
 ```typescript
-function validateExecutionPlan(plan): ValidationResult {
-  // Check: At most one terminal node
-  // Check: Terminal node must be last step
-  // Check: Textual plugin has predecessors
+// PluginExecutor检测到违反约束时
+if (capability.isTerminalNode && !isLastStep(step, context.plan)) {
+  throw new ValidationError(
+    `Plugin ${step.pluginId} is a terminal node and must be the last step. ` +
+    `This is likely an LLM planning error.`
+  );
 }
 ```
+
+详细设计请参考：[15-Terminal-Node-Constraints.md](./15-Terminal-Node-Constraints.md)
 
 ---
 

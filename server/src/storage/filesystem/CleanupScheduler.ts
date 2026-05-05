@@ -4,7 +4,7 @@
  */
 
 import { WorkspaceManagerInstance } from './WorkspaceManager';
-import { MVTPublisher } from '../../utils/publishers/MVTPublisher';
+import { MVTStrategyPublisher } from '../../utils/publishers/MVTStrategyPublisher';
 import { WMSPublisher } from '../../utils/publishers/WMSPublisher';
 import type Database from 'better-sqlite3';
 import path from 'path';
@@ -32,7 +32,7 @@ export interface CleanupResult {
 }
 
 export class CleanupScheduler {
-  private mvtPublisher: MVTPublisher;
+  private mvtPublisher: MVTStrategyPublisher;
   private wmsPublisher: WMSPublisher;
   private db?: Database.Database;
   private config: CleanupConfig;
@@ -43,7 +43,7 @@ export class CleanupScheduler {
     workspaceBase: string,
     config?: Partial<CleanupConfig>
   ) {
-    this.mvtPublisher = new MVTPublisher(workspaceBase, SQLiteManagerInstance.getDatabase());
+    this.mvtPublisher = new MVTStrategyPublisher(workspaceBase, SQLiteManagerInstance.getDatabase());
     this.wmsPublisher = new WMSPublisher(workspaceBase, SQLiteManagerInstance.getDatabase());
     
     // Default configuration

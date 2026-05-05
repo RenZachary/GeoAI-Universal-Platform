@@ -62,40 +62,40 @@
 | Category | Input | Output | Terminal? | Examples |
 |----------|-------|--------|-----------|----------|
 | Statistical | NativeData | JSON | No | StatisticsCalculator |
-| Computational | NativeData | NativeData (multi) | No | BufferAnalysis, OverlayAnalysis |
+| Computational | NativeData | NativeData (single) | No | BufferAnalysis, OverlayAnalysis |
 | Visualization | NativeData | MVT/WMS/GeoJSON | **Yes** | UniformColor, Categorical, Choropleth |
 | Textual | ExecutionResults | HTML/PDF | **Yes** | ReportGenerator |
 
-**创新点：**
-- ✅ 终端节点自动约束（Visualization/Textual必须是最后一步）
-- ✅ 运算类支持多输出（OverlayAnalysis）
-- ✅ 统计类输出JSON便于扩展
+**关键设计决策：**
+- ✅ **所有Plugin均为单输出**：简化Executor实现和Placeholder解析
+- ✅ **终端节点约束由LLM保证**：通过Prompt教育，运行时检测
+- ✅ **不支持循环依赖**：线性执行模型
 
 ---
 
 ### 2️⃣ Capability-Based Plugin Selection
 
-**三阶段决策流程：**
+**两阶段决策流程：**
 ```
 Stage 1: Rule-Based Filtering
   ├─ Infer execution category from goal.type
   ├─ Detect data format (vector/raster)
   └─ Filter by capability criteria
 
-Stage 2: Terminal Node Constraint Validation
-  ├─ Check existing plan for terminal nodes
-  └─ Validate textual plugin predecessors
-
-Stage 3: LLM Chain of Thought Selection
+Stage 2: LLM Chain of Thought Selection
   ├─ Analyze intent
   ├─ Extract parameters
-  └─ Verify constraints
+  ├─ Ensure terminal node constraints (by LLM)
+  └─ Generate execution plan
 ```
+
+**注意：** 终端节点约束由LLM在生成计划时保证，不需要额外的验证阶段。
 
 **优势：**
 - ✅ LLM认知负担降低70%（从9+个降至3-5个候选）
 - ✅ 自动化兼容性检查
 - ✅ 支持无限扩展plugin数量
+- ✅ 简化TaskPlanner实现
 
 ---
 

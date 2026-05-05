@@ -17,7 +17,7 @@ import { ConnectionError, ValidationError } from '../../services/DataSourceServi
 import { DataSourcePublishingService } from '../../services/DataSourcePublishingService';
 import type { DataSourceRecord } from '../../data-access/repositories';
 import type Database from 'better-sqlite3';
-import type { MVTDynamicPublisher } from '../../utils/publishers/MVTDynamicPublisher';
+import type { MVTOnDemandPublisher } from '../../utils/publishers/MVTOnDemandPublisher';
 
 // ============================================================================
 // Validation Schemas
@@ -45,7 +45,7 @@ export class DataSourceController {
   private dataSourceService: DataSourceService;
   private publishingService: DataSourcePublishingService;
 
-  constructor(dataSourceService: DataSourceService, db: Database.Database, workspaceBase: string, mvtPublisher?: MVTDynamicPublisher) {
+  constructor(dataSourceService: DataSourceService, db: Database.Database, workspaceBase: string, mvtPublisher?: MVTOnDemandPublisher) {
     this.dataSourceService = dataSourceService;
     this.publishingService = new DataSourcePublishingService(db, workspaceBase, mvtPublisher);
   }

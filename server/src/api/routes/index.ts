@@ -10,11 +10,11 @@ import { FileUploadController, upload, handleMultipartEncoding } from '../contro
 import { PromptTemplateController } from '../controllers/PromptTemplateController';
 import { PluginManagementController } from '../controllers/PluginManagementController';
 import { MVTServiceController } from '../controllers/MVTServiceController';
-import { MVTDynamicController } from '../controllers/MVTDynamicController';
+import { MVTOnDemandController } from '../controllers/MVTDynamicController';
 import { WMSServiceController } from '../controllers/WMSServiceController';
 import { ResultController } from '../controllers/ResultController';
 import { LLMConfigController } from '../controllers/LLMConfigController';
-import { DataSourceService, FileUploadService, PromptTemplateService, getMVTPublisher, ConversationService } from '../../services';
+import { DataSourceService, FileUploadService, PromptTemplateService, getMVTOnDemandPublisher, ConversationService } from '../../services';
 import { DataSourceRepository } from '../../data-access/repositories';
 import type { LLMConfig } from '../../llm-interaction';
 import { ToolRegistryInstance, type CustomPluginLoader } from '../../plugin-orchestration';
@@ -29,7 +29,7 @@ export class ApiRouter {
   private promptTemplateController: PromptTemplateController;
   private pluginManagementController?: PluginManagementController;
   private mvtServiceController: MVTServiceController;
-  private mvtDynamicController: MVTDynamicController;
+  private mvtOnDemandController: MVTOnDemandController;
   private wmsServiceController: WMSServiceController;
   private resultController: ResultController;
   private llmConfigController: LLMConfigController;
@@ -50,14 +50,14 @@ export class ApiRouter {
     this.toolController = new ToolController(workspaceBase);
     this.chatController = new ChatController(llmConfig, workspaceBase, conversationService);
     
-    // Initialize shared MVTDynamicPublisher singleton
-    const mvtDynamicPublisher = getMVTPublisher(workspaceBase, 10000);
+    // Initialize shared MVTOnDemandPublisher singleton
+    const mvtOnDemandPublisher = getMVTOnDemandPublisher(workspaceBase, 10000);
     
-    this.dataSourceController = new DataSourceController(dataSourceService, db, workspaceBase, mvtDynamicPublisher); // ✅ Injected service with shared publisher
+    this.dataSourceController = new DataSourceController(dataSourceService, db, workspaceBase, mvtOnDemandPublisher); // ✅ Injected service with shared publisher
     this.fileUploadController = new FileUploadController(fileUploadService); // ✅ Injected service
     this.promptTemplateController = new PromptTemplateController(promptTemplateService); // ✅ Injected service
     this.mvtServiceController = new MVTServiceController(workspaceBase, db);
-    this.mvtDynamicController = new MVTDynamicController(mvtDynamicPublisher); // ✅ Use shared publisher
+    this.mvtOnDemandController = new MVTOnDemandController(mvtOnDemandPublisher); // ✅ Use shared publisher
     this.wmsServiceController = new WMSServiceController(workspaceBase, db);
     this.resultController = new ResultController(workspaceBase);
     this.llmConfigController = new LLMConfigController();
@@ -126,18 +126,18 @@ export class ApiRouter {
       this.router.delete('/plugins/:id', (req, res) => this.pluginManagementController?.deletePlugin(req, res));
     }
 
-    // MVT service endpoints (pre-generated tiles)
+    // MVT service endpoints (on-demand tile generation via strategy pattern)
     this.router.get('/services/mvt', (req, res) => this.mvtServiceController.listTilesets(req, res));
     this.router.get('/services/mvt/:tilesetId/metadata', (req, res) => this.mvtServiceController.getMetadata(req, res));
     this.router.get('/services/mvt/:tilesetId/:z/:x/:y.pbf', (req, res) => this.mvtServiceController.serveTile(req, res));
     this.router.delete('/services/mvt/:tilesetId', (req, res) => this.mvtServiceController.deleteTileset(req, res));
 
-    // MVT dynamic publisher endpoints (on-demand tile generation)
-    this.router.post('/mvt-dynamic/publish', (req, res) => this.mvtDynamicController.publish(req, res));
-    this.router.get('/mvt-dynamic/list', (req, res) => this.mvtDynamicController.listTilesets(req, res));
-    this.router.get('/mvt-dynamic/:tilesetId/metadata', (req, res) => this.mvtDynamicController.getMetadata(req, res));
-    this.router.get('/mvt-dynamic/:tilesetId/:z/:x/:y.pbf', (req, res) => this.mvtDynamicController.getTile(req, res));
-    this.router.delete('/mvt-dynamic/:tilesetId', (req, res) => this.mvtDynamicController.deleteTileset(req, res));
+    // MVT on-demand publisher endpoints (on-demand tile generation)
+    this.router.post('/mvt-dynamic/publish', (req, res) => this.mvtOnDemandController.publish(req, res));
+    this.router.get('/mvt-dynamic/list', (req, res) => this.mvtOnDemandController.listTilesets(req, res));
+    this.router.get('/mvt-dynamic/:tilesetId/metadata', (req, res) => this.mvtOnDemandController.getMetadata(req, res));
+    this.router.get('/mvt-dynamic/:tilesetId/:z/:x/:y.pbf', (req, res) => this.mvtOnDemandController.getTile(req, res));
+    this.router.delete('/mvt-dynamic/:tilesetId', (req, res) => this.mvtOnDemandController.deleteTileset(req, res));
 
     // WMS service endpoints
     this.router.get('/services/wms', (req, res) => this.wmsServiceController.listServices(req, res));

@@ -1,5 +1,5 @@
 /**
- * MVT Dynamic Publisher - Independent module for publishing dynamic MVT services
+ * MVT On-Demand Publisher - Generates tiles on-demand without pre-generation
  * 
  * Supports multiple input types:
  * - GeoJSON FeatureCollection (in-memory)
@@ -7,6 +7,7 @@
  * - PostGIS connection + table name or SQL query
  * 
  * Outputs dynamic MVT service with on-demand tile generation
+ * Ideal for large datasets and frequently updated data sources
  */
 
 import geojsonvt from 'geojson-vt';
@@ -16,70 +17,14 @@ import path from 'path';
 import type { PoolConfig } from 'pg';
 import { Pool } from 'pg';
 import { wrapError } from '../../core';
-
-// ============================================================================
-// Type Definitions
-// ============================================================================
-
-export interface MVTTileOptions {
-  minZoom?: number;
-  maxZoom?: number;
-  extent?: number;
-  tolerance?: number;
-  buffer?: number;
-  layerName?: string;
-  tilesetId?: string;  // Optional custom tileset ID
-}
-
-export interface PostGISConnectionInfo {
-  host: string;
-  port: number;
-  database: string;
-  user: string;
-  password: string;
-  schema?: string;  // Default: 'public'
-}
-
-export interface PostGISDataSource {
-  type: 'postgis';
-  connection: PostGISConnectionInfo;
-  tableName?: string;      // Table name (mutually exclusive with sqlQuery)
-  sqlQuery?: string;       // Custom SQL query (mutually exclusive with tableName)
-  geometryColumn?: string; // Default: 'geom'
-}
-
-export interface GeoJSONFileSource {
-  type: 'geojson-file';
-  filePath: string;
-}
-
-export interface GeoJSONInMemorySource {
-  type: 'geojson-memory';
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  featureCollection: any;  // GeoJSON FeatureCollection
-}
-
-export type MVTSource = PostGISDataSource | GeoJSONFileSource | GeoJSONInMemorySource;
-
-export interface MVTPublishResult {
-  success: boolean;
-  tilesetId: string;
-  serviceUrl: string;       // URL template: /api/mvt/{tilesetId}/{z}/{x}/{y}.pbf
-  metadata: MVTPublishMetadata;
-  error?: string;
-}
-
-export interface MVTPublishMetadata {
-  sourceType: 'postgis' | 'geojson-file' | 'geojson-memory';
-  minZoom: number;
-  maxZoom: number;
-  extent: number;
-  generatedAt: string;
-  featureCount?: number;     // For GeoJSON
-  tableName?: string;        // For PostGIS
-  sqlQuery?: string;         // For PostGIS
-  cacheEnabled: boolean;
-}
+import { BaseMVTPublisher } from './base/BaseMVTPublisher';
+import {
+  type MVTTileOptions,
+  type PostGISDataSource,
+  type MVTSource,
+  type MVTPublishMetadata,
+  type MVTPublishResult
+} from './base/MVTPublisherTypes';
 
 // ============================================================================
 // Tile Cache Interface
@@ -126,12 +71,10 @@ class InMemoryTileCache implements TileCache {
 }
 
 // ============================================================================
-// MVT Dynamic Publisher
+// MVT On-Demand Publisher
 // ============================================================================
 
-export class MVTDynamicPublisher {
-  private workspaceBase: string;
-  private mvtOutputDir: string;
+export class MVTOnDemandPublisher extends BaseMVTPublisher {
   private tileCache: TileCache;
   
   // Store tile indexes for GeoJSON sources (tilesetId -> tileIndex)
@@ -145,42 +88,36 @@ export class MVTDynamicPublisher {
   private tilesetMetadata: Map<string, MVTPublishMetadata> = new Map();
 
   // Singleton instance
-  private static instance: MVTDynamicPublisher | null = null;
+  private static instance: MVTOnDemandPublisher | null = null;
 
   /**
    * Get or create the singleton instance
    * @param workspaceBase - Workspace base directory (only used on first call)
    * @param cacheSize - Cache size (only used on first call)
-   * @returns The singleton MVTDynamicPublisher instance
+   * @returns The singleton MVTOnDemandPublisher instance
    */
-  static getInstance(workspaceBase?: string, cacheSize: number = 10000): MVTDynamicPublisher {
-    if (!MVTDynamicPublisher.instance) {
+  static getInstance(workspaceBase?: string, cacheSize: number = 10000): MVTOnDemandPublisher {
+    if (!MVTOnDemandPublisher.instance) {
       if (!workspaceBase) {
-        throw new Error('MVTDynamicPublisher not initialized. Call getInstance(workspaceBase) first.');
+        throw new Error('MVTOnDemandPublisher not initialized. Call getInstance(workspaceBase) first.');
       }
-      MVTDynamicPublisher.instance = new MVTDynamicPublisher(workspaceBase, cacheSize);
+      MVTOnDemandPublisher.instance = new MVTOnDemandPublisher(workspaceBase, cacheSize);
     }
-    return MVTDynamicPublisher.instance;
+    return MVTOnDemandPublisher.instance;
   }
 
   /**
    * Reset the singleton instance (useful for testing)
    */
   static resetInstance(): void {
-    MVTDynamicPublisher.instance = null;
+    MVTOnDemandPublisher.instance = null;
   }
 
   private constructor(workspaceBase: string, cacheSize: number = 10000) {
-    this.workspaceBase = workspaceBase;
-    this.mvtOutputDir = path.join(workspaceBase, 'results', 'mvt-dynamic');
+    super(workspaceBase, 'mvt-dynamic');  // Call base class constructor
     this.tileCache = new InMemoryTileCache(cacheSize);
     
-    // Ensure output directory exists
-    if (!fs.existsSync(this.mvtOutputDir)) {
-      fs.mkdirSync(this.mvtOutputDir, { recursive: true });
-    }
-    
-    console.log('[MVT Dynamic Publisher] Initialized');
+    console.log('[MVT On-Demand Publisher] Initialized');
   }
 
   /**
@@ -188,7 +125,7 @@ export class MVTDynamicPublisher {
    */
   async publish(source: MVTSource, options: MVTTileOptions = {}, tilesetId?: string): Promise<MVTPublishResult> {
     try {
-      console.log(`[MVT Dynamic Publisher] Publishing from source type: ${source.type}`);
+      console.log(`[MVT On-Demand Publisher] Publishing from source type: ${source.type}`);
       
       const {
         minZoom = 0,
@@ -265,8 +202,8 @@ export class MVTDynamicPublisher {
 
       const serviceUrl = `/api/mvt/${tilesetId}/{z}/{x}/{y}.pbf`;
 
-      console.log(`[MVT Dynamic Publisher] Published successfully: ${tilesetId}`);
-      console.log(`[MVT Dynamic Publisher] Service URL: ${serviceUrl}`);
+      console.log(`[MVT On-Demand Publisher] Published successfully: ${tilesetId}`);
+      console.log(`[MVT On-Demand Publisher] Service URL: ${serviceUrl}`);
 
       return {
         success: true,
@@ -275,7 +212,7 @@ export class MVTDynamicPublisher {
         metadata
       };
     } catch (error) {
-      console.error('[MVT Dynamic Publisher] Publication failed:', error);
+      console.error('[MVT On-Demand Publisher] Publication failed:', error);
       return {
         success: false,
         tilesetId: '',
@@ -301,7 +238,7 @@ export class MVTDynamicPublisher {
     // Get metadata to determine source type
     const metadata = this.tilesetMetadata.get(tilesetId);
     if (!metadata) {
-      console.warn(`[MVT Dynamic Publisher] Tileset not found: ${tilesetId}`);
+      console.warn(`[MVT On-Demand Publisher] Tileset not found: ${tilesetId}`);
       return null;
     }
 
@@ -331,7 +268,7 @@ export class MVTDynamicPublisher {
    * Delete a published tileset and clean up resources
    */
   deleteTileset(tilesetId: string): boolean {
-    console.log(`[MVT Dynamic Publisher] Deleting tileset: ${tilesetId}`);
+    console.log(`[MVT On-Demand Publisher] Deleting tileset: ${tilesetId}`);
     
     // Clean up GeoJSON tile index
     this.geojsonTileIndexes.delete(tilesetId);
@@ -369,6 +306,13 @@ export class MVTDynamicPublisher {
     return result;
   }
 
+  /**
+   * Get tileset metadata
+   */
+  getMetadata(tilesetId: string): MVTPublishMetadata | null {
+    return this.tilesetMetadata.get(tilesetId) || null;
+  }
+
   // ============================================================================
   // Private Methods - GeoJSON Handlers
   // ============================================================================
@@ -378,7 +322,7 @@ export class MVTDynamicPublisher {
     options: MVTTileOptions,
     customTilesetId?: string
   ): Promise<string> {
-    console.log('[MVT Dynamic Publisher] Creating tile index from in-memory GeoJSON');
+    console.log('[MVT On-Demand Publisher] Creating tile index from in-memory GeoJSON');
     
     if (!featureCollection || featureCollection.type !== 'FeatureCollection') {
       throw new Error('Input must be a valid GeoJSON FeatureCollection');
@@ -397,8 +341,8 @@ export class MVTDynamicPublisher {
     // Cache the tile index
     this.geojsonTileIndexes.set(tilesetId, tileIndex);
 
-    console.log(`[MVT Dynamic Publisher] GeoJSON tile index created: ${tilesetId}`);
-    console.log(`[MVT Dynamic Publisher] Features: ${featureCollection.features?.length || 0}`);
+    console.log(`[MVT On-Demand Publisher] GeoJSON tile index created: ${tilesetId}`);
+    console.log(`[MVT On-Demand Publisher] Features: ${featureCollection.features?.length || 0}`);
 
     return tilesetId;
   }
@@ -408,7 +352,7 @@ export class MVTDynamicPublisher {
     options: MVTTileOptions,
     customTilesetId?: string
   ): Promise<string> {
-    console.log(`[MVT Dynamic Publisher] Loading GeoJSON file: ${filePath}`);
+    console.log(`[MVT On-Demand Publisher] Loading GeoJSON file: ${filePath}`);
     
     if (!fs.existsSync(filePath)) {
       throw new Error(`GeoJSON file not found: ${filePath}`);
@@ -430,7 +374,7 @@ export class MVTDynamicPublisher {
     const tileIndex = this.geojsonTileIndexes.get(tilesetId);
     
     if (!tileIndex) {
-      console.warn(`[MVT Dynamic Publisher] Tile index not found: ${tilesetId}`);
+      console.warn(`[MVT On-Demand Publisher] Tile index not found: ${tilesetId}`);
       return null;
     }
 
@@ -463,7 +407,7 @@ export class MVTDynamicPublisher {
     options: MVTTileOptions,
     customTilesetId?: string
   ): Promise<string> {
-    console.log('[MVT Dynamic Publisher] Setting up PostGIS MVT service');
+    console.log('[MVT On-Demand Publisher] Setting up PostGIS MVT service');
     
     if (!source.tableName && !source.sqlQuery) {
       throw new Error('PostGIS source must provide either tableName or sqlQuery');
@@ -488,7 +432,7 @@ export class MVTDynamicPublisher {
     // Test connection
     try {
       await pool.query('SELECT 1');
-      console.log('[MVT Dynamic Publisher] PostGIS connection established');
+      console.log('[MVT On-Demand Publisher] PostGIS connection established');
     } catch (error) {
       throw wrapError(error, 'Failed to connect to PostGIS');
     }
@@ -496,8 +440,8 @@ export class MVTDynamicPublisher {
     // Store pool for later use
     this.postgisPools.set(tilesetId, pool);
 
-    console.log(`[MVT Dynamic Publisher] PostGIS tileset created: ${tilesetId}`);
-    console.log(`[MVT Dynamic Publisher] Source: ${source.tableName || 'Custom SQL'}`);
+    console.log(`[MVT On-Demand Publisher] PostGIS tileset created: ${tilesetId}`);
+    console.log(`[MVT On-Demand Publisher] Source: ${source.tableName || 'Custom SQL'}`);
 
     return tilesetId;
   }
@@ -512,7 +456,7 @@ export class MVTDynamicPublisher {
     const pool = this.postgisPools.get(tilesetId);
     
     if (!pool) {
-      console.warn(`[MVT Dynamic Publisher] PostGIS pool not found: ${tilesetId}`);
+      console.warn(`[MVT On-Demand Publisher] PostGIS pool not found: ${tilesetId}`);
       return null;
     }
 
@@ -557,7 +501,7 @@ export class MVTDynamicPublisher {
 
       return result.rows[0].tile;
     } catch (error) {
-      console.error('[MVT Dynamic Publisher] PostGIS tile query failed:', error);
+      console.error('[MVT On-Demand Publisher] PostGIS tile query failed:', error);
       return null;
     }
   }
@@ -587,27 +531,27 @@ export class MVTDynamicPublisher {
 // ============================================================================
 
 /**
- * Get the singleton MVTDynamicPublisher instance
+ * Get the singleton MVTOnDemandPublisher instance
  * @param workspaceBase - Workspace base directory (required on first call)
  * @param cacheSize - Cache size in number of tiles (default: 10000)
- * @returns The singleton MVTDynamicPublisher instance
+ * @returns The singleton MVTOnDemandPublisher instance
  * 
  * @example
  * ```typescript
  * // Initialize during app startup
- * const publisher = getMVTPublisher('/path/to/workspace', 10000);
+ * const publisher = getMVTOnDemandPublisher('/path/to/workspace', 10000);
  * 
  * // Use elsewhere without parameters
- * const publisher = getMVTPublisher();
+ * const publisher = getMVTOnDemandPublisher();
  * ```
  */
-export function getMVTPublisher(workspaceBase?: string, cacheSize: number = 10000): MVTDynamicPublisher {
-  return MVTDynamicPublisher.getInstance(workspaceBase, cacheSize);
+export function getMVTOnDemandPublisher(workspaceBase?: string, cacheSize: number = 10000): MVTOnDemandPublisher {
+  return MVTOnDemandPublisher.getInstance(workspaceBase, cacheSize);
 }
 
 /**
  * Reset the singleton instance (useful for testing)
  */
-export function resetMVTPublisher(): void {
-  MVTDynamicPublisher.resetInstance();
+export function resetMVTOnDemandPublisher(): void {
+  MVTOnDemandPublisher.resetInstance();
 }

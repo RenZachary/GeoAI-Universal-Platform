@@ -48,23 +48,27 @@ interface ChoroplethParams { dataSourceId, valueField, classification?, colorRam
 #### [03-Renderer-Architecture.md](./03-Renderer-Architecture.md)
 **核心内容：**
 - 整体架构图（7层架构）
-- Plugin Execution Category System（4类分类）
+- Plugin Execution Category System（4类分类，**单输出设计**）
 - Capability Schema（修正版）
-- 数据格式抽象（vector/raster）
-- TaskPlanner三阶段决策策略
-- 终端节点约束验证
+- 数据格式抽象（vector/raster）+ **特殊场景处理**
+- TaskPlanner**两阶段**决策策略
+- **终端节点约束由LLM保证**
 - Executor统一工作流（BaseRendererExecutor）
 - StyleFactory重构设计
 - Geometry Adapter Layer设计
+- **Capability Registry设计规范**（内存存储+热加载）
+- **Placeholder解析规范**（简单语法，不支持嵌套）
 - 完整数据流图
 
 **关键创新：**
 1. **Execution Category System**: Statistical/Computational/Visualization/Textual
-2. **Capability Registry**: 结构化声明plugin能力
-3. **两阶段决策**: Rule-based filtering + LLM selection + Constraint validation
+2. **Capability Registry**: 结构化声明plugin能力，内存存储，支持热加载
+3. **两阶段决策**: Rule-based filtering + LLM selection（**终端节点约束由LLM保证**）
 4. **统一Executor基类**: 减少代码重复
 5. **StyleFactory集中化**: 颜色解析+样式生成
 6. **Geometry Adapter**: 自动检测并适配几何类型
+7. **单输出设计**: 所有Plugin每次执行只返回一个结果
+8. **简单Placeholder语法**: `{{step.result}}`，不支持深层嵌套
 
 ---
 
@@ -128,6 +132,13 @@ interface ChoroplethParams { dataSourceId, valueField, classification?, colorRam
 
 #### [DESIGN-SUMMARY.md](./DESIGN-SUMMARY.md)
 设计决策总结与审查要点
+
+#### [15-Terminal-Node-Constraints.md](./15-Terminal-Node-Constraints.md) ⭐ **新增**
+**终端节点约束与LLM Prompt设计规范**
+- 终端节点约束的详细定义
+- LLM Prompt中的约束说明
+- 错误处理策略
+- 验收标准
 
 #### [COMPLETION-REPORT.md](./COMPLETION-REPORT.md)
 **本文档** - 设计完成报告
@@ -218,8 +229,9 @@ interface ChoroplethParams { dataSourceId, valueField, classification?, colorRam
 **关键约束：**
 - ✅ 终端节点（Visualization/Textual）必须是Goal的最后一个Executor
 - ✅ 统计类和运算类可串联形成pipeline
-- ✅ 运算类支持多输出（如OverlayAnalysis输出intersection/union/difference）
+- ✅ 运算类单输出（如需多种结果，重复调用）
 - ❌ 不支持分支执行（通过重复执行实现）
+- ⏳ **MVTPublisherExecutor架构**：⚠️ 待分析和设计（见 [03-Renderer-Architecture.md](./03-Renderer-Architecture.md) Section 3.3.1.5）
 
 ---
 

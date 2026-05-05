@@ -6,7 +6,8 @@
 
 import type Database from 'better-sqlite3';
 import { DataSourceRepository, type DataSourceRecord } from '../data-access/repositories';
-import { MVTDynamicPublisher, type MVTSource, type MVTTileOptions } from '../utils/publishers/MVTDynamicPublisher';
+import { MVTOnDemandPublisher } from '../utils/publishers/MVTOnDemandPublisher';
+import { type MVTSource, type MVTTileOptions, type MVTPublishMetadata } from '../utils/publishers/base/MVTPublisherTypes';
 import { WMSPublisher } from '../utils/publishers/WMSPublisher';
 import { ShapefileAccessor } from '../data-access';
 import fs from 'fs';
@@ -17,21 +18,22 @@ export interface PublishedServiceInfo {
   serviceUrl: string;
   tilesetId?: string;
   serviceId?: string;
-  metadata: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  metadata: Record<string, any>;
 }
 
 export class DataSourcePublishingService {
   private db: Database.Database;
   private dataSourceRepo: DataSourceRepository;
-  private mvtPublisher: MVTDynamicPublisher;
+  private mvtPublisher: MVTOnDemandPublisher;
   private wmsPublisher: WMSPublisher;
   private workspaceBase: string;
 
-  constructor(db: Database.Database, workspaceBase: string, mvtPublisher?: MVTDynamicPublisher) {
+  constructor(db: Database.Database, workspaceBase: string, mvtPublisher?: MVTOnDemandPublisher) {
     this.db = db;
     this.dataSourceRepo = new DataSourceRepository(db);
     // Use provided publisher or get singleton instance
-    this.mvtPublisher = mvtPublisher || MVTDynamicPublisher.getInstance(workspaceBase, 10000);
+    this.mvtPublisher = mvtPublisher || MVTOnDemandPublisher.getInstance(workspaceBase, 10000);
     this.wmsPublisher = new WMSPublisher(workspaceBase, db);
     this.workspaceBase = workspaceBase;
   }
@@ -66,10 +68,10 @@ export class DataSourcePublishingService {
    */
   async isPublished(dataSourceId: string): Promise<boolean> {
     try {
-      // Check MVT tilesets
+      // Check MVT tilesets - dataSourceId is used as tilesetId
       const mvtTilesets = this.mvtPublisher.listTilesets();
-      const isMVTPublished = mvtTilesets.some((ts: any) => 
-        ts.metadata?.dataSourceId === dataSourceId
+      const isMVTPublished = mvtTilesets.some((ts: { tilesetId: string; metadata: MVTPublishMetadata }) => 
+        ts.tilesetId === dataSourceId
       );
 
       if (isMVTPublished) {
@@ -95,7 +97,8 @@ export class DataSourcePublishingService {
   async getServiceUrl(dataSourceId: string): Promise<{
     url: string;
     type: 'mvt' | 'wms';
-    metadata?: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    metadata?: Record<string, any>;
   }> {
     // Check if already published
     const isPublished = await this.isPublished(dataSourceId);
@@ -161,10 +164,16 @@ export class DataSourcePublishingService {
       
       // Use ShapefileAccessor to convert to GeoJSON
       const accessor = new ShapefileAccessor(this.workspaceBase);
-      const geojson = await (accessor as any).loadGeoJSON(shpPath);
+      type ShapefileAccessorWithProtected = ShapefileAccessor & {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        loadGeoJSON: (path: string) => Promise<any>;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        saveGeoJSON: (data: any, name: string) => Promise<string>;
+      };
+      const geojson = await (accessor as ShapefileAccessorWithProtected).loadGeoJSON(shpPath);
       
       // Save GeoJSON to a temporary location for MVT publishing
-      const geojsonPath = await (accessor as any).saveGeoJSON(geojson, `mvt_${dataSource.id}`);
+      const geojsonPath = await (accessor as ShapefileAccessorWithProtected).saveGeoJSON(geojson, `mvt_${dataSource.id}`);
       
       console.log(`[DataSourcePublishingService] Shapefile converted to GeoJSON: ${geojsonPath}`);
       
@@ -229,7 +238,11 @@ export class DataSourcePublishingService {
       id: dataSource.id,
       type: 'tif' as const,
       reference: filePath,
-      metadata: dataSource.metadata || {},
+      metadata: {
+        ...(dataSource.metadata || {}),
+        result: filePath, // Add required StandardizedOutput field
+        description: `WMS service for ${dataSource.name}`
+      },
       createdAt: dataSource.createdAt
     };
 

@@ -3,16 +3,16 @@
  */
 
 import type { Request, Response } from 'express';
-import { MVTPublisher } from '../../utils/publishers/MVTPublisher';
+import { MVTStrategyPublisher } from '../../utils/publishers/MVTStrategyPublisher';
 import type Database from 'better-sqlite3';
 
 
 export class MVTServiceController {
-  private mvtPublisher: MVTPublisher;
+  private mvtPublisher: MVTStrategyPublisher;
 
   constructor(workspaceBase: string, db?: Database.Database) {
-    // Use singleton instance to share tile cache with MVTPublisherExecutor
-    this.mvtPublisher = MVTPublisher.getInstance(workspaceBase, db);
+    // Use singleton instance to share tile cache with MVTStrategyPublisherExecutor
+    this.mvtPublisher = MVTStrategyPublisher.getInstance(workspaceBase, db);
   }
 
   /**
@@ -36,7 +36,7 @@ export class MVTServiceController {
         return;
       }
       
-      // Get tile from publisher (supports both pre-generated and on-demand)
+      // Get tile from publisher (on-demand generation)
       const tileBuffer = await this.mvtPublisher.getTile(tileId, zoom, tileX, tileY);
       
       if (!tileBuffer) {

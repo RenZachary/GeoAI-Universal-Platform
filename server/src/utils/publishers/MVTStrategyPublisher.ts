@@ -1,6 +1,8 @@
 /**
- * MVT Publisher - Generates Mapbox Vector Tiles using strategy pattern
+ * MVT Strategy Publisher - Generates Mapbox Vector Tiles using strategy pattern
  * Supports multiple data source types with optimized generation methods
+ * 
+ * Ideal for plugin workflows and integration with NativeData/DataAccessor
  */
 
 import geojsonvt from 'geojson-vt';
@@ -10,17 +12,14 @@ import path from 'path';
 import type { DataSourceType, NativeData } from '../../core/index';
 import { DataAccessorFactory } from '../../data-access/factories/DataAccessorFactory';
 import type Database from 'better-sqlite3';
+import { BaseMVTPublisher, type MVTPublishResult } from './base/BaseMVTPublisher';
+import type { Pool } from 'pg';
+import { PostGISTileGenerator, type PostGISConnectionConfig, type PostGISTileQuery } from './base/PostGISTileGenerator';
+import { type MVTTileOptions, type MVTPublishMetadata } from './base/MVTPublisherTypes';
 
-
-export interface MVTTileOptions {
-  minZoom?: number;
-  maxZoom?: number;
-  extent?: number;
-  tolerance?: number;
-  buffer?: number;
-  layerName?: string;  // For PostGIS: table name or layer name
-  generationMode?: 'pre-generate' | 'on-demand';  // Tile generation strategy
-}
+// Type definitions for geojson-vt (library doesn't provide types)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type GeoJSONVT = any;
 
 /**
  * Strategy interface for MVT tile generation
@@ -52,11 +51,11 @@ export interface MVTTileGenerationStrategy {
 
 /**
  * GeoJSON MVT Strategy - Uses geojson-vt library
- * Supports both pre-generation and on-demand modes
+ * Generates tiles on-demand from cached tile index
  */
 class GeoJSONMVTTStrategy implements MVTTileGenerationStrategy {
   // Cache for tile indexes (tilesetId -> tileIndex)
-  private tileIndexCache: Map<string, any> = new Map();
+  private tileIndexCache: Map<string, GeoJSONVT> = new Map();
   
   constructor(private mvtOutputDir: string) {}
 
@@ -70,11 +69,10 @@ class GeoJSONMVTTStrategy implements MVTTileGenerationStrategy {
       maxZoom = 22,
       extent = 4096,
       tolerance = 3,
-      buffer = 64,
-      generationMode = 'on-demand'  // Default to on-demand for better performance
+      buffer = 64
     } = options;
 
-    console.log(`[GeoJSON MVT Strategy] Mode: ${generationMode}`);
+    console.log('[GeoJSON MVT Strategy] Creating tile index for on-demand generation');
     
     // Read GeoJSON file
     if (!fs.existsSync(sourceReference)) {
@@ -115,20 +113,7 @@ class GeoJSONMVTTStrategy implements MVTTileGenerationStrategy {
       createdAt: Date.now()
     });
     
-    if (generationMode === 'pre-generate') {
-      // Pre-generate all tiles (only for small datasets)
-      console.log('[GeoJSON MVT Strategy] Pre-generating all tiles...');
-      await this.preGenerateAllTiles(tileIndex, tilesetDir, {
-        minZoom,
-        maxZoom,
-        extent,
-        tolerance,
-        buffer
-      });
-    } else {
-      // On-demand mode: only save metadata, tiles generated when requested
-      console.log('[GeoJSON MVT Strategy] On-demand mode enabled. Tiles will be generated when requested.');
-    }
+    console.log('[GeoJSON MVT Strategy] On-demand mode enabled. Tiles will be generated when requested.');
 
     // Create tileset metadata
     const metadata = {
@@ -136,7 +121,6 @@ class GeoJSONMVTTStrategy implements MVTTileGenerationStrategy {
       minZoom,
       maxZoom,
       extent,
-      generationMode,
       generatedAt: new Date().toISOString(),
       format: 'pbf',
       strategy: 'geojson',  // Must match the registered strategy key
@@ -237,6 +221,7 @@ class GeoJSONMVTTStrategy implements MVTTileGenerationStrategy {
     console.log(`[GeoJSON MVT Strategy] Generating PBF for tile with ${tile.features.length} features`);
     
     // Convert to PBF
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const layers: any = {};
     layers['default'] = {
       features: tile.features,
@@ -249,65 +234,6 @@ class GeoJSONMVTTStrategy implements MVTTileGenerationStrategy {
     console.log(`[GeoJSON MVT Strategy] Generated PBF buffer size: ${pbf.length} bytes`);
     
     return Buffer.from(pbf);
-  }
-  
-  /**
-   * Pre-generate all tiles (for small datasets)
-   */
-  private async preGenerateAllTiles(
-    tileIndex: any,
-    tilesetDir: string,
-    options: MVTTileOptions
-  ): Promise<void> {
-    const { minZoom = 0, maxZoom = 22, extent = 4096 } = options;
-    let tileCount = 0;
-    
-    for (let z = minZoom; z <= maxZoom; z++) {
-      const tileCoords = this.getTileCoordsAtZoom(z, tileIndex);
-      
-      for (const [x, y] of tileCoords) {
-        const tile = tileIndex.getTile(z, x, y);
-        
-        if (tile) {
-          const layers: any = {};
-          layers['default'] = {
-            features: tile.features || [],
-            extent: extent,
-            version: 2
-          };
-          
-          const pbf = vtPbf.fromGeojsonVt(layers, { version: 2, extent });
-          
-          const tilePath = path.join(tilesetDir, `${z}`, `${x}`);
-          if (!fs.existsSync(tilePath)) {
-            fs.mkdirSync(tilePath, { recursive: true });
-          }
-          
-          const tileFile = path.join(tilePath, `${y}.pbf`);
-          fs.writeFileSync(tileFile, Buffer.from(pbf));
-          
-          tileCount++;
-        }
-      }
-    }
-    
-    console.log(`[GeoJSON MVT Strategy] Pre-generated ${tileCount} tiles`);
-  }
-  
-  private getTileCoordsAtZoom(zoom: number, tileIndex: any): Array<[number, number]> {
-    const coords: Array<[number, number]> = [];
-    const tileSize = Math.pow(2, zoom);
-    
-    for (let x = 0; x < tileSize; x++) {
-      for (let y = 0; y < tileSize; y++) {
-        const tile = tileIndex.getTile(zoom, x, y);
-        if (tile && tile.features && tile.features.length > 0) {
-          coords.push([x, y]);
-        }
-      }
-    }
-    
-    return coords;
   }
 }
 
@@ -328,9 +254,26 @@ class ShapefileMVTTStrategy implements MVTTileGenerationStrategy {
     const factory = new DataAccessorFactory();
     const accessor = factory.createAccessor('shapefile');
     
-    // Read the shapefile using the accessor's loadGeoJSON method
-    // ShapefileAccessor extends GeoJSONBasedAccessor which has loadGeoJSON
-    const geojson = await (accessor as any).loadGeoJSON(sourceReference);
+    // Read the shapefile using the public read() method
+    await accessor.read(sourceReference);
+    
+    // The reference should point to a .shp file, we need to convert it to GeoJSON
+    // Since loadGeoJSON is protected, we'll use shapefile library directly
+    const shapefilePath = sourceReference.replace('.shp', '');
+    const source = await import('shapefile').then(m => m.default.open(shapefilePath));
+    
+    const features = [];
+    let result;
+    while (!(result = await source.read()).done) {
+      if (result.value) {
+        features.push(result.value);
+      }
+    }
+    
+    const geojson = {
+      type: 'FeatureCollection',
+      features: features
+    };
     
     console.log(`[Shapefile MVT Strategy] Converted to GeoJSON with ${geojson.features?.length || 0} features`);
     
@@ -370,12 +313,16 @@ class ShapefileMVTTStrategy implements MVTTileGenerationStrategy {
  * Generates tiles on-demand using PostGIS native MVT support
  */
 class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
-  private tileIndexCache: Map<string, any> = new Map();
+  private tileIndexCache: Map<string, GeoJSONVT> = new Map();
+  private postgisPools: Map<string, Pool> = new Map();
+  private tileGenerator: PostGISTileGenerator;
   
   constructor(
     private mvtOutputDir: string,
     private db?: Database.Database
-  ) {}
+  ) {
+    this.tileGenerator = new PostGISTileGenerator();
+  }
 
   async generateTiles(
     sourceReference: string,
@@ -391,8 +338,7 @@ class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
       extent = 4096,
       tolerance = 3,
       buffer = 64,
-      layerName = 'default',
-      generationMode = 'on-demand'  // PostGIS always uses on-demand
+      layerName = 'default'
     } = options;
     
     // Generate a unique ID for this tileset
@@ -407,11 +353,26 @@ class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
     // Format: "postgis://user:pass@host:port/database?table=tablename&geom=geom"
     // Or: "postgis://user:pass@host:port/database?query=SELECT..."
     
-    const connectionInfo = this.parsePostGISReference(sourceReference);
+    const connectionInfo = PostGISTileGenerator.parseReference(sourceReference);
     
     if (!connectionInfo) {
       throw new Error('Invalid PostGIS connection reference format');
     }
+    
+    // Create connection pool using shared generator
+    const poolConfig: PostGISConnectionConfig = {
+      host: connectionInfo.host,
+      port: connectionInfo.port,
+      database: connectionInfo.database,
+      user: connectionInfo.user,
+      password: connectionInfo.password,
+      schema: connectionInfo.schema
+    };
+    
+    const pool = await this.tileGenerator.createPool(poolConfig);
+    
+    // Store pool for later use
+    this.postgisPools.set(tilesetId, pool);
     
     // Cache the connection info for on-demand tile generation
     this.tileIndexCache.set(tilesetId, {
@@ -426,7 +387,6 @@ class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
       minZoom,
       maxZoom,
       extent,
-      generationMode: 'on-demand',  // PostGIS always on-demand
       generatedAt: new Date().toISOString(),
       format: 'pbf',
       strategy: 'postgis',  // Must match the registered strategy key
@@ -459,171 +419,76 @@ class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
     const { connectionInfo, options } = cached;
     const { layerName = 'default', extent = 4096 } = options;
     
+    // Get pool from cache
+    const pool = this.postgisPools.get(tilesetId);
+    if (!pool) {
+      console.warn(`[PostGIS MVT Strategy] PostGIS pool not found: ${tilesetId}`);
+      return null;
+    }
+    
     try {
-      // Note: In production, you would use the pg library to connect to PostGIS
-      // This is a placeholder implementation showing the SQL approach
+      // Build query using shared generator
+      const query: PostGISTileQuery = {
+        tableName: connectionInfo.tableName,
+        sqlQuery: connectionInfo.sqlQuery,
+        geometryColumn: connectionInfo.geometryColumn
+      };
       
-      // Calculate tile bounds in Web Mercator (EPSG:3857)
-      const tileBounds = this.calculateTileBounds(z, x, y);
+      const result = await this.tileGenerator.generateTile(
+        pool,
+        z, x, y,
+        query,
+        {
+          extent,
+          layerName,
+          schema: connectionInfo.schema
+        }
+      );
       
-      // Build the ST_AsMVT query
-      // This query generates MVT tiles directly from PostGIS
-      let sql: string;
-      
-      if (connectionInfo.tableName) {
-        // Table-based query
-        sql = `
-          SELECT ST_AsMVT(q, ${extent}, '${layerName}') as mvt
-          FROM (
-            SELECT ST_AsMVTGeom(
-              ${connectionInfo.geometryColumn || 'geom'},
-              ST_TileEnvelope(${z}, ${x}, ${y}),
-              ${extent},
-              ${options.buffer || 64},
-              true
-            ) AS geom,
-            * EXCLUDE (${connectionInfo.geometryColumn || 'geom'})
-            FROM ${connectionInfo.schema || 'public'}.${connectionInfo.tableName}
-            WHERE ${connectionInfo.geometryColumn || 'geom'} && ST_TileEnvelope(${z}, ${x}, ${y})
-          ) q
-        `;
-      } else if (connectionInfo.sqlQuery) {
-        // Custom SQL query
-        sql = `
-          SELECT ST_AsMVT(q, ${extent}, '${layerName}') as mvt
-          FROM (
-            SELECT ST_AsMVTGeom(
-              ${connectionInfo.geometryColumn || 'geom'},
-              ST_TileEnvelope(${z}, ${x}, ${y}),
-              ${extent},
-              ${options.buffer || 64},
-              true
-            ) AS geom,
-            * EXCLUDE (${connectionInfo.geometryColumn || 'geom'})
-            FROM (${connectionInfo.sqlQuery}) AS subquery
-            WHERE ${connectionInfo.geometryColumn || 'geom'} && ST_TileEnvelope(${z}, ${x}, ${y})
-          ) q
-        `;
-      } else {
-        throw new Error('PostGIS source must specify either tableName or sqlQuery');
+      if (!result.success) {
+        console.error('[PostGIS MVT Strategy] Tile generation failed:', result.error);
+        return null;
       }
       
-      console.log(`[PostGIS MVT Strategy] Executing MVT query for tile ${z}/${x}/${y}`);
-      
-      // TODO: Execute the SQL query using pg library
-      // For now, return null as placeholder
-      // In production:
-      // const pool = new Pool(connectionInfo);
-      // const result = await pool.query(sql);
-      // return result.rows[0]?.mvt || null;
-      
-      console.warn('[PostGIS MVT Strategy] PostGIS MVT execution not fully implemented (requires pg library integration)');
-      return null;
+      return result.tileBuffer || null;
       
     } catch (error) {
       console.error('[PostGIS MVT Strategy] Error generating tile:', error);
       return null;
     }
   }
-  
-  /**
-   * Parse PostGIS reference string to extract connection info
-   */
-  private parsePostGISReference(reference: string): PostGISConnectionInfo | null {
-    try {
-      // Expected format: postgis://user:pass@host:port/database?table=tablename&geom=geom
-      const url = new URL(reference);
-      
-      if (url.protocol !== 'postgis:') {
-        return null;
-      }
-      
-      const params = new URLSearchParams(url.search);
-      
-      return {
-        user: url.username,
-        password: url.password,
-        host: url.hostname,
-        port: parseInt(url.port) || 5432,
-        database: url.pathname.substring(1), // Remove leading /
-        schema: params.get('schema') || 'public',
-        tableName: params.get('table') || undefined,
-        sqlQuery: params.get('query') ? decodeURIComponent(params.get('query')!) : undefined,
-        geometryColumn: params.get('geom') || 'geom'
-      };
-    } catch (error) {
-      console.error('[PostGIS MVT Strategy] Failed to parse reference:', error);
-      return null;
-    }
-  }
-  
-  /**
-   * Calculate tile bounds in Web Mercator coordinates
-   */
-  private calculateTileBounds(z: number, x: number, y: number): { minX: number; minY: number; maxX: number; maxY: number } {
-    const tileSize = 20037508.34; // Half of Earth's circumference in meters
-    const numTiles = Math.pow(2, z);
-    const tileWidth = (2 * tileSize) / numTiles;
-    
-    const minX = -tileSize + x * tileWidth;
-    const maxX = -tileSize + (x + 1) * tileWidth;
-    const maxY = tileSize - y * tileWidth;
-    const minY = tileSize - (y + 1) * tileWidth;
-    
-    return { minX, minY, maxX, maxY };
-  }
 }
 
-interface PostGISConnectionInfo {
-  user: string;
-  password: string;
-  host: string;
-  port: number;
-  database: string;
-  schema?: string;
-  tableName?: string;
-  sqlQuery?: string;
-  geometryColumn?: string;
-}
-
-export class MVTPublisher {
-  private workspaceBase: string;
-  private mvtOutputDir: string;
+export class MVTStrategyPublisher extends BaseMVTPublisher {
   private db?: Database.Database;
   private strategies: Map<DataSourceType, MVTTileGenerationStrategy>;
   
   // Singleton instance
-  private static instance: MVTPublisher | null = null;
+  private static instance: MVTStrategyPublisher | null = null;
   
   /**
    * Get or create singleton instance
    */
-  static getInstance(workspaceBase: string, db?: Database.Database): MVTPublisher {
-    if (!MVTPublisher.instance) {
-      console.log('[MVT Publisher] Creating new singleton instance');
-      MVTPublisher.instance = new MVTPublisher(workspaceBase, db);
+  static getInstance(workspaceBase: string, db?: Database.Database): MVTStrategyPublisher {
+    if (!MVTStrategyPublisher.instance) {
+      console.log('[MVT Strategy Publisher] Creating new singleton instance');
+      MVTStrategyPublisher.instance = new MVTStrategyPublisher(workspaceBase, db);
     } else {
-      console.log('[MVT Publisher] Reusing existing singleton instance');
+      console.log('[MVT Strategy Publisher] Reusing existing singleton instance');
     }
-    return MVTPublisher.instance;
+    return MVTStrategyPublisher.instance;
   }
   
   /**
    * Reset singleton (for testing)
    */
   static resetInstance(): void {
-    MVTPublisher.instance = null;
+    MVTStrategyPublisher.instance = null;
   }
 
   constructor(workspaceBase: string, db?: Database.Database) {
-    this.workspaceBase = workspaceBase;
-    this.mvtOutputDir = path.join(workspaceBase, 'results', 'mvt');
+    super(workspaceBase, 'mvt');  // Call base class constructor
     this.db = db;
-    
-    // Ensure output directory exists
-    if (!fs.existsSync(this.mvtOutputDir)) {
-      fs.mkdirSync(this.mvtOutputDir, { recursive: true });
-    }
     
     // Register default strategies
     this.strategies = new Map();
@@ -655,16 +520,53 @@ export class MVTPublisher {
   }
 
   /**
+   * Publish/generate MVT tiles from NativeData reference
+   * Automatically selects the appropriate strategy based on data source type
+   * Implements BaseMVTPublisher.publish()
+   */
+  async publish(nativeData: NativeData, options: MVTTileOptions = {}): Promise<MVTPublishResult> {
+    try {
+      console.log('[MVT Strategy Publisher] Publishing tiles from NativeData (on-demand generation)...');
+      console.log(`[MVT Strategy Publisher] Data source type: ${nativeData.type}`);
+      console.log(`[MVT Strategy Publisher] Reference: ${nativeData.reference}`);
+      
+      const tilesetId = await this.generateTiles(nativeData, options);
+      const metadata = this.getMetadata(tilesetId);
+      
+      return {
+        success: true,
+        tilesetId,
+        serviceUrl: `/api/services/mvt/${tilesetId}/{z}/{x}/{y}.pbf`,
+        metadata: metadata || {}
+      };
+    } catch (error) {
+      console.error('[MVT Strategy Publisher] Publication failed:', error);
+      return {
+        success: false,
+        tilesetId: '',
+        serviceUrl: '',
+        metadata: {},
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
    * Generate MVT tiles from NativeData reference
    * Automatically selects the appropriate strategy based on data source type
+   * All tiles are generated on-demand (no pre-generation)
+   * 
+   * @param nativeData - The native data to generate tiles from
+   * @param options - Tile generation options
+   * @returns tilesetId - Unique identifier for the generated tileset
    */
   async generateTiles(
     nativeData: NativeData,
     options: MVTTileOptions = {}
   ): Promise<string> {
-    console.log('[MVT Publisher] Generating tiles from NativeData...');
-    console.log(`[MVT Publisher] Data source type: ${nativeData.type}`);
-    console.log(`[MVT Publisher] Reference: ${nativeData.reference}`);
+    console.log('[MVT Strategy Publisher] Generating tiles from NativeData (on-demand)...');
+    console.log(`[MVT Strategy Publisher] Data source type: ${nativeData.type}`);
+    console.log(`[MVT Strategy Publisher] Reference: ${nativeData.reference}`);
     
     // Get the appropriate strategy for this data type
     const strategy = this.getStrategy(nativeData.type);
@@ -678,55 +580,45 @@ export class MVTPublisher {
   }
 
   /**
-   * Get tile from filesystem or generate on-demand
+   * Get tile from strategy (on-demand generation only)
    */
   async getTile(tilesetId: string, z: number, x: number, y: number): Promise<Buffer | null> {
-    console.log(`[MVT Publisher] getTile called: ${tilesetId}/${z}/${x}/${y}`);
+    console.log(`[MVT Strategy Publisher] getTile called: ${tilesetId}/${z}/${x}/${y}`);
     
-    // First, try to get from filesystem (pre-generated tiles)
-    const tilePath = path.join(this.mvtOutputDir, tilesetId, `${z}`, `${x}`, `${y}.pbf`);
-    
-    if (fs.existsSync(tilePath)) {
-      console.log(`[MVT Publisher] Found pre-generated tile: ${tilePath}`);
-      return fs.readFileSync(tilePath);
-    }
-    
-    // If not found, check metadata for generation mode
+    // Check metadata to get strategy type
     const metadataPath = path.join(this.mvtOutputDir, tilesetId, 'metadata.json');
     if (!fs.existsSync(metadataPath)) {
-      console.warn(`[MVT Publisher] Metadata not found: ${metadataPath}`);
+      console.warn(`[MVT Strategy Publisher] Metadata not found: ${metadataPath}`);
       return null;
     }
     
     const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
-    console.log(`[MVT Publisher] Metadata loaded: generationMode=${metadata.generationMode}, strategy=${metadata.strategy}`);
+    console.log(`[MVT Strategy Publisher] Metadata loaded: strategy=${metadata.strategy}`);
     
-    // If on-demand mode, delegate to strategy
-    if (metadata.generationMode === 'on-demand') {
-      const strategy = this.strategies.get(metadata.strategy as DataSourceType);
-      console.log(`[MVT Publisher] Strategy found: ${strategy ? 'yes' : 'no'}`);
-      
-      if (strategy && strategy.getTile) {
-        console.log(`[MVT Publisher] Generating tile on-demand: ${tilesetId}/${z}/${x}/${y}`);
-        return strategy.getTile(tilesetId, z, x, y);
-      } else {
-        console.warn(`[MVT Publisher] Strategy not found or getTile not implemented for: ${metadata.strategy}`);
-      }
+    // Delegate to strategy for on-demand generation
+    const strategy = this.strategies.get(metadata.strategy as DataSourceType);
+    console.log(`[MVT Strategy Publisher] Strategy found: ${strategy ? 'yes' : 'no'}`);
+    
+    if (strategy && strategy.getTile) {
+      console.log(`[MVT Strategy Publisher] Generating tile on-demand: ${tilesetId}/${z}/${x}/${y}`);
+      return strategy.getTile(tilesetId, z, x, y);
+    } else {
+      console.warn(`[MVT Strategy Publisher] Strategy not found or getTile not implemented for: ${metadata.strategy}`);
     }
     
-    console.warn(`[MVT Publisher] Tile not found and cannot generate on-demand`);
+    console.warn(`[MVT Strategy Publisher] Tile generation failed`);
     return null;
   }
 
   /**
    * List all available tilesets
    */
-  listTilesets(): Array<{ id: string; metadata: any }> {
+  listTilesets(): Array<{ tilesetId: string; metadata: MVTPublishMetadata }> {
     if (!fs.existsSync(this.mvtOutputDir)) {
       return [];
     }
 
-    const tilesets: Array<{ id: string; metadata: any }> = [];
+    const tilesets: Array<{ tilesetId: string; metadata: MVTPublishMetadata }> = [];
     const entries = fs.readdirSync(this.mvtOutputDir, { withFileTypes: true });
 
     for (const entry of entries) {
@@ -734,7 +626,7 @@ export class MVTPublisher {
         const metadataPath = path.join(this.mvtOutputDir, entry.name, 'metadata.json');
         if (fs.existsSync(metadataPath)) {
           const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
-          tilesets.push({ id: entry.name, metadata });
+          tilesets.push({ tilesetId: entry.name, metadata });
         }
       }
     }
@@ -745,7 +637,7 @@ export class MVTPublisher {
   /**
    * Get tileset metadata
    */
-  getMetadata(tilesetId: string): any | null {
+  getMetadata(tilesetId: string): MVTPublishMetadata | null {
     const metadataPath = path.join(this.mvtOutputDir, tilesetId, 'metadata.json');
     
     if (fs.existsSync(metadataPath)) {
