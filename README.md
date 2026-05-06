@@ -2,6 +2,7 @@
 
 <div align="center">
 
+
 **Intelligent Spatial Analysis Powered by Natural Language**
 
 [![Node.js](https://img.shields.io/badge/node-%5E20.19.0%20%7C%7C%20%3E%3D22.12.0-green.svg)](https://nodejs.org/)
@@ -16,6 +17,8 @@
 ## 🌟 Overview
 
 **GeoAI-UP** is an **out-of-the-box GIS application agent** that combines Large Language Models (LLMs) with advanced spatial analysis capabilities. Simply describe your geospatial analysis needs in natural language, and the AI agent will intelligently plan, execute, and visualize results.
+
+![首页](https://foruda.gitee.com/images/1778104634845045889/691faa01_790454.png "首页")
 
 ### Core Advantages
 
