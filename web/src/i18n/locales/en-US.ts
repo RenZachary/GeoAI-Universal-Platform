@@ -62,6 +62,10 @@ export default {
     allLayersCleared: 'All layers cleared',
     fullscreen: 'Fullscreen',
     exitFullscreen: 'Exit Fullscreen',
+    featureInfo: 'Feature Information',
+    noFeatureFound: 'No feature found at this location',
+    properties: 'Properties',
+    clickToView: 'Click on a feature to view its information',
     basemap: {
       cartoDark: 'CARTO Dark',
       cartoLight: 'CARTO Light',

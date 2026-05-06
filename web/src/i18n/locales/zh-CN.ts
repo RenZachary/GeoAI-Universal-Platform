@@ -62,6 +62,10 @@ export default {
     allLayersCleared: '已清空所有图层',
     fullscreen: '全屏',
     exitFullscreen: '退出全屏',
+    featureInfo: '要素信息',
+    noFeatureFound: '此位置未找到要素',
+    properties: '属性',
+    clickToView: '点击要素查看其信息',
     basemap: {
       cartoDark: 'CARTO 深色',
       cartoLight: 'CARTO 浅色',

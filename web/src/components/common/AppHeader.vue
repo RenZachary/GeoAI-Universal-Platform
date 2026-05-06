@@ -1,7 +1,7 @@
 <template>
   <div class="app-header">
     <div class="header-left">
-      <el-icon class="logo-icon"><Location /></el-icon>
+      <img src="@/assets/logo.png" alt="Logo" class="logo-icon" />
       <span class="app-title">GeoAI-UP</span>
     </div>
     
@@ -37,7 +37,7 @@
 import { useConfigStore } from '@/stores/config'
 import { useUIStore } from '@/stores/ui'
 import { useI18n } from 'vue-i18n'
-import { Moon, Sunny, Setting, Location } from '@element-plus/icons-vue'
+import { Moon, Sunny, Setting } from '@element-plus/icons-vue'
 
 const configStore = useConfigStore()
 const uiStore = useUIStore()
@@ -70,8 +70,8 @@ function toggleTheme() {
   gap: 12px;
   
   .logo-icon {
-    font-size: 24px;
-    color: var(--el-color-primary);
+    height: 32px;
+    width: auto;
   }
   
   .app-title {

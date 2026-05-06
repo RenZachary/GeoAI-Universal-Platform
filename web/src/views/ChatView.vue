@@ -3,109 +3,43 @@
     <!-- Conversation Sidebar -->
     <aside class="conversation-sidebar" :class="{ collapsed: sidebarCollapsed }">
       <div class="sidebar-header">
-        <el-button 
-          v-if="!sidebarCollapsed"
-          type="primary" 
-          @click="handleNewChat" 
-          :icon="Plus"
-        >
+        <el-button v-if="!sidebarCollapsed" type="primary" size="small" @click="handleNewChat" :icon="Plus">
           {{ $t('chat.newChat') }}
         </el-button>
-        <el-button 
-          class="sidebar-toggle-btn"
-          text
-          @click="sidebarCollapsed = !sidebarCollapsed"
-          :title="sidebarCollapsed ? 'Expand' : 'Collapse'"
-        >
+        <el-button class="sidebar-toggle-btn" text @click="sidebarCollapsed = !sidebarCollapsed"
+          :title="sidebarCollapsed ? 'Expand' : 'Collapse'">
           {{ sidebarCollapsed ? '▶' : '◀' }}
         </el-button>
       </div>
-      
-      <!-- Data Sources Toggle -->
-      <div v-if="!sidebarCollapsed" class="data-sources-toggle">
-        <el-button 
-          text 
-          size="small" 
-          @click="showDataSources = !showDataSources"
-          style="width: 100%; justify-content: flex-start"
-        >
-          <el-icon><Folder /></el-icon>
-          {{ showDataSources ? t('chat.hideDataSources') : t('chat.showDataSources') }} ({{ dataSourceStore.dataSources.length }})
-        </el-button>
-      </div>
-      
-      <!-- Data Sources List -->
-      <div v-if="!sidebarCollapsed && showDataSources" class="data-sources-section">
-        <div class="section-title">{{ t('chat.availableData') }}</div>
-        <div 
-          v-for="ds in dataSourceStore.dataSources" 
-          :key="ds.id"
-          class="data-source-item"
-          @click="handleAddDataSourceToChat(ds)"
-        >
-          <div class="ds-info">
-            <span class="ds-name">{{ ds.name }}</span>
-            <el-tag size="small" type="info">{{ ds.type }}</el-tag>
-          </div>
-          <div class="ds-meta">
-            <span>{{ (ds.metadata as any)?.featureCount || 'N/A' }} {{ t('chat.records') }}</span>
-          </div>
-        </div>
-        <el-empty 
-          v-if="dataSourceStore.dataSources.length === 0"
-          :description="t('chat.noDataSources')"
-          :image-size="60"
-        >
-          <el-button size="small" type="primary" @click="$router.push('/data')">
-            {{ t('chat.uploadData') }}
-          </el-button>
-        </el-empty>
-      </div>
-      
+
       <div v-if="!sidebarCollapsed" class="conversation-list">
-        <div
-          v-for="conv in chatStore.conversations"
-          :key="conv.id"
-          class="conversation-item"
-          :class="{ active: conv.id === chatStore.currentConversationId }"
-          @click="handleSelectConversation(conv.id)"
-        >
+        <div v-for="conv in chatStore.conversations" :key="conv.id" class="conversation-item"
+          :class="{ active: conv.id === chatStore.currentConversationId }" @click="handleSelectConversation(conv.id)">
           <span class="conversation-title">{{ conv.title || 'Untitled' }}</span>
-          <el-icon 
-            class="delete-icon"
-            @click.stop="handleDeleteConversation(conv.id)"
-          >
+          <el-icon class="delete-icon" @click.stop="handleDeleteConversation(conv.id)">
             <Delete />
           </el-icon>
         </div>
-        
-        <el-empty 
-          v-if="chatStore.conversations.length === 0"
-          :description="$t('chat.noMessages')"
-          :image-size="80"
-        />
+
+        <el-empty v-if="chatStore.conversations.length === 0" :description="$t('chat.noMessages')" :image-size="80" />
       </div>
     </aside>
-    
+
     <!-- Main Content Area: Split Layout -->
     <main class="chat-main split-layout">
       <!-- Left Panel: Chat -->
-      <div 
-        class="chat-panel" 
-        :style="{ width: chatPanelWidth + '%' }"
-      >
+      <div class="chat-panel" :style="{ width: chatPanelWidth + '%' }">
         <!-- Workflow Status Indicator -->
-        <WorkflowStatusIndicator 
-          :status="chatStore.workflowStatus"
-          :active-tools="chatStore.activeTools"
-        />
-        
+        <WorkflowStatusIndicator :status="chatStore.workflowStatus" :active-tools="chatStore.activeTools" />
+
         <!-- Messages Container -->
         <div class="messages-container" ref="messagesContainerRef">
           <div v-if="chatStore.currentMessages.length === 0" class="empty-state">
-            <el-icon :size="64" color="#409eff"><ChatDotRound /></el-icon>
+            <el-icon :size="64" color="#409eff">
+              <ChatDotRound />
+            </el-icon>
             <p>{{ $t('chat.noMessages') }}</p>
-            
+
             <!-- Quick Actions -->
             <div class="quick-actions">
               <el-button @click="handleQuickAction('buffer')">Buffer Analysis</el-button>
@@ -113,33 +47,44 @@
               <el-button @click="handleQuickAction('statistics')">Statistics</el-button>
             </div>
           </div>
-          
-          <MessageBubble
-            v-for="(msg, index) in chatStore.currentMessages"
-            :key="msg.id"
-            :message="msg"
-            :is-streaming="shouldShowStreaming(msg, index)"
-          />
+
+          <MessageBubble v-for="(msg, index) in chatStore.currentMessages" :key="msg.id" :message="msg"
+            :is-streaming="shouldShowStreaming(msg, index)" />
         </div>
-        
+
         <!-- Input Area -->
-        <div class="input-area">
+        <div class="input-area" style="position: relative">
           <el-input
             v-model="inputMessage"
             type="textarea"
-            :placeholder="$t('chat.placeholder')"
+            placeholder="Type your message... Use @ to mention data sources"
             :rows="3"
             :disabled="chatStore.isStreaming"
-            @keydown.enter.ctrl="handleSendMessage"
+            @input="handleInput"
+            @keydown="handleKeydown"
           />
-          <div class="input-actions">
-            <el-button 
-              type="primary" 
-              :loading="chatStore.isStreaming"
-              :disabled="!inputMessage.trim()"
-              @click="handleSendMessage"
+          
+          <!-- Custom autocomplete dropdown -->
+          <div v-if="showAutocomplete && filteredDataSources.length > 0" class="autocomplete-dropdown">
+            <div 
+              v-for="(ds, index) in filteredDataSources" 
+              :key="ds.id"
+              class="autocomplete-item"
+              :class="{ active: index === activeSuggestionIndex }"
+              @click="selectDataSource(ds)"
+              @mouseenter="activeSuggestionIndex = index"
             >
-              <el-icon><Promotion /></el-icon>
+              <span class="suggestion-name">{{ ds.name }}</span>
+              <el-tag size="small" type="info">{{ ds.type }}</el-tag>
+            </div>
+          </div>
+          
+          <div class="input-actions">
+            <el-button type="primary" :loading="chatStore.isStreaming" :disabled="!inputMessage.trim()"
+              @click="handleSendMessage">
+              <el-icon>
+                <Promotion />
+              </el-icon>
               Send
             </el-button>
           </div>
@@ -147,16 +92,10 @@
       </div>
 
       <!-- Split Pane Resizer -->
-      <SplitPane 
-        :initial-ratio="0.4"
-        @resize="handleSplitResize"
-      />
+      <SplitPane :initial-ratio="0.4" @resize="handleSplitResize" />
 
       <!-- Right Panel: Map -->
-      <div 
-        class="map-panel"
-        :style="{ width: mapPanelWidth + '%' }"
-      >
+      <div class="map-panel" :style="{ width: mapPanelWidth + '%' }">
         <MapWorkspace />
       </div>
     </main>
@@ -164,7 +103,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, watch } from 'vue'
+import { ref, nextTick, watch, computed } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { useDataSourceStore } from '@/stores/dataSources'
 import { useI18n } from 'vue-i18n'
@@ -181,14 +120,29 @@ const dataSourceStore = useDataSourceStore()
 const inputMessage = ref('')
 const messagesContainerRef = ref<HTMLElement>()
 
+// Autocomplete state
+const showAutocomplete = ref(false)
+const activeSuggestionIndex = ref(0)
+const mentionStartPos = ref(-1)
+
 // Load sidebar state from localStorage
 const SIDERBAR_COLLAPSED_KEY = 'chat-sidebar-collapsed'
 const savedSidebarState = localStorage.getItem(SIDERBAR_COLLAPSED_KEY)
 const sidebarCollapsed = ref(savedSidebarState === 'true')
 
-const showDataSources = ref(false)
 const chatPanelWidth = ref(40)
 const mapPanelWidth = ref(60)
+
+// Computed: Filtered data sources based on @mention text
+const filteredDataSources = computed(() => {
+  if (mentionStartPos.value === -1) return []
+  
+  const textAfterAt = inputMessage.value.slice(mentionStartPos.value + 1).toLowerCase()
+  
+  return dataSourceStore.dataSources.filter(ds => 
+    ds.name.toLowerCase().includes(textAfterAt)
+  )
+})
 
 // Debug: Watch partialServices changes
 watch(() => chatStore.partialServices, (newVal) => {
@@ -217,21 +171,21 @@ function shouldShowStreaming(msg: any, index: number): boolean {
   const isLastMessage = index === messages.length - 1
   const isAssistant = msg.role === 'assistant'
   const isStreaming = chatStore.isStreaming
-    
+
   return isStreaming && isAssistant && isLastMessage
 }
 
 async function handleSendMessage() {
   if (!inputMessage.value.trim() || chatStore.isStreaming) return
-  
+
   const message = inputMessage.value
   inputMessage.value = ''
-  
+
   await chatStore.sendMessage(message, () => {
     // Scroll to bottom on each token
     scrollToBottom()
   })
-  
+
   scrollToBottom()
 }
 
@@ -250,7 +204,7 @@ async function handleDeleteConversation(conversationId: string) {
         type: 'warning'
       }
     )
-    
+
     await chatStore.deleteConversation(conversationId)
   } catch {
     // User cancelled
@@ -267,7 +221,7 @@ function handleQuickAction(action: string) {
     overlay: 'Run an overlay analysis between two layers',
     statistics: 'Calculate statistics for my dataset'
   }
-  
+
   inputMessage.value = prompts[action] || ''
 }
 
@@ -279,6 +233,83 @@ function handleAddDataSourceToChat(dataSource: any) {
   } else {
     inputMessage.value = `Analyze ${mention}: `
   }
+}
+
+// Autocomplete handlers
+function handleInput() {
+  // Check if user typed @
+  const cursorPos = getCursorPosition()
+  const textBeforeCursor = inputMessage.value.slice(0, cursorPos)
+  const lastAtIndex = textBeforeCursor.lastIndexOf('@')
+  
+  if (lastAtIndex !== -1) {
+    // Check if there's a space after @
+    const textAfterAt = textBeforeCursor.slice(lastAtIndex + 1)
+    if (!textAfterAt.includes(' ')) {
+      mentionStartPos.value = lastAtIndex
+      showAutocomplete.value = true
+      activeSuggestionIndex.value = 0
+      return
+    }
+  }
+  
+  // Hide autocomplete if no valid @mention
+  showAutocomplete.value = false
+  mentionStartPos.value = -1
+}
+
+function handleKeydown(event: KeyboardEvent) {
+  if (!showAutocomplete.value) return
+  
+  if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    activeSuggestionIndex.value = Math.min(
+      activeSuggestionIndex.value + 1,
+      filteredDataSources.value.length - 1
+    )
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    activeSuggestionIndex.value = Math.max(activeSuggestionIndex.value - 1, 0)
+  } else if (event.key === 'Enter' || event.key === 'Tab') {
+    event.preventDefault()
+    if (filteredDataSources.value.length > 0) {
+      selectDataSource(filteredDataSources.value[activeSuggestionIndex.value])
+    }
+  } else if (event.key === 'Escape') {
+    showAutocomplete.value = false
+  }
+}
+
+function selectDataSource(ds: any) {
+  if (mentionStartPos.value === -1) return
+  
+  const beforeMention = inputMessage.value.slice(0, mentionStartPos.value)
+  const afterMention = inputMessage.value.slice(mentionStartPos.value + 1)
+  const spaceIndex = afterMention.indexOf(' ')
+  const mentionEnd = spaceIndex === -1 ? afterMention.length : spaceIndex
+  const afterMentionText = afterMention.slice(mentionEnd)
+  
+  // Insert the data source name with @ prefix
+  inputMessage.value = `${beforeMention}@${ds.name} ${afterMentionText}`
+  
+  // Hide autocomplete
+  showAutocomplete.value = false
+  mentionStartPos.value = -1
+  
+  // Focus back on textarea and set cursor position
+  nextTick(() => {
+    const textarea = document.querySelector('.input-area textarea') as HTMLTextAreaElement
+    if (textarea) {
+      textarea.focus()
+      const newPos = beforeMention.length + ds.name.length + 2 // +2 for @ and space
+      textarea.setSelectionRange(newPos, newPos)
+    }
+  })
+}
+
+function getCursorPosition(): number {
+  const textarea = document.querySelector('.input-area textarea') as HTMLTextAreaElement
+  return textarea ? textarea.selectionStart : inputMessage.value.length
 }
 
 function scrollToBottom() {
@@ -314,7 +345,7 @@ function handleViewOnMap(service: any) {
   // TODO: Add layer to map store
   console.log('[ChatView] View on map:', service)
   ElMessage.info(`Adding ${service.type} layer to map...`)
-  
+
   // Navigate to map view if not already there
   // In future, integrate with mapStore to add layer directly
   // For now, just show a message
@@ -341,18 +372,19 @@ function handleViewOnMap(service: any) {
   flex-direction: column;
   transition: width 0.3s;
   overflow: hidden;
-  
+
   &.collapsed {
     width: 40px;
   }
 }
 
 .sidebar-header {
-  padding: 16px;
+  padding: 8px 0px;
   border-bottom: 1px solid var(--el-border-color);
   display: flex;
   gap: 8px;
   align-items: center;
+  justify-content: space-around;
 }
 
 .sidebar-toggle-btn {
@@ -374,11 +406,11 @@ function handleViewOnMap(service: any) {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 4px;
-  
+
   &:hover {
     background: var(--el-fill-color-light);
   }
-  
+
   &.active {
     background: var(--el-color-primary-light-9);
     color: var(--el-color-primary);
@@ -396,7 +428,7 @@ function handleViewOnMap(service: any) {
 .delete-icon {
   opacity: 0;
   transition: opacity 0.2s;
-  
+
   &:hover {
     color: var(--el-color-danger);
   }
@@ -404,55 +436,6 @@ function handleViewOnMap(service: any) {
 
 .conversation-item:hover .delete-icon {
   opacity: 1;
-}
-
-.data-sources-toggle {
-  padding: 8px 8px;
-  border-bottom: 1px solid var(--el-border-color);
-}
-
-.data-sources-section {
-  max-height: 300px;
-  overflow-y: auto;
-  border-bottom: 1px solid var(--el-border-color);
-}
-
-.section-title {
-  padding: 12px 16px 8px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--el-text-color-secondary);
-  text-transform: uppercase;
-}
-
-.data-source-item {
-  padding: 10px 16px;
-  cursor: pointer;
-  transition: background 0.2s;
-  
-  &:hover {
-    background: var(--el-fill-color-light);
-  }
-}
-
-.ds-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
-}
-
-.ds-name {
-  font-size: 14px;
-  color: var(--el-text-color-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ds-meta {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
 }
 
 .chat-main {
@@ -498,7 +481,7 @@ function handleViewOnMap(service: any) {
   height: 100%;
   gap: 24px;
   color: var(--el-text-color-secondary);
-  
+
   p {
     font-size: 16px;
   }
@@ -523,5 +506,46 @@ function handleViewOnMap(service: any) {
   display: flex;
   justify-content: flex-end;
   align-items: center;
+}
+
+.suggestion-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.suggestion-name {
+  flex: 1;
+}
+
+.autocomplete-dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color);
+  border-radius: 4px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 1000;
+  margin-bottom: 8px;
+}
+
+.autocomplete-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.2s;
+  
+  &:hover,
+  &.active {
+    background: var(--el-fill-color-light);
+  }
 }
 </style>

@@ -77,13 +77,15 @@ export const useMapStore = defineStore('map', () => {
     } else {
       layers.value.push({
         ...layer,
-        visible: false, // Always default to invisible
+        visible: layer.visible !== undefined ? layer.visible : false,
         createdAt: new Date().toISOString()
       })
     }
 
-    // Note: Layer won't be added to map initially since visible is false
-    // User must manually toggle visibility to show the layer
+    // If layer is visible, add it to map
+    if (layer.visible && mapInstance.value) {
+      addLayerToMap(layer)
+    }
   }
 
   function removeLayer(layerId: string) {
@@ -441,7 +443,7 @@ export const useMapStore = defineStore('map', () => {
       id: service.id,
       type: layerType,
       url: service.url,
-      visible: true, // Auto-show layers added from chat
+      visible: true,
       opacity: 0.8,
       metadata: service.metadata,
       name: service.metadata?.name || service.id,
@@ -451,13 +453,84 @@ export const useMapStore = defineStore('map', () => {
       }
     }
 
-    // Add to store
+    // Add to store (will automatically add to map if visible)
     addLayer(layer)
+  }
 
-    // If layer should be visible, add it to map immediately
-    if (layer.visible && mapInstance.value) {
-      addLayerToMap(layer)
-    }
+  /**
+   * Query features at a specific point on the map
+   * Returns features from all visible MVT and GeoJSON layers
+   */
+  function queryFeaturesAtPoint(lngLat: [number, number], radius: number = 5): Array<{ layerId: string; layerName?: string; properties: Record<string, any> }> {
+    if (!mapInstance.value) return []
+
+    const map = mapInstance.value
+    const results: Array<{ layerId: string; layerName?: string; properties: Record<string, any> }> = []
+
+    // Get all visible layers that can be queried
+    const queryableLayers = layers.value.filter(layer => 
+      layer.visible && (layer.type === LayerType.MVT || layer.type === LayerType.GeoJSON)
+    )
+
+    if (queryableLayers.length === 0) return []
+
+    // Convert lng/lat to pixel coordinates
+    const point = map.project(lngLat)
+    const bbox: [number, number, number, number] = [
+      point.x - radius,
+      point.y - radius,
+      point.x + radius,
+      point.y + radius
+    ]
+
+    // Query features from each layer
+    queryableLayers.forEach(layer => {
+      try {
+        // For MVT layers with custom styles, we need to query all sub-layers
+        let layersToQuery: string[] = [layer.id]
+        
+        // Check if this layer has custom style sub-layers
+        if (layer.metadata?.styleUrl) {
+          // Get all layers in the map style that use this source
+          const allStyleLayers = map.getStyle().layers
+          const subLayers = allStyleLayers
+            .filter((l: any) => l.source === layer.id && l.id !== layer.id)
+            .map((l: any) => l.id)
+          
+          if (subLayers.length > 0) {
+            layersToQuery = subLayers
+            console.log(`[Map Store] Querying ${subLayers.length} sub-layers for ${layer.id}`)
+          }
+        }
+        
+        // Use MapLibre's queryRenderedFeatures
+        const features = map.queryRenderedFeatures(bbox, {
+          layers: layersToQuery
+        })
+
+        if (features && features.length > 0) {
+          features.forEach((feature: any) => {
+            // Avoid duplicates - check if we already have this feature
+            const isDuplicate = results.some(r => 
+              r.layerId === layer.id && 
+              JSON.stringify(r.properties) === JSON.stringify(feature.properties)
+            )
+            
+            if (!isDuplicate) {
+              results.push({
+                layerId: layer.id,
+                layerName: layer.name || layer.id,
+                properties: feature.properties || {}
+              })
+            }
+          })
+        }
+      } catch (error) {
+        console.warn(`[Map Store] Failed to query features from layer ${layer.id}:`, error)
+      }
+    })
+
+    return results
   }
 
   return {
@@ -476,6 +549,7 @@ export const useMapStore = defineStore('map', () => {
     toggleLayerVisibility,
     setLayerOpacity,
     clearAllLayers,
-    addLayerFromService
+    addLayerFromService,
+    queryFeaturesAtPoint
   }
 })

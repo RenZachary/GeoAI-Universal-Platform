@@ -41,6 +41,11 @@ export class GeoJSONFilterOperation {
   }
 
   private evaluateCondition(properties: any, condition: FilterCondition): boolean {
+    // Handle empty or invalid conditions - return true (include all features)
+    if (!condition || Object.keys(condition).length === 0) {
+      return true;
+    }
+
     if ('conditions' in condition && condition.conditions && condition.conditions.length > 0) {
       const results = condition.conditions.map((cond: FilterCondition) => 
         this.evaluateCondition(properties, cond)
@@ -58,7 +63,14 @@ export class GeoJSONFilterOperation {
       return true;
     }
 
-    return this.evaluateAttributeCondition(properties, condition as AttributeFilter);
+    // Check if this is a valid attribute filter
+    const attrCond = condition as AttributeFilter;
+    if (!attrCond.field || !attrCond.operator) {
+      console.warn('[GeoJSONFilterOperation] Invalid attribute filter - missing field or operator, including all features');
+      return true;
+    }
+
+    return this.evaluateAttributeCondition(properties, attrCond);
   }
 
   private evaluateAttributeCondition(properties: any, cond: AttributeFilter): boolean {
@@ -79,13 +91,22 @@ export class GeoJSONFilterOperation {
         return Number(fieldValue) > Number(cond.value);
       case 'less_than':
         return Number(fieldValue) < Number(cond.value);
+      case 'greater_equal':
+        return Number(fieldValue) >= Number(cond.value);
+      case 'less_equal':
+        return Number(fieldValue) <= Number(cond.value);
       case 'in':
         return Array.isArray(cond.value) && cond.value.includes(fieldValue);
       case 'between':
         return Number(fieldValue) >= Number(cond.value[0]) &&
                Number(fieldValue) <= Number(cond.value[1]);
+      case 'is_null':
+        return fieldValue === null || fieldValue === undefined;
+      case 'is_not_null':
+        return fieldValue !== null && fieldValue !== undefined;
       default:
-        throw new Error(`Unsupported operator: ${cond.operator}`);
+        console.warn(`[GeoJSONFilterOperation] Unsupported operator: ${cond.operator}, including all features`);
+        return true;
     }
   }
 }
