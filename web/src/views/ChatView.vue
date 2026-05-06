@@ -358,7 +358,16 @@ function handleQuickAction(action: string) {
 // Contenteditable editor handlers
 function handleEditorInput(event: Event) {
   const target = event.target as HTMLElement
-  inputMessage.value = target.innerText || ''
+  const text = target.innerText || ''
+  inputMessage.value = text
+  
+  // Ensure editor is truly empty for placeholder to show
+  if (!text.trim() && editorRef.value) {
+    // Remove all child nodes to ensure :empty selector works
+    while (editorRef.value.firstChild) {
+      editorRef.value.removeChild(editorRef.value.firstChild)
+    }
+  }
   
   // Check if user typed @ or /
   const selection = window.getSelection()
