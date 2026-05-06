@@ -205,7 +205,7 @@
   cursor: text;
   
   &:empty::before {
-    content: 'Type your message... Use @ to mention data sources';
+    content: 'Type your message... Use @ for data sources, / for tools';
     color: var(--el-text-color-placeholder);
     pointer-events: none;
   }
@@ -213,6 +213,14 @@
   .mention-highlight {
     color: var(--el-color-primary);
     background: var(--el-color-primary-light-9);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+  }
+  
+  .tool-highlight {
+    color: var(--el-color-success);
+    background: var(--el-color-success-light-9);
     padding: 2px 6px;
     border-radius: 4px;
     font-weight: 500;

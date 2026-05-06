@@ -85,8 +85,8 @@
                 :disabled="chatStore.isStreaming"
               ></div>
               
-              <!-- Custom autocomplete dropdown -->
-              <div v-if="showAutocomplete && filteredDataSources.length > 0" class="autocomplete-dropdown">
+              <!-- Custom autocomplete dropdown for @datasources -->
+              <div v-if="showAutocomplete && autocompleteType === 'datasource' && filteredDataSources.length > 0" class="autocomplete-dropdown">
                 <div 
                   v-for="(ds, index) in filteredDataSources" 
                   :key="ds.id"
@@ -97,6 +97,22 @@
                 >
                   <span class="suggestion-name">{{ ds.name }}</span>
                   <el-tag size="small" type="info">{{ ds.type }}</el-tag>
+                </div>
+              </div>
+              
+              <!-- Custom autocomplete dropdown for /tools -->
+              <div v-if="showAutocomplete && autocompleteType === 'tool' && filteredTools.length > 0" class="autocomplete-dropdown tool-dropdown">
+                <div 
+                  v-for="(tool, index) in filteredTools" 
+                  :key="tool.id"
+                  class="autocomplete-item"
+                  :class="{ active: index === activeSuggestionIndex }"
+                  @click="selectTool(tool)"
+                  @mouseenter="activeSuggestionIndex = index"
+                >
+                  <el-icon><Tools /></el-icon>
+                  <span class="suggestion-name">{{ tool.name }}</span>
+                  <el-tag size="small" type="primary">{{ tool.category || 'tool' }}</el-tag>
                 </div>
               </div>
               
@@ -128,22 +144,25 @@
 import { ref, nextTick, watch, computed, onMounted } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { useDataSourceStore } from '@/stores/dataSources'
+import { useToolStore } from '@/stores/tools'
 import { useI18n } from 'vue-i18n'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
 import WorkflowStatusIndicator from '@/components/chat/WorkflowStatusIndicator.vue'
 import MapWorkspace from '@/components/chat-map/MapWorkspace.vue'
-import { Plus, Delete, ChatDotRound, Promotion, DArrowRight, DArrowLeft, Edit } from '@element-plus/icons-vue'
+import { Plus, Delete, ChatDotRound, Promotion, DArrowRight, DArrowLeft, Edit, Tools } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 
 const { t } = useI18n()
 const chatStore = useChatStore()
 const dataSourceStore = useDataSourceStore()
+const toolStore = useToolStore()
 const inputMessage = ref('')
 const messagesContainerRef = ref<HTMLElement>()
 const editorRef = ref<HTMLElement>()
 
 // Autocomplete state
 const showAutocomplete = ref(false)
+const autocompleteType = ref<'datasource' | 'tool'>('datasource') // Track which type of autocomplete
 const activeSuggestionIndex = ref(0)
 const mentionStartPos = ref(-1)
 
@@ -154,12 +173,24 @@ const sidebarCollapsed = ref(savedSidebarState === 'true')
 
 // Computed: Filtered data sources based on @mention text
 const filteredDataSources = computed(() => {
-  if (mentionStartPos.value === -1) return []
+  if (mentionStartPos.value === -1 || autocompleteType.value !== 'datasource') return []
   
-  const textAfterAt = inputMessage.value.slice(mentionStartPos.value + 1).toLowerCase()
+  const textAfterSymbol = inputMessage.value.slice(mentionStartPos.value + 1).toLowerCase()
   
   return dataSourceStore.dataSources.filter((ds: any) => 
-    ds.name.toLowerCase().includes(textAfterAt)
+    ds.name.toLowerCase().includes(textAfterSymbol)
+  )
+})
+
+// Computed: Filtered tools based on / command
+const filteredTools = computed(() => {
+  if (mentionStartPos.value === -1 || autocompleteType.value !== 'tool') return []
+  
+  const textAfterSlash = inputMessage.value.slice(mentionStartPos.value + 1).toLowerCase()
+  
+  return toolStore.tools.filter((tool: any) => 
+    tool.name.toLowerCase().includes(textAfterSlash) ||
+    (tool.description && tool.description.toLowerCase().includes(textAfterSlash))
   )
 })
 
@@ -182,6 +213,7 @@ watch(sidebarCollapsed, (newValue) => {
 onMounted(async () => {
   await chatStore.loadConversations()
   await dataSourceStore.loadDataSources()
+  await toolStore.loadTools()
 })
 
 // Methods
@@ -312,30 +344,42 @@ function handleEditorInput(event: Event) {
   const target = event.target as HTMLElement
   inputMessage.value = target.innerText || ''
   
-  // Check if user typed @
+  // Check if user typed @ or /
   const selection = window.getSelection()
   if (!selection || selection.rangeCount === 0) return
   
   const range = selection.getRangeAt(0)
   const textBeforeCursor = getTextBeforeCursor(range)
   const lastAtIndex = textBeforeCursor.lastIndexOf('@')
+  const lastSlashIndex = textBeforeCursor.lastIndexOf('/')
   
-  if (lastAtIndex !== -1) {
-    // Check if there's a space after @
-    const textAfterAt = textBeforeCursor.slice(lastAtIndex + 1)
-    // Only show autocomplete if the text after @ doesn't contain spaces and is not inside a highlight span
+  // Determine which trigger is closer to cursor (most recent)
+  const triggerIndex = Math.max(lastAtIndex, lastSlashIndex)
+  
+  if (triggerIndex !== -1) {
+    const triggerChar = textBeforeCursor[triggerIndex]
+    const textAfterTrigger = textBeforeCursor.slice(triggerIndex + 1)
+    
+    // Check if there's a space after the trigger
     const currentContainer = range.startContainer.parentElement
     const isInHighlight = currentContainer?.classList.contains('mention-highlight')
     
-    if (!textAfterAt.includes(' ') && !isInHighlight) {
-      mentionStartPos.value = lastAtIndex
+    if (!textAfterTrigger.includes(' ') && !isInHighlight) {
+      mentionStartPos.value = triggerIndex
       showAutocomplete.value = true
       activeSuggestionIndex.value = 0
+      
+      // Set autocomplete type based on trigger character
+      if (triggerChar === '@') {
+        autocompleteType.value = 'datasource'
+      } else if (triggerChar === '/') {
+        autocompleteType.value = 'tool'
+      }
       return
     }
   }
   
-  // Hide autocomplete if no valid @mention
+  // Hide autocomplete if no valid trigger
   showAutocomplete.value = false
   mentionStartPos.value = -1
 }
@@ -343,19 +387,25 @@ function handleEditorInput(event: Event) {
 function handleEditorKeydown(event: KeyboardEvent) {
   if (!showAutocomplete.value) return
   
+  const items = autocompleteType.value === 'datasource' ? filteredDataSources.value : filteredTools.value
+  
   if (event.key === 'ArrowDown') {
     event.preventDefault()
     activeSuggestionIndex.value = Math.min(
       activeSuggestionIndex.value + 1,
-      filteredDataSources.value.length - 1
+      items.length - 1
     )
   } else if (event.key === 'ArrowUp') {
     event.preventDefault()
     activeSuggestionIndex.value = Math.max(activeSuggestionIndex.value - 1, 0)
   } else if (event.key === 'Enter' || event.key === 'Tab') {
     event.preventDefault()
-    if (filteredDataSources.value.length > 0) {
-      selectDataSource(filteredDataSources.value[activeSuggestionIndex.value])
+    if (items.length > 0) {
+      if (autocompleteType.value === 'datasource') {
+        selectDataSource(items[activeSuggestionIndex.value])
+      } else {
+        selectTool(items[activeSuggestionIndex.value])
+      }
     }
   } else if (event.key === 'Escape') {
     showAutocomplete.value = false
@@ -443,6 +493,91 @@ function selectDataSource(ds: any) {
   // Add a space after
   const spaceNode = document.createTextNode(' ')
   mentionSpan.parentNode?.insertBefore(spaceNode, mentionSpan.nextSibling)
+  
+  // Move cursor after the space
+  const newRange = document.createRange()
+  newRange.setStartAfter(spaceNode)
+  newRange.collapse(true)
+  selection.removeAllRanges()
+  selection.addRange(newRange)
+  
+  // Update inputMessage
+  inputMessage.value = editorRef.value.innerText || ''
+  
+  // Hide autocomplete
+  showAutocomplete.value = false
+  mentionStartPos.value = -1
+  
+  // Focus back on editor
+  editorRef.value.focus()
+}
+
+function selectTool(tool: any) {
+  if (mentionStartPos.value === -1 || !editorRef.value) return
+  
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0) return
+  
+  const range = selection.getRangeAt(0)
+  const textBeforeCursor = getTextBeforeCursor(range)
+  
+  // Find the / position
+  const slashIndex = textBeforeCursor.lastIndexOf('/')
+  if (slashIndex === -1) return
+  
+  // Get text after /
+  const afterSlash = textBeforeCursor.slice(slashIndex + 1)
+  const spaceIndex = afterSlash.indexOf(' ')
+  const mentionEnd = spaceIndex === -1 ? afterSlash.length : spaceIndex
+  
+  // Create a new range to replace the /command
+  const replaceRange = document.createRange()
+  
+  // Start from the current position and walk backwards
+  let currentNode: Node | null = range.startContainer
+  let currentOffset = range.startOffset
+  let charsToWalkBack = mentionEnd + 1 // +1 for the / symbol
+  
+  // Walk back through text nodes to find the start of the /command
+  while (charsToWalkBack > 0 && currentNode) {
+    if (currentNode.nodeType === Node.TEXT_NODE) {
+      const textLength = (currentNode as Text).length
+      if (currentOffset >= charsToWalkBack) {
+        // The / is in this node
+        replaceRange.setStart(currentNode, currentOffset - charsToWalkBack)
+        charsToWalkBack = 0
+      } else {
+        // Move to previous sibling
+        charsToWalkBack -= currentOffset
+        const prevSibling = currentNode.previousSibling
+        currentNode = prevSibling as Node | null
+        currentOffset = currentNode ? (currentNode.nodeType === Node.TEXT_NODE ? (currentNode as Text).length : 0) : 0
+      }
+    } else {
+      // Skip non-text nodes
+      const prevSibling = currentNode.previousSibling
+      currentNode = prevSibling as Node | null
+      currentOffset = currentNode ? (currentNode.nodeType === Node.TEXT_NODE ? (currentNode as Text).length : 0) : 0
+    }
+  }
+  
+  // Set the end of the range at current cursor position
+  replaceRange.setEnd(range.startContainer, range.startOffset)
+  
+  // Delete the old /command and insert the new one with highlight
+  replaceRange.deleteContents()
+  
+  // Create highlighted span for tool
+  const toolSpan = document.createElement('span')
+  toolSpan.className = 'tool-highlight'
+  toolSpan.textContent = `/${tool.name}`
+  
+  // Insert the span
+  replaceRange.insertNode(toolSpan)
+  
+  // Add a space after
+  const spaceNode = document.createTextNode(' ')
+  toolSpan.parentNode?.insertBefore(spaceNode, toolSpan.nextSibling)
   
   // Move cursor after the space
   const newRange = document.createRange()
