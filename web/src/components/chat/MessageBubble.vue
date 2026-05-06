@@ -77,10 +77,12 @@ import { User, ChatDotRound, DocumentCopy, RefreshRight, Link, Document, MapLoca
 import { marked } from 'marked'
 import { useChatStore } from '@/stores/chat'
 import { useMapStore } from '@/stores/map'
+import { useDataSourceStore } from '@/stores/dataSources'
 import { ElMessage } from 'element-plus'
 
 const chatStore = useChatStore()
 const mapStore = useMapStore()
+const dataSourceStore = useDataSourceStore()
 
 const props = defineProps<{
   message: ChatMessage
@@ -90,7 +92,23 @@ const props = defineProps<{
 // Render markdown content
 const renderedContent = computed(() => {
   if (props.message.role === 'user') {
-    return props.message.content
+    // For user messages, convert @[datasource:ID] back to @name with highlights
+    let content = props.message.content
+    
+    // Find all @[datasource:ID] patterns and replace with highlighted @name
+    const datasourceRegex = /@\[datasource:([^\]]+)\]/g
+    content = content.replace(datasourceRegex, (match, datasourceId) => {
+      // Find the data source by ID
+      const ds = dataSourceStore.dataSources.find((d: any) => d.id === datasourceId)
+      if (ds) {
+        // Return highlighted span with the data source name
+        return `<span class="mention-highlight">@${ds.name}</span>`
+      }
+      // If not found, return the original match
+      return match
+    })
+    
+    return content
   }
   
   // Parse markdown for assistant messages
@@ -265,6 +283,15 @@ function handleRegenerate() {
       background: transparent;
       padding: 0;
     }
+  }
+  
+  // Support for @mention highlights in user messages
+  :deep(.mention-highlight) {
+    color: var(--el-color-primary);
+    background: var(--el-color-primary-light-9);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
   }
 }
 

@@ -27,6 +27,8 @@ export interface PluginStatus {
   id: string;
   name: string;
   version: string;
+  description: string;
+  category: string;
   status: 'enabled' | 'disabled' | 'error';
   error?: string;
   loadedAt?: Date;
@@ -78,6 +80,8 @@ export class CustomPluginLoader {
             id: dirName,
             name: dirName,
             version: 'unknown',
+            description: '',
+            category: 'unknown',
             status: 'error',
             error: error instanceof Error ? error.message : 'Unknown error'
           });
@@ -138,6 +142,8 @@ export class CustomPluginLoader {
       id: manifest.id,
       name: manifest.name,
       version: manifest.version,
+      description: manifest.description,
+      category: manifest.category,
       status: 'enabled',
       loadedAt: new Date()
     });

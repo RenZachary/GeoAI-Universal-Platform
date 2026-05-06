@@ -13,7 +13,12 @@ export const usePluginStore = defineStore('plugins', () => {
   async function loadPlugins() {
     isLoading.value = true
     try {
-      plugins.value = await pluginService.listPlugins()
+      const backendPlugins = await pluginService.listPlugins()
+      // Convert backend status field to frontend enabled field
+      plugins.value = backendPlugins.map((plugin: any) => ({
+        ...plugin,
+        enabled: plugin.status === 'enabled'
+      }))
     } catch (error) {
       console.error('Failed to load plugins:', error)
     } finally {
@@ -34,7 +39,7 @@ export const usePluginStore = defineStore('plugins', () => {
     try {
       await pluginService.enablePlugin(pluginId)
       // Update local state
-      const plugin = plugins.value.find(p => p.id === pluginId)
+      const plugin = plugins.value.find((p: Plugin) => p.id === pluginId)
       if (plugin) {
         plugin.enabled = true
       }
@@ -48,7 +53,7 @@ export const usePluginStore = defineStore('plugins', () => {
     try {
       await pluginService.disablePlugin(pluginId)
       // Update local state
-      const plugin = plugins.value.find(p => p.id === pluginId)
+      const plugin = plugins.value.find((p: Plugin) => p.id === pluginId)
       if (plugin) {
         plugin.enabled = false
       }
@@ -77,7 +82,7 @@ export const usePluginStore = defineStore('plugins', () => {
     try {
       await pluginService.deletePlugin(pluginId)
       // Remove from local state
-      const index = plugins.value.findIndex(p => p.id === pluginId)
+      const index = plugins.value.findIndex((p: Plugin) => p.id === pluginId)
       if (index !== -1) {
         plugins.value.splice(index, 1)
       }

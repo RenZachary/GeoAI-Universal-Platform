@@ -56,18 +56,24 @@
         </template>
       </el-table-column>
       
-      <el-table-column :label="$t('common.actions')" width="100" fixed="right">
+      <el-table-column :label="$t('common.actions')" width="180" fixed="right">
         <template #default="{ row }">
-          <el-popconfirm
-            :title="$t('data.deleteConfirm', { name: row.name })"
-            @confirm="handleDelete(row.id)"
-          >
-            <template #reference>
-              <el-button size="small" type="danger" text>
-                {{ $t('common.delete') }}
-              </el-button>
-            </template>
-          </el-popconfirm>
+          <div class="action-buttons">
+            <el-button size="small" type="primary" text @click="handleViewMetadata(row)">
+              <el-icon><InfoFilled /></el-icon>
+              {{ $t('data.viewMetadata') }}
+            </el-button>
+            <el-popconfirm
+              :title="$t('data.deleteConfirm', { name: row.name })"
+              @confirm="handleDelete(row.id)"
+            >
+              <template #reference>
+                <el-button size="small" type="danger" text>
+                  {{ $t('common.delete') }}
+                </el-button>
+              </template>
+            </el-popconfirm>
+          </div>
         </template>
       </el-table-column>
     </el-table>
@@ -196,6 +202,79 @@
         </el-button>
       </template>
     </el-dialog>
+    
+    <!-- Metadata View Dialog -->
+    <el-dialog
+      v-model="showMetadataDialog"
+      :title="selectedDataSource?.name || 'Metadata'"
+      width="700px"
+    >
+      <div v-if="selectedDataSource" class="metadata-content">
+        <el-descriptions :column="2" border>
+          <el-descriptions-item :label="$t('data.name')">
+            {{ selectedDataSource.name }}
+          </el-descriptions-item>
+          <el-descriptions-item :label="$t('data.type')">
+            <el-tag size="small" :type="getTypeColor(selectedDataSource.type)">
+              {{ selectedDataSource.type }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item :label="$t('data.uploadedAt')">
+            {{ formatDate(selectedDataSource.createdAt) }}
+          </el-descriptions-item>
+          <el-descriptions-item :label="$t('data.size')">
+            {{ formatFileSize(selectedDataSource.metadata?.fileSize) }}
+          </el-descriptions-item>
+        </el-descriptions>
+        
+        <el-divider>{{ $t('data.metadata.spatialInfo') }}</el-divider>
+        
+        <el-descriptions :column="2" border>
+          <el-descriptions-item :label="$t('data.features')">
+            {{ selectedDataSource.metadata?.featureCount || 'N/A' }}
+          </el-descriptions-item>
+          <el-descriptions-item :label="$t('data.geometryType')">
+            {{ selectedDataSource.metadata?.geometryType || 'N/A' }}
+          </el-descriptions-item>
+          <el-descriptions-item :label="$t('data.crs')" :span="2">
+            {{ selectedDataSource.metadata?.crs || 'N/A' }}
+          </el-descriptions-item>
+          <el-descriptions-item :label="$t('data.bbox')" :span="2" v-if="selectedDataSource.metadata?.bbox">
+            <code class="bbox-code">
+              [{{ selectedDataSource.metadata.bbox.join(', ') }}]
+            </code>
+          </el-descriptions-item>
+        </el-descriptions>
+        
+        <el-divider v-if="selectedDataSource.metadata?.fields && selectedDataSource.metadata.fields.length > 0">
+          {{ $t('data.fields') }} ({{ selectedDataSource.metadata.fields.length }})
+        </el-divider>
+        
+        <el-table 
+          v-if="selectedDataSource.metadata?.fields && selectedDataSource.metadata.fields.length > 0"
+          :data="selectedDataSource.metadata.fields" 
+          stripe
+          max-height="300"
+        >
+          <el-table-column prop="name" :label="$t('data.fieldName')" min-width="150" />
+          <el-table-column prop="type" :label="$t('data.fieldType')" width="120">
+            <template #default="{ row }">
+              <el-tag size="small" type="info">{{ row.type }}</el-tag>
+            </template>
+          </el-table-column>
+        </el-table>
+        
+        <el-empty 
+          v-else
+          :description="$t('data.noFields')"
+          :image-size="80"
+        />
+      </div>
+      
+      <template #footer>
+        <el-button @click="showMetadataDialog = false">{{ $t('common.close') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -204,7 +283,7 @@ import { ref, reactive } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDataSourceStore } from '@/stores/dataSources'
 import { ElMessage } from 'element-plus'
-import { Upload, Document, UploadFilled, Connection } from '@element-plus/icons-vue'
+import { Upload, Document, UploadFilled, Connection, InfoFilled } from '@element-plus/icons-vue'
 import type { UploadUserFile } from 'element-plus'
 
 const { t } = useI18n()
@@ -212,6 +291,8 @@ const dataSourceStore = useDataSourceStore()
 
 const showUploadDialog = ref(false)
 const showPostGISDialog = ref(false)
+const showMetadataDialog = ref(false)
+const selectedDataSource = ref<any>(null)
 const selectedFiles = ref<File[]>([])
 const isUploading = ref(false)
 const isConnecting = ref(false)
@@ -363,6 +444,11 @@ async function handleDelete(id: string) {
   }
 }
 
+function handleViewMetadata(dataSource: any) {
+  selectedDataSource.value = dataSource
+  showMetadataDialog.value = true
+}
+
 // Utility functions
 function getTypeColor(type: string): 'success' | 'warning' | 'info' | 'primary' {
   const colors: Record<string, any> = {
@@ -476,5 +562,22 @@ function formatDate(dateString: string): string {
   font-size: 12px;
   color: var(--el-text-color-secondary);
   margin-top: 4px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.metadata-content {
+  .bbox-code {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    background: var(--el-fill-color-light);
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: inline-block;
+  }
 }
 </style>

@@ -8,69 +8,76 @@
       </el-button>
     </div>
     
-    <!-- Plugins List -->
-    <div class="plugins-list" v-loading="pluginStore.isLoading">
-      <el-card 
-        v-for="plugin in pluginStore.plugins" 
-        :key="plugin.id"
-        class="plugin-card"
-        shadow="hover"
-      >
-        <div class="plugin-header">
-          <div class="plugin-info">
-            <h3 class="plugin-name">{{ plugin.name }}</h3>
-            <p class="plugin-version">v{{ plugin.version }}</p>
+    <!-- Plugins Table -->
+    <el-table 
+      :data="pluginStore.plugins" 
+      v-loading="pluginStore.isLoading"
+      stripe
+      style="width: 100%"
+    >
+      <el-table-column prop="name" :label="$t('plugins.name')" min-width="200">
+        <template #default="{ row }">
+          <div class="plugin-name-cell">
+            <span class="plugin-name">{{ row.name }}</span>
+            <span class="plugin-version">v{{ row.version }}</span>
           </div>
-          
-          <el-switch
-            v-model="plugin.enabled"
-            :active-text="$t('plugins.enabled')"
-            :inactive-text="$t('plugins.disabled')"
-            @change="(val: boolean) => handleTogglePlugin(plugin, val)"
-          />
-        </div>
-        
-        <p class="plugin-description">{{ plugin.description }}</p>
-        
-        <div class="plugin-meta">
-          <el-tag size="small" :type="plugin.isBuiltin ? 'success' : 'warning'">
-            {{ plugin.isBuiltin ? $t('plugins.builtin') : $t('plugins.custom') }}
-          </el-tag>
-          
-          <span class="plugin-category">{{ plugin.category }}</span>
-        </div>
-        
-        <div class="plugin-actions">
-          <el-button 
-            size="small" 
-            text
-            @click="handleViewDetails(plugin)"
-          >
-            {{ $t('plugins.viewDetails') }}
-          </el-button>
-          
-          <el-button 
-            v-if="!plugin.isBuiltin"
-            size="small" 
-            type="danger"
-            text
-            @click="handleDeletePlugin(plugin)"
-          >
-            {{ $t('plugins.delete') }}
-          </el-button>
-        </div>
-      </el-card>
+        </template>
+      </el-table-column>
       
-      <el-empty 
-        v-if="!pluginStore.isLoading && pluginStore.plugins.length === 0"
-        :description="$t('plugins.noPlugins')"
-        :image-size="120"
-      >
-        <el-button type="primary" @click="showUploadDialog = true">
-          {{ $t('plugins.upload') }}
-        </el-button>
-      </el-empty>
-    </div>
+      <el-table-column prop="description" :label="$t('plugins.description')" min-width="250" show-overflow-tooltip />
+      
+      <el-table-column prop="category" :label="$t('plugins.category')" width="120">
+        <template #default="{ row }">
+          <el-tag size="small">{{ row.category }}</el-tag>
+        </template>
+      </el-table-column>
+      
+      <el-table-column :label="$t('plugins.type')" width="100">
+        <template #default="{ row }">
+          <el-tag size="small" :type="row.isBuiltin ? 'success' : 'warning'">
+            {{ row.isBuiltin ? $t('plugins.builtin') : $t('plugins.custom') }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      
+      <el-table-column :label="$t('plugins.status')" width="120">
+        <template #default="{ row }">
+          <el-switch
+            v-model="row.enabled"
+            @change="(val: boolean) => handleTogglePlugin(row, val)"
+          />
+        </template>
+      </el-table-column>
+      
+      <el-table-column :label="$t('common.actions')" width="180" fixed="right">
+        <template #default="{ row }">
+          <div class="action-buttons">
+            <el-button size="small" type="primary" text @click="handleViewDetails(row)">
+              {{ $t('plugins.viewDetails') }}
+            </el-button>
+            <el-button 
+              v-if="!row.isBuiltin"
+              size="small" 
+              type="danger" 
+              text
+              @click="handleDeletePlugin(row)"
+            >
+              {{ $t('plugins.delete') }}
+            </el-button>
+          </div>
+        </template>
+      </el-table-column>
+    </el-table>
+    
+    <el-empty 
+      v-if="!pluginStore.isLoading && pluginStore.plugins.length === 0"
+      :description="$t('plugins.noPlugins')"
+      :image-size="120"
+    >
+      <el-button type="primary" @click="showUploadDialog = true">
+        {{ $t('plugins.upload') }}
+      </el-button>
+    </el-empty>
     
     <!-- Upload Plugin Dialog -->
     <el-dialog
@@ -116,7 +123,6 @@
     <el-dialog
       v-model="showDetailsDialog"
       :title="selectedPlugin?.name || $t('plugins.pluginDetails')"
-      width="600px"
     >
       <div v-if="selectedPlugin" class="plugin-details">
         <el-descriptions :column="1" border>
@@ -298,67 +304,30 @@ async function handleDeletePlugin(plugin: Plugin) {
   }
 }
 
-.plugins-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 20px;
+.plugins-table {
+  margin-top: 16px;
 }
 
-.plugin-card {
-  transition: transform 0.2s;
+.plugin-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   
-  &:hover {
-    transform: translateY(-4px);
+  .plugin-name {
+    font-weight: 500;
+    color: var(--el-text-color-primary);
+  }
+  
+  .plugin-version {
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
   }
 }
 
-.plugin-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 12px;
-}
-
-.plugin-info {
-  flex: 1;
-}
-
-.plugin-name {
-  margin: 0 0 4px 0;
-  font-size: 18px;
-  color: #303133;
-}
-
-.plugin-version {
-  margin: 0;
-  font-size: 12px;
-  color: #909399;
-}
-
-.plugin-description {
-  margin: 0 0 12px 0;
-  font-size: 14px;
-  color: #606266;
-  line-height: 1.5;
-  min-height: 42px;
-}
-
-.plugin-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.plugin-category {
-  font-size: 12px;
-  color: #909399;
-}
-
-.plugin-actions {
+.action-buttons {
   display: flex;
   gap: 8px;
-  justify-content: flex-end;
+  align-items: center;
 }
 
 .plugin-details {

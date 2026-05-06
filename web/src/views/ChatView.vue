@@ -67,16 +67,16 @@
         </div>
 
         <!-- Input Area -->
-        <div class="input-area" style="position: relative">
-          <el-input
-            v-model="inputMessage"
-            type="textarea"
-            placeholder="Type your message... Use @ to mention data sources"
-            :rows="3"
+        <div class="input-area">
+          <div 
+            ref="editorRef"
+            class="rich-editor"
+            contenteditable="true"
+            @input="handleEditorInput"
+            @keydown="handleEditorKeydown"
+            @paste="handlePaste"
             :disabled="chatStore.isStreaming"
-            @input="handleInput"
-            @keydown="handleKeydown"
-          />
+          ></div>
           
           <!-- Custom autocomplete dropdown -->
           <div v-if="showAutocomplete && filteredDataSources.length > 0" class="autocomplete-dropdown">
@@ -117,7 +117,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, watch, computed } from 'vue'
+import { ref, nextTick, watch, computed, onMounted } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { useDataSourceStore } from '@/stores/dataSources'
 import { useI18n } from 'vue-i18n'
@@ -125,7 +125,7 @@ import MessageBubble from '@/components/chat/MessageBubble.vue'
 import WorkflowStatusIndicator from '@/components/chat/WorkflowStatusIndicator.vue'
 import SplitPane from '@/components/chat-map/SplitPane.vue'
 import MapWorkspace from '@/components/chat-map/MapWorkspace.vue'
-import { Plus, Delete, ChatDotRound, Promotion, Folder, DArrowRight, DArrowLeft } from '@element-plus/icons-vue'
+import { Plus, Delete, ChatDotRound, Promotion, DArrowRight, DArrowLeft } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 
 const { t } = useI18n()
@@ -133,6 +133,7 @@ const chatStore = useChatStore()
 const dataSourceStore = useDataSourceStore()
 const inputMessage = ref('')
 const messagesContainerRef = ref<HTMLElement>()
+const editorRef = ref<HTMLElement>()
 
 // Autocomplete state
 const showAutocomplete = ref(false)
@@ -153,11 +154,12 @@ const filteredDataSources = computed(() => {
   
   const textAfterAt = inputMessage.value.slice(mentionStartPos.value + 1).toLowerCase()
   
-  return dataSourceStore.dataSources.filter(ds => 
+  return dataSourceStore.dataSources.filter((ds: any) => 
     ds.name.toLowerCase().includes(textAfterAt)
   )
 })
 
+// Computed: Highlighted text with @mentions styled
 // Debug: Watch partialServices changes
 watch(() => chatStore.partialServices, (newVal) => {
   console.log('[ChatView] partialServices changed:', newVal.length, 'services')
@@ -173,7 +175,6 @@ watch(sidebarCollapsed, (newValue) => {
 })
 
 // Lifecycle
-import { onMounted } from 'vue'
 onMounted(async () => {
   await chatStore.loadConversations()
   await dataSourceStore.loadDataSources()
@@ -192,15 +193,46 @@ function shouldShowStreaming(msg: any, index: number): boolean {
 async function handleSendMessage() {
   if (!inputMessage.value.trim() || chatStore.isStreaming) return
 
-  const message = inputMessage.value
+  // Convert @mentions to data source IDs for backend processing
+  const messageWithIds = convertMentionsToIds(inputMessage.value)
+  
+  // Clear the editor
+  if (editorRef.value) {
+    editorRef.value.innerHTML = ''
+  }
   inputMessage.value = ''
 
-  await chatStore.sendMessage(message, () => {
+  // Send the message with IDs (MessageBubble will convert back to names for display)
+  await chatStore.sendMessage(messageWithIds, () => {
     // Scroll to bottom on each token
     scrollToBottom()
   })
 
   scrollToBottom()
+}
+
+// Convert @mention names to data source IDs
+function convertMentionsToIds(text: string): string {
+  let result = text
+  
+  // Find all @mentions
+  const mentionRegex = /@([^\s,，]+)/g
+  let match
+  
+  while ((match = mentionRegex.exec(text)) !== null) {
+    const mentionName = match[1]
+    
+    // Find exact match in data sources
+    const matchedDS = dataSourceStore.dataSources.find((ds: any) => ds.name === mentionName)
+    
+    if (matchedDS) {
+      // Replace @name with @id format that backend can parse
+      const replacement = `@[datasource:${matchedDS.id}]`
+      result = result.replace(`@${mentionName}`, replacement)
+    }
+  }
+  
+  return result
 }
 
 function handleSelectConversation(conversationId: string) {
@@ -239,27 +271,28 @@ function handleQuickAction(action: string) {
   inputMessage.value = prompts[action] || ''
 }
 
-function handleAddDataSourceToChat(dataSource: any) {
-  // Insert data source reference into chat input
-  const mention = `@${dataSource.name}`
-  if (inputMessage.value) {
-    inputMessage.value += ` ${mention}`
-  } else {
-    inputMessage.value = `Analyze ${mention}: `
-  }
-}
-
 // Autocomplete handlers
-function handleInput() {
+// Contenteditable editor handlers
+function handleEditorInput(event: Event) {
+  const target = event.target as HTMLElement
+  inputMessage.value = target.innerText || ''
+  
   // Check if user typed @
-  const cursorPos = getCursorPosition()
-  const textBeforeCursor = inputMessage.value.slice(0, cursorPos)
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0) return
+  
+  const range = selection.getRangeAt(0)
+  const textBeforeCursor = getTextBeforeCursor(range)
   const lastAtIndex = textBeforeCursor.lastIndexOf('@')
   
   if (lastAtIndex !== -1) {
     // Check if there's a space after @
     const textAfterAt = textBeforeCursor.slice(lastAtIndex + 1)
-    if (!textAfterAt.includes(' ')) {
+    // Only show autocomplete if the text after @ doesn't contain spaces and is not inside a highlight span
+    const currentContainer = range.startContainer.parentElement
+    const isInHighlight = currentContainer?.classList.contains('mention-highlight')
+    
+    if (!textAfterAt.includes(' ') && !isInHighlight) {
       mentionStartPos.value = lastAtIndex
       showAutocomplete.value = true
       activeSuggestionIndex.value = 0
@@ -272,7 +305,7 @@ function handleInput() {
   mentionStartPos.value = -1
 }
 
-function handleKeydown(event: KeyboardEvent) {
+function handleEditorKeydown(event: KeyboardEvent) {
   if (!showAutocomplete.value) return
   
   if (event.key === 'ArrowDown') {
@@ -294,36 +327,104 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
+function handlePaste(event: ClipboardEvent) {
+  event.preventDefault()
+  const text = event.clipboardData?.getData('text/plain') || ''
+  document.execCommand('insertText', false, text)
+}
+
+function getTextBeforeCursor(range: Range): string {
+  if (!editorRef.value) return ''
+  const preCaretRange = range.cloneRange()
+  preCaretRange.selectNodeContents(editorRef.value)
+  preCaretRange.setEnd(range.endContainer, range.endOffset)
+  return preCaretRange.toString()
+}
+
 function selectDataSource(ds: any) {
-  if (mentionStartPos.value === -1) return
+  if (mentionStartPos.value === -1 || !editorRef.value) return
   
-  const beforeMention = inputMessage.value.slice(0, mentionStartPos.value)
-  const afterMention = inputMessage.value.slice(mentionStartPos.value + 1)
-  const spaceIndex = afterMention.indexOf(' ')
-  const mentionEnd = spaceIndex === -1 ? afterMention.length : spaceIndex
-  const afterMentionText = afterMention.slice(mentionEnd)
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0) return
   
-  // Insert the data source name with @ prefix
-  inputMessage.value = `${beforeMention}@${ds.name} ${afterMentionText}`
+  const range = selection.getRangeAt(0)
+  const textBeforeCursor = getTextBeforeCursor(range)
+  
+  // Find the @ position
+  const atIndex = textBeforeCursor.lastIndexOf('@')
+  if (atIndex === -1) return
+  
+  // Get text after @
+  const afterAtSymbol = textBeforeCursor.slice(atIndex + 1)
+  const spaceIndex = afterAtSymbol.indexOf(' ')
+  const mentionEnd = spaceIndex === -1 ? afterAtSymbol.length : spaceIndex
+  
+  // Create a new range to replace the @mention
+  // We need to walk back from current cursor position to find the @ symbol
+  const replaceRange = document.createRange()
+  
+  // Start from the current position and walk backwards
+  let currentNode: Node | null = range.startContainer
+  let currentOffset = range.startOffset
+  let charsToWalkBack = mentionEnd + 1 // +1 for the @ symbol
+  
+  // Walk back through text nodes to find the start of the @mention
+  while (charsToWalkBack > 0 && currentNode) {
+    if (currentNode.nodeType === Node.TEXT_NODE) {
+      const textLength = (currentNode as Text).length
+      if (currentOffset >= charsToWalkBack) {
+        // The @ is in this node
+        replaceRange.setStart(currentNode, currentOffset - charsToWalkBack)
+        charsToWalkBack = 0
+      } else {
+        // Move to previous sibling
+        charsToWalkBack -= currentOffset
+        const prevSibling = currentNode.previousSibling
+        currentNode = prevSibling as Node | null
+        currentOffset = currentNode ? (currentNode.nodeType === Node.TEXT_NODE ? (currentNode as Text).length : 0) : 0
+      }
+    } else {
+      // Skip non-text nodes
+      const prevSibling = currentNode.previousSibling
+      currentNode = prevSibling as Node | null
+      currentOffset = currentNode ? (currentNode.nodeType === Node.TEXT_NODE ? (currentNode as Text).length : 0) : 0
+    }
+  }
+  
+  // Set the end of the range at current cursor position
+  replaceRange.setEnd(range.startContainer, range.startOffset)
+  
+  // Delete the old @mention and insert the new one with highlight
+  replaceRange.deleteContents()
+  
+  // Create highlighted span
+  const mentionSpan = document.createElement('span')
+  mentionSpan.className = 'mention-highlight'
+  mentionSpan.textContent = `@${ds.name}`
+  
+  // Insert the span
+  replaceRange.insertNode(mentionSpan)
+  
+  // Add a space after
+  const spaceNode = document.createTextNode(' ')
+  mentionSpan.parentNode?.insertBefore(spaceNode, mentionSpan.nextSibling)
+  
+  // Move cursor after the space
+  const newRange = document.createRange()
+  newRange.setStartAfter(spaceNode)
+  newRange.collapse(true)
+  selection.removeAllRanges()
+  selection.addRange(newRange)
+  
+  // Update inputMessage
+  inputMessage.value = editorRef.value.innerText || ''
   
   // Hide autocomplete
   showAutocomplete.value = false
   mentionStartPos.value = -1
   
-  // Focus back on textarea and set cursor position
-  nextTick(() => {
-    const textarea = document.querySelector('.input-area textarea') as HTMLTextAreaElement
-    if (textarea) {
-      textarea.focus()
-      const newPos = beforeMention.length + ds.name.length + 2 // +2 for @ and space
-      textarea.setSelectionRange(newPos, newPos)
-    }
-  })
-}
-
-function getCursorPosition(): number {
-  const textarea = document.querySelector('.input-area textarea') as HTMLTextAreaElement
-  return textarea ? textarea.selectionStart : inputMessage.value.length
+  // Focus back on editor
+  editorRef.value.focus()
 }
 
 function scrollToBottom() {
@@ -557,6 +658,38 @@ function handleViewOnMap(service: any) {
   border-top: 1px solid var(--el-border-color);
   padding: 8px;
   background: var(--el-bg-color);
+  position: relative;
+  border: 1px solid var(--el-border-color);
+  border-radius: 4px;
+}
+
+.rich-editor {
+  flex: 1;
+  min-height: 60px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 8px 12px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--el-text-color-primary);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  outline: none;
+  cursor: text;
+  
+  &:empty::before {
+    content: 'Type your message... Use @ to mention data sources';
+    color: var(--el-text-color-placeholder);
+    pointer-events: none;
+  }
+  
+  .mention-highlight {
+    color: var(--el-color-primary);
+    background: var(--el-color-primary-light-9);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+  }
 }
 
 .input-actions {

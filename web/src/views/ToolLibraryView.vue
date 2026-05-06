@@ -44,9 +44,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useToolStore } from '@/stores/tools'
-import { ElMessage } from 'element-plus'
-import { Search, Operation, DataAnalysis, Location, TrendCharts } from '@element-plus/icons-vue'
-import type { Tool } from '@/types'
+import { Operation, DataAnalysis, Location, TrendCharts } from '@element-plus/icons-vue'
 
 const toolStore = useToolStore()
 
@@ -63,7 +61,7 @@ const filteredTools = computed(() => {
   if (!searchQuery.value) return toolStore.tools
   
   const query = searchQuery.value.toLowerCase()
-  return toolStore.tools.filter(tool => 
+  return toolStore.tools.filter((tool: any) => 
     tool.name.toLowerCase().includes(query) ||
     tool.description.toLowerCase().includes(query) ||
     tool.category.toLowerCase().includes(query)
