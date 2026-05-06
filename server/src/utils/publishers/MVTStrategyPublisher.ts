@@ -18,7 +18,6 @@ import { PostGISTileGenerator, type PostGISTileQuery } from './base/PostGISTileG
 import { PostGISConnectionManager } from '../PostGISConnectionManager';
 import type { PostGISConnectionConfig } from '../../core';
 import { type MVTTileOptions, type MVTPublishMetadata } from './base/MVTPublisherTypes';
-import { SQLiteManagerInstance } from '../../storage';
 import { DataSourceRepository } from '../../data-access/repositories';
 
 // Type definitions for geojson-vt (library doesn't provide types)
@@ -419,12 +418,86 @@ class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
    * Get a single tile on-demand using PostGIS ST_AsMVT()
    */
   async getTile(tilesetId: string, z: number, x: number, y: number): Promise<Buffer | null> {
-    const cached = this.tileIndexCache.get(tilesetId);
+    let cached = this.tileIndexCache.get(tilesetId);
     
+    // If not in cache, reload from database and metadata
     if (!cached) {
-      console.warn(`[PostGIS MVT Strategy] Tileset not found in cache: ${tilesetId}`);
-      return null;
+      console.log(`[PostGIS MVT Strategy] Tileset not in cache, reloading from source...`);
+      
+      // Read metadata to get source reference
+      const tilesetDir = path.join(this.mvtOutputDir, tilesetId);
+      const metadataPath = path.join(tilesetDir, 'metadata.json');
+      
+      if (!fs.existsSync(metadataPath)) {
+        console.warn(`[PostGIS MVT Strategy] Metadata not found: ${metadataPath}`);
+        return null;
+      }
+      
+      const fileMetadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
+      const sourceReference = fileMetadata.sourceReference;
+      
+      if (!sourceReference) {
+        console.warn(`[PostGIS MVT Strategy] Source reference not found in metadata`);
+        return null;
+      }
+      
+      console.log(`[PostGIS MVT Strategy] Reloading PostGIS connection for: ${sourceReference}`);
+      
+      try {
+        // Query database to get full metadata with connection info
+        const dsr = new DataSourceRepository(this.db).getByReferenceAndType(
+          sourceReference, 
+          'postgis'
+        );
+        
+        if (!dsr) {
+          console.warn(`[PostGIS MVT Strategy] Data source not found in database: ${sourceReference}`);
+          return null;
+        }
+        
+        console.log(`[PostGIS MVT Strategy] Found data source in database, reconnecting...`);
+        
+        // Parse connection info from database metadata
+        const connectionInfo = PostGISConnectionManager.parseReference(
+          sourceReference, 
+          dsr.metadata
+        );
+        
+        if (!connectionInfo) {
+          console.warn(`[PostGIS MVT Strategy] Failed to parse connection info`);
+          return null;
+        }
+        
+        // Recreate connection pool
+        const poolConfig: PostGISConnectionConfig = {
+          host: connectionInfo.host,
+          port: connectionInfo.port,
+          database: connectionInfo.database,
+          user: connectionInfo.user,
+          password: connectionInfo.password,
+          schema: connectionInfo.schema
+        };
+        
+        const pool = await this.tileGenerator.createPool(poolConfig);
+        this.postgisPools.set(tilesetId, pool);
+        
+        // Restore cache entry
+        const { minZoom = 0, maxZoom = 22, extent = 4096, layerName = 'default' } = fileMetadata;
+        cached = {
+          connectionInfo,
+          options: { minZoom, maxZoom, extent, layerName },
+          createdAt: Date.now()
+        };
+        this.tileIndexCache.set(tilesetId, cached);
+        
+        console.log(`[PostGIS MVT Strategy] Connection restored and cached for: ${tilesetId}`);
+      } catch (error) {
+        console.error('[PostGIS MVT Strategy] Failed to reload connection:', error);
+        return null;
+      }
     }
+    
+    console.log(`[PostGIS MVT Strategy] Found cached connection for: ${tilesetId}`);
     
     const { connectionInfo, options } = cached;
     const { layerName = 'default', extent = 4096 } = options;
@@ -443,7 +516,9 @@ class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
         sqlQuery: connectionInfo.sqlQuery,
         geometryColumn: connectionInfo.geometryColumn
       };
-      
+      console.log('[PostGIS MVT Strategy] Generating tile using ST_AsMVT()...');
+      console.log('[PostGIS MVT Strategy] sqlQuery:', connectionInfo.sqlQuery);
+      console.log("[PostGIS MVT Strategy] extent:", extent)
       const result = await this.tileGenerator.generateTile(
         pool,
         z, x, y,
@@ -459,7 +534,6 @@ class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
         console.error('[PostGIS MVT Strategy] Tile generation failed:', result.error);
         return null;
       }
-      
       return result.tileBuffer || null;
       
     } catch (error) {

@@ -119,7 +119,6 @@ export class PostGISTileGenerator {
           error: 'PostGIS query must specify either tableName or sqlQuery'
         };
       }
-
       const result = await pool.query(sql, params);
 
       if (result.rows.length === 0 || !result.rows[0].tile) {
