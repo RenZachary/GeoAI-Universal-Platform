@@ -6,14 +6,11 @@ import { z } from 'zod';
 import type { LLMConfig } from '../adapters/LLMAdapterFactory';
 import { LLMAdapterFactory } from '../adapters/LLMAdapterFactory';
 import type { PromptManager } from '../managers/PromptManager';
-import type { GeoAIStateType, ExecutionPlan, ExecutionStep} from '../workflow/GeoAIGraph';
+import type { GeoAIStateType, ExecutionPlan, ExecutionStep } from '../workflow/GeoAIGraph';
 import { ToolRegistryInstance } from '../../plugin-orchestration';
 import { DataSourceRepository } from '../../data-access/repositories';
 import { SQLiteManagerInstance } from '../../storage/';
 import { PluginCapabilityRegistry } from '../../plugin-orchestration';
-import { GeometryAdapter } from '../../utils/GeometryAdapter';
-import type {  ExecutionCategory } from '../../core/index';
-import { GOAL_TO_EXECUTION_CATEGORY } from '../../core/index';
 
 export class TaskPlannerAgent {
   private llmConfig: LLMConfig;
@@ -52,7 +49,7 @@ export class TaskPlannerAgent {
 
       // Get available tools for context
       const allTools = ToolRegistryInstance.listToolsWithMetadata();
-      
+
       // Get available data sources with metadata
       const dataSources = this.dataSourceRepo.listAll();
       const dataSourcesMetadata = this.formatDataSourcesForLLM(dataSources);
@@ -87,16 +84,16 @@ export class TaskPlannerAgent {
           // STAGE 1: Use required executors from goal (no filtering needed)
           console.log(`[Task Planner] Stage 1: Processing goal ${goal.id}`);
           console.log(`[Task Planner] Required executors:`, goal.requiredExecutors);
-          
+
           // Use the required executors directly - no category filtering
           const compatiblePluginIds = goal.requiredExecutors || [];
-          
+
           if (compatiblePluginIds.length === 0) {
             console.warn(`[Task Planner] No executors specified for goal ${goal.id}`);
           }
-          
+
           console.log(`[Task Planner] Stage 1: Found ${compatiblePluginIds.length} required executors:`, compatiblePluginIds);
-          
+
           // If no compatible plugins found, create fallback plan
           if (compatiblePluginIds.length === 0) {
             console.warn(`[Task Planner] No compatible plugins found for goal ${goal.id}`);
@@ -107,14 +104,14 @@ export class TaskPlannerAgent {
             };
             return [goal.id, fallbackPlan] as const;
           }
-          
+
           // Filter tools to only include compatible ones
-          const compatibleTools = allTools.filter(tool => 
+          const compatibleTools = allTools.filter(tool =>
             compatiblePluginIds.includes(tool.id)
           );
-          
+
           console.log(`[Task Planner] Stage 2: LLM selection from ${compatibleTools.length} candidates`);
-          
+
           // Prepare previous results context for multi-goal scenarios
           let previousResultsContext = '';
           if (state.executionResults && state.executionResults.size > 0) {
@@ -131,17 +128,16 @@ export class TaskPlannerAgent {
                 });
               }
             }
-            
+
             if (previousGoalsResults.length > 0) {
               previousResultsContext = JSON.stringify(previousGoalsResults, null, 2);
               console.log(`[Task Planner] Providing ${previousGoalsResults.length} previous results as context`);
             }
           }
-          
+
           // STAGE 2: LLM-based selection from filtered candidates
           const plan = await chain.invoke({
             goalDescription: goal.description,
-            goalType: goal.type,
             availableTools: JSON.stringify(compatibleTools, null, 2),
             dataSourcesMetadata,
             availablePlugins: JSON.stringify(compatibleTools.map(t => ({
@@ -166,7 +162,7 @@ export class TaskPlannerAgent {
           // STAGE 3: Validate terminal node constraints
           console.log(`[Task Planner] Stage 3: Validating terminal node constraints for goal ${goal.id}`);
           const validatedPlan = this.validateTerminalNodeConstraints(deduplicatedPlan, compatiblePluginIds);
-          
+
           if (!validatedPlan) {
             console.warn(`[Task Planner] Plan failed terminal node validation, creating fallback`);
             const fallbackPlan: ExecutionPlan = {
@@ -181,14 +177,14 @@ export class TaskPlannerAgent {
           return [goal.id, validatedPlan] as const;
         } catch (error) {
           console.error(`[Task Planner] Failed to plan goal ${goal.id}:`, error);
-          
+
           // Create fallback plan
           const fallbackPlan: ExecutionPlan = {
             goalId: goal.id,
             steps: [],
             requiredPlugins: []
           };
-          
+
           return [goal.id, fallbackPlan] as const;
         }
       });
@@ -205,7 +201,7 @@ export class TaskPlannerAgent {
 
     } catch (error) {
       console.error('[Task Planner] Failed to create execution plans:', error);
-      
+
       // Fallback: Create empty plans for all goals
       const fallbackPlans = new Map<string, ExecutionPlan>();
       state.goals.forEach(goal => {
@@ -246,32 +242,32 @@ export class TaskPlannerAgent {
         `  Type: ${ds.type}`,
         `  Description: ${ds.metadata?.description || 'No description'}`
       ];
-      
+
       // Add type-specific info
       if (ds.type === 'postgis') {
         const refParts = ds.reference?.split('/') || [];
         const tableName = refParts[refParts.length - 1] || 'unknown';
         lines.push(`  Table: ${tableName}`);
-        
+
         // Add geometry info if available
         if (ds.metadata?.geometryType) {
           lines.push(`  Geometry: ${ds.metadata.geometryType} (SRID: ${ds.metadata.srid || 'unknown'})`);
         }
-        
+
         // Add row count if available
         if (ds.metadata?.rowCount !== undefined) {
           lines.push(`  Rows: ${ds.metadata.rowCount.toLocaleString()}`);
         }
-        
+
         // Add field information if available in metadata
         if (ds.metadata?.fields && Array.isArray(ds.metadata.fields)) {
-          const numericFields = ds.metadata.fields.filter((f: any) => 
+          const numericFields = ds.metadata.fields.filter((f: any) =>
             ['integer', 'numeric', 'float', 'double precision', 'real'].includes(f.dataType?.toLowerCase())
           );
-          const textFields = ds.metadata.fields.filter((f: any) => 
+          const textFields = ds.metadata.fields.filter((f: any) =>
             ['character varying', 'text', 'varchar', 'char'].includes(f.dataType?.toLowerCase())
           );
-          
+
           if (numericFields.length > 0) {
             lines.push(`  Numeric Fields: ${numericFields.map((f: any) => f.columnName).join(', ')}`);
           }
@@ -281,21 +277,21 @@ export class TaskPlannerAgent {
         }
       } else if (ds.type === 'geojson' || ds.type === 'shapefile') {
         lines.push(`  File: ${ds.reference?.split('/').pop() || 'unknown'}`);
-        
+
         // Add geometry type if available
         if (ds.metadata?.geometryType) {
           lines.push(`  Geometry: ${ds.metadata.geometryType}`);
         }
-        
+
         // Add feature count if available
         if (ds.metadata?.featureCount !== undefined) {
           lines.push(`  Features: ${ds.metadata.featureCount.toLocaleString()}`);
         }
-        
+
         // Add field information if available
         if (ds.metadata?.fields && Array.isArray(ds.metadata.fields)) {
           const sampleValues = ds.metadata.sampleValues || {};
-          
+
           // Support both formats: string[] or Array<{name: string; type: string}>
           const fieldInfo = ds.metadata.fields.slice(0, 8).map((field: any) => {
             // If field is an object with name and type
@@ -321,7 +317,7 @@ export class TaskPlannerAgent {
           lines.push(`  Fields: ${fieldInfo.join(', ')}`);
         }
       }
-      
+
       return lines.join('\n');
     }).join('\n\n');
 
@@ -378,13 +374,13 @@ export class TaskPlannerAgent {
       console.error(`[Task Planner] VALIDATION FAILED: Terminal node at index ${terminalNodeIndex} is not the last step`);
       console.error(`[Task Planner] Terminal node: ${plan.steps[terminalNodeIndex].pluginId}`);
       console.error(`[Task Planner] Expected at index: ${plan.steps.length - 1}`);
-      
+
       // Fix: Move terminal node to the end
       console.warn(`[Task Planner] Attempting to fix: Moving terminal node to last position`);
       const fixedSteps = [...plan.steps];
       const terminalStep = fixedSteps.splice(terminalNodeIndex, 1)[0];
       fixedSteps.push(terminalStep);
-      
+
       return {
         ...plan,
         steps: fixedSteps
@@ -416,16 +412,16 @@ export class TaskPlannerAgent {
   private getTerminalPluginIds(pluginIds: string[]): string[] {
     // These are known terminal node categories
     const terminalCategories = ['visualization', 'textual'];
-    
+
     const terminalIds: string[] = [];
-    
+
     for (const pluginId of pluginIds) {
       const capability = PluginCapabilityRegistry.getCapability(pluginId);
       if (capability && terminalCategories.includes(capability.executionCategory)) {
         terminalIds.push(pluginId);
       }
     }
-    
+
     return terminalIds;
   }
 

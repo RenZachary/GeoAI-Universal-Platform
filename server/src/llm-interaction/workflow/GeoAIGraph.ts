@@ -8,7 +8,6 @@ import { HumanMessage } from '@langchain/core/messages';
 import type { LLMConfig } from '../adapters/LLMAdapterFactory';
 import type Database from 'better-sqlite3';
 import { PromptManager } from '../managers/PromptManager';
-import type { GoalType } from '../../core/index';
 import { GoalSplitterAgent } from '../agents/GoalSplitterAgent';
 import { TaskPlannerAgent } from '../agents/TaskPlannerAgent';
 import { ToolRegistryInstance } from '../../plugin-orchestration';

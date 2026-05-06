@@ -2,7 +2,6 @@
 Create an execution plan for the given goal using available plugins and data sources.
 
 Goal: {{goalDescription}}
-Goal Type: {{goalType}}
 
 Available Data Sources:
 {{dataSourcesMetadata}}

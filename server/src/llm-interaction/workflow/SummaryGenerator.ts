@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Summary Generator - Generates analysis summaries using templates
  * Supports multi-language and customizable summary styles
@@ -6,7 +7,7 @@
 import { PromptManager } from '../managers/PromptManager';
 import { LLMAdapterFactory } from '../adapters/LLMAdapterFactory';
 import type { LLMConfig } from '../adapters/LLMAdapterFactory';
-import type { GeoAIStateType, AnalysisGoal, AnalysisResult, VisualizationService } from './GeoAIGraph';
+import type { GeoAIStateType, AnalysisResult, VisualizationService } from './GeoAIGraph';
 
 export interface SummaryOptions {
   language?: string;
@@ -131,8 +132,6 @@ export class SummaryGenerator {
         failedGoalsCount = results.filter(r => r.status === 'failed').length;
       }
       variables.failedGoals = failedGoalsCount.toString();
-      
-      variables.goalsList = this.formatGoalsList(state.goals);
     }
 
     // Results summary
@@ -222,7 +221,7 @@ export class SummaryGenerator {
     // Goals information
     if (state.goals && state.goals.length > 0) {
       context.completedGoals = state.goals.length.toString();
-      context.goalsList = state.goals.map(g => `- ${g.description} (${g.type})`).join('\n');
+      context.goalsList = state.goals.map(g => `- ${g.description}`).join('\n');
     } else {
       context.completedGoals = '0';
       context.goalsList = 'No goals were processed.';
@@ -294,17 +293,7 @@ export class SummaryGenerator {
     
     // Header
     summary += '## Analysis Complete\n\n';
-    
-    // Goals processed
-    if (options.includeGoals && state.goals && state.goals.length > 0) {
-      summary += `### Goals Processed (${state.goals.length})\n\n`;
-      state.goals.forEach((goal, index) => {
-        const goalTypeIcon = this.getGoalTypeIcon(goal.type);
-        summary += `${index + 1}. ${goalTypeIcon} **${goal.description}** (${goal.type})\n`;
-      });
-      summary += '\n';
-    }
-    
+        
     // Execution results summary
     if (options.includeResults && state.executionResults) {
       const results = Array.from(state.executionResults.values());
@@ -361,17 +350,6 @@ export class SummaryGenerator {
     
     return summary;
   }
-
-  /**
-   * Helper: Format goals list
-   */
-  private formatGoalsList(goals: AnalysisGoal[]): string {
-    return goals.map((goal, index) => {
-      const icon = this.getGoalTypeIcon(goal.type);
-      return `${index + 1}. ${icon} ${goal.description} (${goal.type})`;
-    }).join('\n');
-  }
-
   /**
    * Helper: Format results summary
    */
@@ -438,20 +416,6 @@ export class SummaryGenerator {
    */
   private formatErrorsList(errors: Array<{ goalId: string; error: string }>): string {
     return errors.map(err => `- ${err.goalId}: ${err.error}`).join('\n');
-  }
-
-  /**
-   * Helper: Get icon for goal type
-   */
-  private getGoalTypeIcon(type: string): string {
-    const icons: Record<string, string> = {
-      'spatial_analysis': '🗺️',
-      'visualization': '📊',
-      'data_processing': '⚙️',
-      'report': '📄',
-      'general': '💬'
-    };
-    return icons[type] || '💬';
   }
 
   /**
