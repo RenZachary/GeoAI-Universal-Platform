@@ -39,7 +39,8 @@ export default {
     rename: '重命名',
     renameConversation: '重命名对话',
     enterNewTitle: '输入新标题',
-    renameConfirm: '确认重命名'
+    renameConfirm: '确认重命名',
+    send: '发送'
   },
   map: {
     title: '地图',

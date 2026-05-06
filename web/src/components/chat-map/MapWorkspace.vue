@@ -344,12 +344,12 @@ function closeFeaturePopup() {
   }
 
   &.basemap-btn {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    // background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     border: none;
-    color: white;
+    // color: white;
 
     &:hover {
-      background: linear-gradient(135deg, #5568d3 0%, #65408b 100%);
+      // background: linear-gradient(135deg, #5568d3 0%, #65408b 100%);
     }
   }
 

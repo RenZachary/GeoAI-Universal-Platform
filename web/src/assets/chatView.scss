@@ -82,13 +82,22 @@
 }
 
 .conversation-item {
-  padding: 12px;
-  border-radius: 8px;
+  padding: 8px;
+  border-radius: 4px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 4px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+
+  .info {
+    display: flex;
+    flex-direction: column;
+    width: 80%;
+    align-items: flex-start;
+    gap: 4px;
+  }
 
   &:hover {
     background: var(--el-fill-color-light);
@@ -101,11 +110,12 @@
 }
 
 .conversation-title {
-  flex: 1;
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 14px;
+  width: 100%;
 }
 
 .conversation-actions {

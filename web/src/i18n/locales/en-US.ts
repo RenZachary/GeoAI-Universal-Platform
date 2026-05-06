@@ -39,7 +39,8 @@ export default {
     rename: 'Rename',
     renameConversation: 'Rename Conversation',
     enterNewTitle: 'Enter new title',
-    renameConfirm: 'Confirm Rename'
+    renameConfirm: 'Confirm Rename',
+    send: 'Send'
   },
   map: {
     title: 'Map',

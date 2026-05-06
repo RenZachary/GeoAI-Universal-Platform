@@ -219,7 +219,7 @@ function handleRegenerate() {
     background: var(--el-fill-color-light);
     
     .message-avatar {
-      background: var(--el-color-success);
+      background: var(--el-color-primary-light-7);
       color: white;
     }
   }
