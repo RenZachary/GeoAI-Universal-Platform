@@ -76,7 +76,12 @@ export class ShapefileAccessor extends GeoJSONBasedAccessor implements DataAcces
       fs.mkdirSync(resultsDir, { recursive: true });
     }
     
-    const filename = `${hint || 'shapefile'}_${Date.now()}.geojson`;
+    // If hint is provided and looks like a UUID, use it as filename for consistency
+    // Otherwise generate a new ID
+    const fileId = (hint && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(hint)) 
+      ? hint 
+      : generateId();
+    const filename = `${fileId}.geojson`;
     const filepath = path.join(resultsDir, filename);
     fs.writeFileSync(filepath, JSON.stringify(geojson, null, 2), 'utf-8');
     return filepath;

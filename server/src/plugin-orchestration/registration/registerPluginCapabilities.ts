@@ -146,6 +146,30 @@ export function registerAllPluginCapabilities(): void {
         isTerminalNode: true
       },
       priority: 6
+    },
+
+    // Query Plugins - Utility
+    'data_source_query': {
+      executionCategory: 'statistical' as const,
+      inputRequirements: {
+        supportedDataFormats: ['vector', 'raster']
+      },
+      outputCapabilities: {
+        outputType: 'native_data',
+        isTerminalNode: true  // ← 改为 true，作为最终输出
+      },
+      priority: 8
+    },
+    'general_qa': {
+      executionCategory: 'computational' as const,
+      inputRequirements: {
+        supportedDataFormats: ['vector', 'raster']
+      },
+      outputCapabilities: {
+        outputType: 'native_data',
+        isTerminalNode: false
+      },
+      priority: 7
     }
   };
 

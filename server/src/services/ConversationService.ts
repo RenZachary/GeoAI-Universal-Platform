@@ -92,14 +92,15 @@ export class ConversationService {
   getConversation(conversationId: string): ChatMessage[] {
     try {
       const messages = this.db.prepare(`
-        SELECT role, content, timestamp, services
+        SELECT id, role, content, timestamp, services
         FROM conversation_messages
         WHERE conversation_id = ?
         ORDER BY timestamp ASC
-      `).all(conversationId) as Array<{ role: string; content: string; timestamp: string; services: string | null }>;
+      `).all(conversationId) as Array<{ id: number; role: string; content: string; timestamp: string; services: string | null }>;
 
-      // Deserialize services JSON
+      // Deserialize services JSON and convert to frontend format
       return messages.map(msg => ({
+        id: msg.id.toString(),  // Convert number to string for frontend compatibility
         role: msg.role,
         content: msg.content,
         timestamp: msg.timestamp,

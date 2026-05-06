@@ -653,5 +653,5 @@ function scrollToBottom() {
 </script>
 
 <style scoped lang="scss">
-@import '../assets/chatView.scss';
+@use './../assets/chatView.scss';
 </style>

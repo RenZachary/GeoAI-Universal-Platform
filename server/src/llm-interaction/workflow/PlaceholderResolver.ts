@@ -80,6 +80,11 @@ function tryResolvePlaceholder(value: string, executionResults: Map<string, Exec
   // Extract the result value from metadata.result
   const resultValue = result.data.metadata?.result;
   
+  // Special case: if accessing .id field, return NativeData.id directly
+  if (fieldPath === 'id') {
+    return result.data.id;
+  }
+  
   if (resultValue === undefined) {
     console.warn(`[Placeholder Resolver] metadata.result is undefined for step: ${stepId}`);
     return undefined;

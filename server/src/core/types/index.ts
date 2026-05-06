@@ -14,10 +14,10 @@
  */
 export type GoalType = 
   | 'spatial_analysis'   // Spatial operations (buffer, overlay, etc.)
-  | 'data_processing'    // Statistical calculations, aggregation, filtering
+  | 'data_processing'    // Statistical calculations, aggregation, filtering, metadata queries
   | 'visualization'      // Map rendering, thematic visualization
   | 'report'             // Document generation, summary creation
-  | 'general';           // General queries, text-based responses
+  | 'general';           // General queries, greetings, capability inquiries
 
 /**
  * Execution categories for plugin capability matching
@@ -38,7 +38,7 @@ export const GOAL_TO_EXECUTION_CATEGORY: Record<GoalType, ExecutionCategory> = {
   'data_processing': 'statistical',
   'visualization': 'visualization',
   'report': 'textual',
-  'general': 'textual'
+  'general': 'computational'
 };
 
 /**

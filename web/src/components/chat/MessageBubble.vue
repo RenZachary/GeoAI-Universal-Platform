@@ -35,7 +35,7 @@
             </el-icon>
             <span class="service-name">{{ getServiceName(service) }}</span>
             <el-button 
-              v-if="service.type !== VisualizationServiceType.GeoJSON"
+              
               link 
               type="primary" 
               size="small"
@@ -197,12 +197,18 @@ function handleRegenerate() {
   // Get the previous user message
   const messages = chatStore.currentMessages
   const currentIndex = messages.findIndex((m: ChatMessage) => m.id === props.message.id)
-  if (currentIndex <= 0) return
+  
+  if (currentIndex <= 0) {
+    return
+  }
   
   const lastUserMessage = messages[currentIndex - 1]
-  if (lastUserMessage.role !== 'user') return
   
-  // Simply re-send the user message to regenerate (backend will handle conversation context)
+  if (!lastUserMessage || lastUserMessage.role !== 'user') {
+    return
+  }
+  
+  // Re-send the user message to regenerate (backend will handle conversation context)
   chatStore.sendMessage(lastUserMessage.content)
 }
 </script>

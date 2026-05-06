@@ -46,6 +46,7 @@ export const useChatStore = defineStore('chat', () => {
   }
   
   async function sendMessage(message: string, onEvent?: (event: any) => void) {
+    console.log('[Chat Store] sendMessage called with message:', message.substring(0, 50) + '...')
     isStreaming.value = true
     
     // Immediately create user and empty assistant messages for better UX
@@ -57,6 +58,8 @@ export const useChatStore = defineStore('chat', () => {
     console.log('[Chat Store] Creating initial messages for conversation:', conversationId)
     
     const currentMsgs = messages.value.get(conversationId) || []
+    console.log('[Chat Store] Current messages count:', currentMsgs.length)
+    
     const updatedMsgs: ChatMessage[] = [
       ...currentMsgs,
       {
@@ -73,7 +76,7 @@ export const useChatStore = defineStore('chat', () => {
       }
     ]
     
-    console.log('[Chat Store] Initial messages count:', updatedMsgs.length)
+    console.log('[Chat Store] Updated messages count:', updatedMsgs.length)
     
     // Force Vue reactivity
     const newMap = new Map(messages.value)

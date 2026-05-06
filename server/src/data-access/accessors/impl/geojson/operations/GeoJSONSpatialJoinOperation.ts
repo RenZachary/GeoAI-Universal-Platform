@@ -71,10 +71,12 @@ export class GeoJSONSpatialJoinOperation {
         features: resultFeatures
       };
 
-      const resultPath = await saveGeoJSON(result, 'spatial_join');
+      // Generate ID first, then use it for filename to ensure consistency
+      const resultId = generateId();
+      const resultPath = await saveGeoJSON(result, resultId);
 
       return {
-        id: generateId(),
+        id: resultId,
         type: 'geojson',
         reference: resultPath,
         metadata: {

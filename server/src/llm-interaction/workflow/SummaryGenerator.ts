@@ -242,6 +242,9 @@ export class SummaryGenerator {
       // Format results summary for template
       context.resultsSummary = this.formatResultsSummary(results, successCount, failCount);
       
+      // ← 添加详细的结果数据（包括 metadata.summary）
+      context.resultDetails = this.formatResultDetails(results);
+      
       // Format successful operations
       const successOps = results.filter(r => r.status === 'success');
       context.successfulOperations = successOps.length > 0
@@ -334,32 +337,6 @@ export class SummaryGenerator {
       }
     }
     
-    // Visualization services
-    if (options.includeServices && state.visualizationServices && state.visualizationServices.length > 0) {
-      summary += `### Generated Services (${state.visualizationServices.length})\n\n`;
-      
-      state.visualizationServices.forEach((service, index) => {
-        const serviceIcon = this.getServiceTypeIcon(service.type);
-        summary += `${index + 1}. ${serviceIcon} **${service.type.toUpperCase()} Service**\n`;
-        summary += `   - URL: \`${service.url}\`\n`;
-        summary += `   - TTL: ${Math.round(service.ttl / 60000)} minutes\n`;
-        if (service.metadata?.resultType) {
-          summary += `   - Data Type: ${service.metadata.resultType}\n`;
-        }
-        
-        // Add action links based on service type
-        if (service.type === 'mvt' || service.type === 'image') {
-          summary += `   - 🗺️ [View on Map](${service.url})\n`;
-        } else if (service.type === 'geojson') {
-          summary += `   - 📥 [Download GeoJSON](${service.url})\n`;
-        } else if (service.type === 'report') {
-          summary += `   - 📄 [View Report](${service.url})\n`;
-        }
-        
-        summary += '\n';
-      });
-    }
-    
     // Errors encountered
     if (options.includeErrors && state.errors && state.errors.length > 0) {
       summary += `### ⚠️ Warnings & Errors\n\n`;
@@ -419,6 +396,31 @@ export class SummaryGenerator {
     }
     
     return summary;
+  }
+
+  /**
+   * Helper: Format detailed result information - pass raw data to LLM
+   */
+  private formatResultDetails(results: AnalysisResult[]): string {
+    const details: string[] = [];
+    
+    for (const result of results) {
+      if (result.status !== 'success' || !result.data) continue;
+      
+      const pluginName = result.metadata?.pluginId || 'Unknown';
+      
+      // Pass the complete result structure to LLM
+      // Let LLM understand and summarize it naturally
+      const resultData = {
+        plugin: pluginName,
+        operation: result.metadata?.parameters?.operation || 'unknown',
+        data: result.data.metadata?.result || result.data.metadata
+      };
+      
+      details.push(JSON.stringify(resultData, null, 2));
+    }
+    
+    return details.length > 0 ? details.join('\n\n') : 'No detailed results available.';
   }
 
   /**

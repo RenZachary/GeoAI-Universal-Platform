@@ -25,10 +25,12 @@ export class GeoJSONFilterOperation {
         crs: geojson.crs
       };
 
-      const resultPath = await saveGeoJSON(result, 'filtered');
+      // Generate ID first, then use it for filename to ensure consistency
+      const resultId = generateId();
+      const resultPath = await saveGeoJSON(result, resultId);
 
       return {
-        id: generateId(),
+        id: resultId,
         type: 'geojson',
         reference: resultPath,
         metadata: extractMetadata(result, resultPath),

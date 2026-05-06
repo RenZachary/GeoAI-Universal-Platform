@@ -22,6 +22,12 @@ export class ServicePublisher {
             return null;
         }
 
+        // Skip metadata-only results (e.g., data source queries)
+        if (result.data.metadata?.isMetadataOnly) {
+            console.log(`[Service Publisher] Skipping metadata-only result: ${stepId}`);
+            return null;
+        }
+
         // Determine service type and URL based on data type
         const serviceType = this.determineServiceType(result.data.type);
         // Use result.data.id for URL generation (actual file ID)

@@ -32,6 +32,12 @@ Rules:
 - The step_id must exactly match the stepId from a previous step
 - For nested fields, use dot notation: {step_id.result.fieldName}
 
+CRITICAL RULES FOR DATA DEPENDENCIES:
+1. When a visualization plugin follows an analysis step, you MUST pass the analysis result's ID as dataSourceId using placeholder syntax.
+2. Use the pattern: "dataSourceId": "{previous_step_id.result.id}" to reference the NativeData.id from the previous step's output.
+3. NEVER pass the original data source ID to visualization plugins when there's a preceding analysis step that produces new geometry.
+4. The .result.id field contains the unique identifier of the previous step's NativeData output, which is required for loading that specific processed result.
+
 Each plugin's outputSchema defines what fields are available in .result. Check the plugin documentation for details.
 
 Choropleth Map Generation Pattern:

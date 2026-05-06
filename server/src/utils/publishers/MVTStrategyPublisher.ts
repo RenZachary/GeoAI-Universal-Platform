@@ -260,7 +260,8 @@ class ShapefileMVTTStrategy implements MVTTileGenerationStrategy {
     // The reference should point to a .shp file, we need to convert it to GeoJSON
     // Since loadGeoJSON is protected, we'll use shapefile library directly
     const shapefilePath = sourceReference.replace('.shp', '');
-    const source = await import('shapefile').then(m => m.default.open(shapefilePath));
+    const shapefileModule = await import('shapefile');
+    const source = await shapefileModule.open(shapefilePath);
     
     const features = [];
     let result;

@@ -13,6 +13,7 @@ import { GeometryAdapter } from '../../../utils/GeometryAdapter';
 import { StyleFactory } from '../../utils/StyleFactory';
 import type Database from 'better-sqlite3';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -142,35 +143,89 @@ export abstract class BaseRendererExecutor {
     nativeData: NativeData;
     accessor: any;
   }> {
-    // Get data source from database
+    console.log(`[${this.constructor.name}] Loading data source: ${dataSourceId}`);
+    
+    // Try to get from database first (original data sources)
     const dataSource = this.dataSourceRepo.getById(dataSourceId);
-    if (!dataSource) {
-      throw new Error(`Data source not found: ${dataSourceId}`);
+    
+    if (dataSource) {
+      // Case 1: dataSourceId is a registered data source in database
+      console.log(`[${this.constructor.name}] Found data source in database: ${dataSource.name}`);
+      
+      // Get geometry type from metadata (already stored in SQLite during ingestion)
+      const geometryType = GeometryAdapter.getGeometryTypeFromMetadata(dataSource);
+      
+      if (!geometryType) {
+        console.warn(`[${this.constructor.name}] Geometry type not found in metadata for data source ${dataSourceId}`);
+        console.warn(`[${this.constructor.name}] Will attempt to detect from data during rendering`);
+      } else {
+        console.log(`[${this.constructor.name}] Geometry type from metadata: ${geometryType}`);
+      }
+      
+      // Create appropriate accessor and read data
+      const accessor = this.accessorFactory.createAccessor(dataSource.type);
+      const nativeData = await accessor.read(dataSource.reference);
+      
+      // Store geometry type in nativeData metadata for StyleFactory to use
+      if (geometryType) {
+        nativeData.metadata = {
+          ...nativeData.metadata,
+          geometryType
+        };
+      }
+      
+      return { dataSource, nativeData, accessor };
     }
     
-    // Get geometry type from metadata (already stored in SQLite during ingestion)
-    const geometryType = GeometryAdapter.getGeometryTypeFromMetadata(dataSource);
+    // Case 2: dataSourceId is a NativeData.id from a previous step result
+    // We need to find the file path from results directory or reconstruct NativeData
+    console.log(`[${this.constructor.name}] Data source ID not found in database, treating as result ID`);
     
-    if (!geometryType) {
-      console.warn(`[${this.constructor.name}] Geometry type not found in metadata for data source ${dataSourceId}`);
-      console.warn(`[${this.constructor.name}] Will attempt to detect from data during rendering`);
-    } else {
-      console.log(`[${this.constructor.name}] Geometry type from metadata: ${geometryType}`);
+    // Search for GeoJSON files in results directory that match this ID
+    const resultsDir = path.join(this.workspaceBase, 'results', 'geojson');
+    const possibleFilePaths = [
+      path.join(resultsDir, `${dataSourceId}.geojson`),
+      // Also check if it's a timestamp-based filename
+      ...(fs.existsSync(resultsDir) ? fs.readdirSync(resultsDir)
+        .filter((f: string) => f.includes(dataSourceId))
+        .map((f: string) => path.join(resultsDir, f)) : [])
+    ];
+    
+    let filePath: string | null = null;
+    for (const p of possibleFilePaths) {
+      if (fs.existsSync(p)) {
+        filePath = p;
+        break;
+      }
     }
     
-    // Create appropriate accessor and read data
-    const accessor = this.accessorFactory.createAccessor(dataSource.type);
-    const nativeData = await accessor.read(dataSource.reference);
-    
-    // Store geometry type in nativeData metadata for StyleFactory to use
-    if (geometryType) {
-      nativeData.metadata = {
-        ...nativeData.metadata,
-        geometryType
-      };
+    if (!filePath) {
+      throw new Error(`Cannot find data for ID: ${dataSourceId}. Not in database and no matching file in results directory.`);
     }
     
-    return { dataSource, nativeData, accessor };
+    console.log(`[${this.constructor.name}] Found result file: ${filePath}`);
+    
+    // Detect file type and create appropriate accessor
+    const ext = path.extname(filePath).toLowerCase();
+    const dataSourceType = ext === '.geojson' || ext === '.json' ? 'geojson' : 'shapefile';
+    
+    const accessor = this.accessorFactory.createAccessor(dataSourceType);
+    const nativeData = await accessor.read(filePath);
+    
+    // Create a mock DataSourceRecord for compatibility
+    const mockDataSource: DataSourceRecord = {
+      id: dataSourceId,
+      name: `Result_${dataSourceId.substring(0, 8)}`,
+      type: dataSourceType,
+      reference: filePath,
+      metadata: nativeData.metadata,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    console.log(`[${this.constructor.name}] Loaded result data with ${nativeData.metadata?.featureCount || 0} features`);
+    
+    return { dataSource: mockDataSource, nativeData, accessor };
   }
 
   /**

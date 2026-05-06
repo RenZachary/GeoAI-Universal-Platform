@@ -10,6 +10,8 @@ export { AggregationPlugin } from './analysis/AggregationPlugin';
 export { StatisticsCalculatorPlugin } from './analysis/StatisticsCalculatorPlugin';
 export { ReportGeneratorPlugin } from './reporting/ReportGeneratorPlugin';
 export { HeatmapPlugin } from './visualization/HeatmapPlugin';
+export { DataSourceQueryPlugin } from './query/DataSourceQueryPlugin';
+export { GeneralQAPlugin } from './query/GeneralQAPlugin';
 
 // Phase 2: New visualization renderers
 export { UniformColorRendererPlugin } from './visualization/UniformColorRendererPlugin';
@@ -24,6 +26,8 @@ import { AggregationPlugin } from './analysis/AggregationPlugin';
 import { StatisticsCalculatorPlugin } from './analysis/StatisticsCalculatorPlugin';
 import { ReportGeneratorPlugin } from './reporting/ReportGeneratorPlugin';
 import { HeatmapPlugin } from './visualization/HeatmapPlugin';
+import { DataSourceQueryPlugin } from './query/DataSourceQueryPlugin';
+import { GeneralQAPlugin } from './query/GeneralQAPlugin';
 
 // Phase 2: New visualization renderers
 import { UniformColorRendererPlugin } from './visualization/UniformColorRendererPlugin';
@@ -38,6 +42,8 @@ export const BUILT_IN_PLUGINS = [
   StatisticsCalculatorPlugin,
   ReportGeneratorPlugin,
   HeatmapPlugin,
+  DataSourceQueryPlugin,
+  GeneralQAPlugin,
   // Phase 2: New renderers
   UniformColorRendererPlugin,
   CategoricalRendererPlugin,

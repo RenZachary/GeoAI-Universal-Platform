@@ -14,6 +14,8 @@ import { FilterExecutor } from '../executor/analysis/FilterExecutor';
 import { AggregationExecutor } from '../executor/analysis/AggregationExecutor';
 import { HtmlReportGeneratorExecutor } from '../executor/reporting/HtmlReportGeneratorExecutor';
 import { HeatmapExecutor } from '../executor/visualization/HeatmapExecutor';
+import { DataSourceQueryExecutor } from '../executor/query/DataSourceQueryExecutor';
+import { GeneralQAExecutor } from '../executor/query/GeneralQAExecutor';
 
 // Phase 2: New visualization renderers
 import { UniformColorExecutor } from '../executor/visualization/UniformColorExecutor';
@@ -101,5 +103,19 @@ export const BUILTIN_EXECUTORS: ExecutorClassRef[] = [
     executorClass: HtmlReportGeneratorExecutor,
     requiresDb: false,
     requiresWorkspace: true
+  },
+
+  // Query Executors
+  {
+    pluginId: 'data_source_query',
+    executorClass: DataSourceQueryExecutor,
+    requiresDb: true,
+    requiresWorkspace: false
+  },
+  {
+    pluginId: 'general_qa',
+    executorClass: GeneralQAExecutor,
+    requiresDb: true,
+    requiresWorkspace: false
   }
 ];
