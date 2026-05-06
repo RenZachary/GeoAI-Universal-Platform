@@ -295,7 +295,15 @@ function handleQuickAction(action: string) {
     statistics: 'Calculate statistics for my dataset'
   }
 
-  inputMessage.value = prompts[action] || ''
+  const promptText = prompts[action] || ''
+  inputMessage.value = promptText
+  
+  // Also update the contenteditable editor
+  if (editorRef.value) {
+    editorRef.value.innerText = promptText
+    // Focus the editor
+    editorRef.value.focus()
+  }
 }
 
 // Autocomplete handlers
