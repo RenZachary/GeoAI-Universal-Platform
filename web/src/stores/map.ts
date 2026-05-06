@@ -336,15 +336,37 @@ export const useMapStore = defineStore('map', () => {
       minzoom: layer.minZoom || 0,
       maxzoom: layer.maxZoom || 22
     })
-
+    
     map.addLayer({
       id: layer.id,
       type: 'fill',
       source: layer.id,
-      'source-layer': layer.sourceLayer || 'default',
+      'source-layer': layer.sourceLayer || layer.metadata?.tableName || 'default',
       paint: {
         'fill-color': layer.style?.fillColor || '#409eff',
         'fill-opacity': layer.style?.fillOpacity || layer.opacity || 0.5
+      }
+    })
+    map.addLayer({
+      id: `${layer.id}-outline`,
+      type: 'line',
+      source: layer.id,
+      'source-layer': layer.sourceLayer || layer.metadata?.tableName || 'default',
+      paint: {
+        'line-color': '#000000',
+        'line-width': 10
+      }
+    })
+    // 点状
+    map.addLayer({
+      id: `${layer.id}-point`,
+      type: 'circle',
+      source: layer.id,
+      'source-layer': layer.sourceLayer || layer.metadata?.tableName || 'default',
+      paint: {
+        'circle-radius': 5,
+        'circle-color': '#409eff',
+        'circle-opacity': 0.5
       }
     })
   }

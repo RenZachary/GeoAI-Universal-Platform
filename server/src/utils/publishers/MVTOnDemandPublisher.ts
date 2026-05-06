@@ -188,6 +188,9 @@ export class MVTOnDemandPublisher extends BaseMVTPublisher {
             generatedAt: new Date().toISOString(),
             tableName: source.tableName,
             sqlQuery: source.sqlQuery,
+            schema: source.connection.schema || 'public',  // Save schema from connection
+            geometryColumn: source.geometryColumn || 'geom',  // Save geometry column name
+            layerName: layerName,  // Save layer name for ST_AsMVT
             cacheEnabled: true
           };
           break;
@@ -461,44 +464,73 @@ export class MVTOnDemandPublisher extends BaseMVTPublisher {
     }
 
     const extent = metadata.extent || 4096;
-    const geometryColumn = 'geom';  // TODO: Make configurable
+    const geometryColumn = metadata.geometryColumn || 'geom';  // Get geometry column from metadata
     
     let query: string;
     let params: any[];
 
     if (metadata.tableName) {
-      // Use table name
-      const schema = 'public';  // TODO: Make configurable
+      // Use table name - Use ST_AsMVTGeom to properly transform coordinates to tile space
+      const schema = metadata.schema || 'public';  // Get schema from metadata, default to 'public'
+      console.log(`[MVT On-Demand Publisher] Querying table: ${schema}.${metadata.tableName}, geometryColumn: ${geometryColumn}`);
+      
+      // Debug: Check if table has data and get bbox
+      try {
+        const debugResult = await pool.query(
+          `SELECT COUNT(*) as count, ST_Extent(${geometryColumn}) as extent FROM ${schema}.${metadata.tableName}`
+        );
+        if (debugResult.rows.length > 0) {
+          console.log(`[MVT On-Demand Publisher] Table stats - Count: ${debugResult.rows[0].count}, Extent: ${debugResult.rows[0].extent}`);
+        }
+      } catch (debugError) {
+        console.warn('[MVT On-Demand Publisher] Debug query failed:', debugError);
+      }
+      
       query = `
         SELECT ST_AsMVT(q, $1, $2, 'geom') as tile
         FROM (
-          SELECT ${geometryColumn}
+          SELECT ST_AsMVTGeom(
+            ST_Transform(${geometryColumn}, 3857),
+            ST_TileEnvelope($3, $4, $5),
+            $2,
+            0,
+            true
+          ) as geom
           FROM ${schema}.${metadata.tableName}
-          WHERE ST_Intersects(${geometryColumn}, ST_TileEnvelope($3, $4, $5))
+          WHERE ST_Intersects(ST_Transform(${geometryColumn}, 3857), ST_TileEnvelope($3, $4, $5))
         ) q
       `;
-      params = [extent, 'default', z, x, y];
+      params = [metadata.layerName || metadata.tableName || 'default_layer', extent, z, x, y];
     } else if (metadata.sqlQuery) {
-      // Use custom SQL query
+      // Use custom SQL query - assume the query already handles projection or returns 3857
       query = `
-        SELECT ST_AsMVT(q, $1, $2, 'geom') as tile
+        SELECT ST_AsMVT(q, $1, $2, $3) as tile
         FROM (
           ${metadata.sqlQuery}
         ) q
-        WHERE ST_Intersects(geom, ST_TileEnvelope($3, $4, $5))
+        WHERE ST_Intersects(${geometryColumn}, ST_TileEnvelope($4, $5, $6))
       `;
-      params = [extent, 'default', z, x, y];
+      params = [metadata.layerName || 'default_layer', extent, geometryColumn, z, x, y];
     } else {
       throw new Error('Invalid PostGIS metadata');
     }
 
     try {
+      console.log(`[MVT On-Demand Publisher] Executing query for tile ${z}/${x}/${y}`);
+      console.log(`[MVT On-Demand Publisher] Query params:`, params);
+      
       const result = await pool.query(query, params);
       
+      console.log(`[MVT On-Demand Publisher] Query result rows: ${result.rows.length}`);
+      
       if (result.rows.length === 0 || !result.rows[0].tile) {
+        console.log(`[MVT On-Demand Publisher] Empty tile returned for ${z}/${x}/${y}`);
         return null;  // Empty tile
       }
 
+      const tileSize = result.rows[0].tile.length;
+      console.log(`[MVT On-Demand Publisher] Tile size: ${tileSize} bytes for ${z}/${x}/${y}`);
+      
       return result.rows[0].tile;
     } catch (error) {
       console.error('[MVT On-Demand Publisher] PostGIS tile query failed:', error);

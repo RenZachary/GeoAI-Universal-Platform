@@ -102,7 +102,7 @@ export class DataSourcePublishingService {
   }> {
     // Check if already published
     const isPublished = await this.isPublished(dataSourceId);
-    
+    console.log(`[DataSourcePublishingService] Checking publication status for data source: ${dataSourceId}, isPublished: ${isPublished}`);
     if (!isPublished) {
       console.log(`[DataSourcePublishingService] Data source ${dataSourceId} not published, publishing now...`);
       await this.publishDataSource(dataSourceId);
@@ -140,6 +140,23 @@ export class DataSourcePublishingService {
         throw new Error(`PostGIS data source missing connection info: ${dataSource.id}`);
       }
 
+      // Debug: Log metadata to see what's available
+      // console.log('[DataSourcePublishingService] PostGIS metadata:', JSON.stringify(dataSource.metadata, null, 2));
+
+      // Extract tableName - check multiple possible locations
+      const tableName = dataSource.metadata.tableName || 
+                       (dataSource.metadata.result && typeof dataSource.metadata.result === 'object' ? dataSource.metadata.result.table : undefined);
+      const sqlQuery = dataSource.metadata.sqlQuery;
+
+      if (!tableName && !sqlQuery) {
+        throw new Error(
+          `PostGIS data source must have either tableName or sqlQuery in metadata. ` +
+          `Data source ID: ${dataSource.id}, Metadata keys: ${Object.keys(dataSource.metadata).join(', ')}`
+        );
+      }
+
+      console.log(`[DataSourcePublishingService] Using tableName: ${tableName}, sqlQuery: ${sqlQuery ? 'present' : 'not present'}`);
+
       source = {
         type: 'postgis',
         connection: {
@@ -147,9 +164,11 @@ export class DataSourcePublishingService {
           port: connection.port || 5432,
           database: connection.database,
           user: connection.user,
-          password: connection.password || '' // Should be decrypted in real implementation
+          password: connection.password || '', // Should be decrypted in real implementation
+          schema: connection.schema || dataSource.metadata.schema || 'public'  // Include schema
         },
-        tableName: dataSource.metadata.tableName,
+        tableName: tableName,
+        sqlQuery: sqlQuery,
         geometryColumn: dataSource.metadata.geometryColumn || 'geom'
       };
     } else if (dataSource.type === 'shapefile') {
@@ -202,7 +221,7 @@ export class DataSourcePublishingService {
       extent: 4096,
       tolerance: 3,
       buffer: 64,
-      layerName: dataSource.name.replace(/[^a-zA-Z0-9_-]/g, '_'),
+      layerName: 'default',  // Use 'default' as layer name to match frontend expectation
       tilesetId: dataSource.id  // Use data source ID as tileset ID
     };
 
