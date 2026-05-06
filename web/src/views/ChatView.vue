@@ -3,13 +3,27 @@
     <!-- Conversation Sidebar -->
     <aside class="conversation-sidebar" :class="{ collapsed: sidebarCollapsed }">
       <div class="sidebar-header">
-        <el-button v-if="!sidebarCollapsed" type="primary" size="small" @click="handleNewChat" :icon="Plus">
-          {{ $t('chat.newChat') }}
+        <el-button 
+          v-if="!sidebarCollapsed" 
+          class="new-chat-btn"
+          type="primary" 
+          size="default" 
+          @click="handleNewChat"
+        >
+          <el-icon><Plus /></el-icon>
+          <span>{{ $t('chat.newChat') }}</span>
         </el-button>
-        <el-button class="sidebar-toggle-btn" text @click="sidebarCollapsed = !sidebarCollapsed"
-          :title="sidebarCollapsed ? 'Expand' : 'Collapse'">
-          {{ sidebarCollapsed ? '▶' : '◀' }}
-        </el-button>
+        <el-tooltip :content="sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'" placement="right">
+          <el-button 
+            class="sidebar-toggle-btn" 
+            text 
+            circle
+            @click="sidebarCollapsed = !sidebarCollapsed"
+          >
+            <el-icon v-if="sidebarCollapsed"><DArrowRight /></el-icon>
+            <el-icon v-else><DArrowLeft /></el-icon>
+          </el-button>
+        </el-tooltip>
       </div>
 
       <div v-if="!sidebarCollapsed" class="conversation-list">
@@ -111,7 +125,7 @@ import MessageBubble from '@/components/chat/MessageBubble.vue'
 import WorkflowStatusIndicator from '@/components/chat/WorkflowStatusIndicator.vue'
 import SplitPane from '@/components/chat-map/SplitPane.vue'
 import MapWorkspace from '@/components/chat-map/MapWorkspace.vue'
-import { Plus, Delete, ChatDotRound, Promotion, Folder } from '@element-plus/icons-vue'
+import { Plus, Delete, ChatDotRound, Promotion, Folder, DArrowRight, DArrowLeft } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 
 const { t } = useI18n()
@@ -379,17 +393,60 @@ function handleViewOnMap(service: any) {
 }
 
 .sidebar-header {
-  padding: 8px 0px;
-  border-bottom: 1px solid var(--el-border-color);
+  padding: 16px 12px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
   display: flex;
   gap: 8px;
   align-items: center;
-  justify-content: space-around;
-}
+  justify-content: space-between;
+  background: linear-gradient(135deg, var(--el-bg-color) 0%, var(--el-fill-color-lighter) 100%);
+  transition: all 0.3s ease;
 
-.sidebar-toggle-btn {
-  min-width: 32px;
-  padding: 4px 8px;
+  .new-chat-btn {
+    flex: 1;
+    height: 40px;
+    border-radius: 8px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+    }
+
+    .el-icon {
+      font-size: 16px;
+    }
+
+    span {
+      font-size: 14px;
+    }
+  }
+
+  .sidebar-toggle-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    color: var(--el-text-color-secondary);
+
+    &:hover {
+      background: var(--el-fill-color);
+      color: var(--el-color-primary);
+      transform: scale(1.1);
+    }
+
+    .el-icon {
+      font-size: 16px;
+    }
+  }
 }
 
 .conversation-list {
