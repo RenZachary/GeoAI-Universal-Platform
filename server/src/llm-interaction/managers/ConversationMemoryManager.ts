@@ -57,11 +57,11 @@ export class SQLiteMessageHistory extends BaseChatMessageHistory {
     `).get(this.conversationId) as { count: number };
 
     if (conversationExists.count === 0) {
-      // Create conversation record with default values
+      // Create conversation record with empty title (will be generated from first message)
       this.db.prepare(`
         INSERT INTO conversations (id, title, created_at, updated_at)
-        VALUES (?, ?, datetime('now'), datetime('now'))
-      `).run(this.conversationId, `Conversation ${this.conversationId}`);
+        VALUES (?, '', datetime('now'), datetime('now'))
+      `).run(this.conversationId);
     }
 
     this.db.prepare(`

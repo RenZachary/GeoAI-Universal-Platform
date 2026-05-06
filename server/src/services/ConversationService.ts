@@ -31,33 +31,48 @@ export class ConversationService {
    */
   listConversations(): ConversationSummary[] {
     try {
-      // Get conversation summaries
+      // Get conversation summaries with custom titles from conversations table
       const conversations = this.db.prepare(`
-        SELECT DISTINCT conversation_id as id, 
-               MIN(timestamp) as created_at,
-               MAX(timestamp) as updated_at,
-               COUNT(*) as message_count
-        FROM conversation_messages
-        GROUP BY conversation_id
+        SELECT 
+          cm.conversation_id as id,
+          MIN(cm.timestamp) as created_at,
+          MAX(cm.timestamp) as updated_at,
+          COUNT(*) as message_count,
+          c.title as custom_title
+        FROM conversation_messages cm
+        LEFT JOIN conversations c ON cm.conversation_id = c.id
+        GROUP BY cm.conversation_id
         ORDER BY updated_at DESC
-      `).all() as Array<{ id: string; created_at: string; updated_at: string; message_count: number }>;
+      `).all() as Array<{ 
+        id: string; 
+        created_at: string; 
+        updated_at: string; 
+        message_count: number;
+        custom_title: string | null;
+      }>;
 
-      // Enrich with titles from first user message
+      // Enrich with titles - prefer custom title, fallback to first user message
       return conversations.map(conv => {
-        // Get the first user message as the title
-        const firstUserMessage = this.db.prepare(`
-          SELECT content
-          FROM conversation_messages
-          WHERE conversation_id = ? AND role = 'user'
-          ORDER BY timestamp ASC
-          LIMIT 1
-        `).get(conv.id) as { content: string } | undefined;
-
         let title = 'Untitled';
-        if (firstUserMessage && firstUserMessage.content) {
-          // Use first 50 characters of the first user message as title
-          const content = firstUserMessage.content.trim();
-          title = content.length > 50 ? content.substring(0, 50) + '...' : content;
+        
+        // First, check if there's a custom title in the conversations table (non-empty)
+        if (conv.custom_title && conv.custom_title.trim()) {
+          title = conv.custom_title.trim();
+        } else {
+          // Fallback: Get the first user message as the title
+          const firstUserMessage = this.db.prepare(`
+            SELECT content
+            FROM conversation_messages
+            WHERE conversation_id = ? AND role = 'user'
+            ORDER BY timestamp ASC
+            LIMIT 1
+          `).get(conv.id) as { content: string } | undefined;
+
+          if (firstUserMessage && firstUserMessage.content) {
+            // Use first 50 characters of the first user message as title
+            const content = firstUserMessage.content.trim();
+            title = content.length > 50 ? content.substring(0, 50) + '...' : content;
+          }
         }
 
         return {
