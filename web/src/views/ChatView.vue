@@ -460,72 +460,82 @@ function selectDataSource(ds: any) {
   const spaceIndex = afterAtSymbol.indexOf(' ')
   const mentionEnd = spaceIndex === -1 ? afterAtSymbol.length : spaceIndex
   
-  // Create a new range to replace the @mention
-  // We need to walk back from current cursor position to find the @ symbol
-  const replaceRange = document.createRange()
-  
-  // Start from the current position and walk backwards
-  let currentNode: Node | null = range.startContainer
-  let currentOffset = range.startOffset
-  let charsToWalkBack = mentionEnd + 1 // +1 for the @ symbol
-  
-  // Walk back through text nodes to find the start of the @mention
-  while (charsToWalkBack > 0 && currentNode) {
-    if (currentNode.nodeType === Node.TEXT_NODE) {
-      const textLength = (currentNode as Text).length
-      if (currentOffset >= charsToWalkBack) {
-        // The @ is in this node
-        replaceRange.setStart(currentNode, currentOffset - charsToWalkBack)
-        charsToWalkBack = 0
+  try {
+    // Create a new range to replace the @mention
+    const replaceRange = document.createRange()
+    
+    // Walk back from current cursor position to find the @ symbol
+    let currentNode: Node | null = range.startContainer
+    let currentOffset = range.startOffset
+    let charsToWalkBack = mentionEnd + 1 // +1 for the @ symbol
+    
+    // Walk back through text nodes to find the start of the @mention
+    while (charsToWalkBack > 0 && currentNode) {
+      if (currentNode.nodeType === Node.TEXT_NODE) {
+        const textLength = (currentNode as Text).length
+        if (currentOffset >= charsToWalkBack) {
+          // The @ is in this node
+          replaceRange.setStart(currentNode, currentOffset - charsToWalkBack)
+          charsToWalkBack = 0
+        } else {
+          // Move to previous sibling
+          charsToWalkBack -= currentOffset
+          const prevSibling = currentNode.previousSibling
+          currentNode = prevSibling as Node | null
+          currentOffset = currentNode ? (currentNode.nodeType === Node.TEXT_NODE ? (currentNode as Text).length : 0) : 0
+        }
       } else {
-        // Move to previous sibling
-        charsToWalkBack -= currentOffset
+        // Skip non-text nodes
         const prevSibling = currentNode.previousSibling
         currentNode = prevSibling as Node | null
         currentOffset = currentNode ? (currentNode.nodeType === Node.TEXT_NODE ? (currentNode as Text).length : 0) : 0
       }
-    } else {
-      // Skip non-text nodes
-      const prevSibling = currentNode.previousSibling
-      currentNode = prevSibling as Node | null
-      currentOffset = currentNode ? (currentNode.nodeType === Node.TEXT_NODE ? (currentNode as Text).length : 0) : 0
     }
+    
+    // Set the end of the range at current cursor position
+    replaceRange.setEnd(range.startContainer, range.startOffset)
+    
+    // Delete the old @mention
+    replaceRange.deleteContents()
+    
+    // Create highlighted span
+    const mentionSpan = document.createElement('span')
+    mentionSpan.className = 'mention-highlight'
+    mentionSpan.textContent = `@${ds.name}`
+    
+    // Insert the span at the collapsed range position
+    replaceRange.collapse(true)
+    replaceRange.insertNode(mentionSpan)
+    
+    // Add a space after
+    const spaceNode = document.createTextNode(' ')
+    mentionSpan.parentNode?.insertBefore(spaceNode, mentionSpan.nextSibling)
+    
+    // Move cursor after the space
+    const newRange = document.createRange()
+    newRange.setStartAfter(spaceNode)
+    newRange.collapse(true)
+    selection.removeAllRanges()
+    selection.addRange(newRange)
+    
+    // Update inputMessage
+    inputMessage.value = editorRef.value.innerText || ''
+    
+    // Hide autocomplete
+    showAutocomplete.value = false
+    mentionStartPos.value = -1
+    
+    // Focus back on editor
+    editorRef.value.focus()
+  } catch (error) {
+    console.error('[ChatView] Error selecting datasource:', error)
+    // Fallback: just insert the text
+    const textToInsert = `@${ds.name} `
+    document.execCommand('insertText', false, textToInsert)
+    inputMessage.value = editorRef.value?.innerText || ''
+    showAutocomplete.value = false
+    mentionStartPos.value = -1
   }
-  
-  // Set the end of the range at current cursor position
-  replaceRange.setEnd(range.startContainer, range.startOffset)
-  
-  // Delete the old @mention and insert the new one with highlight
-  replaceRange.deleteContents()
-  
-  // Create highlighted span
-  const mentionSpan = document.createElement('span')
-  mentionSpan.className = 'mention-highlight'
-  mentionSpan.textContent = `@${ds.name}`
-  
-  // Insert the span
-  replaceRange.insertNode(mentionSpan)
-  
-  // Add a space after
-  const spaceNode = document.createTextNode(' ')
-  mentionSpan.parentNode?.insertBefore(spaceNode, mentionSpan.nextSibling)
-  
-  // Move cursor after the space
-  const newRange = document.createRange()
-  newRange.setStartAfter(spaceNode)
-  newRange.collapse(true)
-  selection.removeAllRanges()
-  selection.addRange(newRange)
-  
-  // Update inputMessage
-  inputMessage.value = editorRef.value.innerText || ''
-  
-  // Hide autocomplete
-  showAutocomplete.value = false
-  mentionStartPos.value = -1
-  
-  // Focus back on editor
-  editorRef.value.focus()
 }
 
 function selectTool(tool: any) {
@@ -546,71 +556,82 @@ function selectTool(tool: any) {
   const spaceIndex = afterSlash.indexOf(' ')
   const mentionEnd = spaceIndex === -1 ? afterSlash.length : spaceIndex
   
-  // Create a new range to replace the /command
-  const replaceRange = document.createRange()
-  
-  // Start from the current position and walk backwards
-  let currentNode: Node | null = range.startContainer
-  let currentOffset = range.startOffset
-  let charsToWalkBack = mentionEnd + 1 // +1 for the / symbol
-  
-  // Walk back through text nodes to find the start of the /command
-  while (charsToWalkBack > 0 && currentNode) {
-    if (currentNode.nodeType === Node.TEXT_NODE) {
-      const textLength = (currentNode as Text).length
-      if (currentOffset >= charsToWalkBack) {
-        // The / is in this node
-        replaceRange.setStart(currentNode, currentOffset - charsToWalkBack)
-        charsToWalkBack = 0
+  try {
+    // Create a new range to replace the /command
+    const replaceRange = document.createRange()
+    
+    // Walk back from current cursor position to find the / symbol
+    let currentNode: Node | null = range.startContainer
+    let currentOffset = range.startOffset
+    let charsToWalkBack = mentionEnd + 1 // +1 for the / symbol
+    
+    // Walk back through text nodes to find the start of the /command
+    while (charsToWalkBack > 0 && currentNode) {
+      if (currentNode.nodeType === Node.TEXT_NODE) {
+        const textLength = (currentNode as Text).length
+        if (currentOffset >= charsToWalkBack) {
+          // The / is in this node
+          replaceRange.setStart(currentNode, currentOffset - charsToWalkBack)
+          charsToWalkBack = 0
+        } else {
+          // Move to previous sibling
+          charsToWalkBack -= currentOffset
+          const prevSibling = currentNode.previousSibling
+          currentNode = prevSibling as Node | null
+          currentOffset = currentNode ? (currentNode.nodeType === Node.TEXT_NODE ? (currentNode as Text).length : 0) : 0
+        }
       } else {
-        // Move to previous sibling
-        charsToWalkBack -= currentOffset
+        // Skip non-text nodes
         const prevSibling = currentNode.previousSibling
         currentNode = prevSibling as Node | null
         currentOffset = currentNode ? (currentNode.nodeType === Node.TEXT_NODE ? (currentNode as Text).length : 0) : 0
       }
-    } else {
-      // Skip non-text nodes
-      const prevSibling = currentNode.previousSibling
-      currentNode = prevSibling as Node | null
-      currentOffset = currentNode ? (currentNode.nodeType === Node.TEXT_NODE ? (currentNode as Text).length : 0) : 0
     }
+    
+    // Set the end of the range at current cursor position
+    replaceRange.setEnd(range.startContainer, range.startOffset)
+    
+    // Delete the old /command
+    replaceRange.deleteContents()
+    
+    // Create highlighted span for tool
+    const toolSpan = document.createElement('span')
+    toolSpan.className = 'tool-highlight'
+    toolSpan.textContent = `/${tool.name}`
+    
+    // Insert the span at the collapsed range position
+    replaceRange.collapse(true)
+    replaceRange.insertNode(toolSpan)
+    
+    // Add a space after
+    const spaceNode = document.createTextNode(' ')
+    toolSpan.parentNode?.insertBefore(spaceNode, toolSpan.nextSibling)
+    
+    // Move cursor after the space
+    const newRange = document.createRange()
+    newRange.setStartAfter(spaceNode)
+    newRange.collapse(true)
+    selection.removeAllRanges()
+    selection.addRange(newRange)
+    
+    // Update inputMessage
+    inputMessage.value = editorRef.value.innerText || ''
+    
+    // Hide autocomplete
+    showAutocomplete.value = false
+    mentionStartPos.value = -1
+    
+    // Focus back on editor
+    editorRef.value.focus()
+  } catch (error) {
+    console.error('[ChatView] Error selecting tool:', error)
+    // Fallback: just insert the text
+    const textToInsert = `/${tool.name} `
+    document.execCommand('insertText', false, textToInsert)
+    inputMessage.value = editorRef.value?.innerText || ''
+    showAutocomplete.value = false
+    mentionStartPos.value = -1
   }
-  
-  // Set the end of the range at current cursor position
-  replaceRange.setEnd(range.startContainer, range.startOffset)
-  
-  // Delete the old /command and insert the new one with highlight
-  replaceRange.deleteContents()
-  
-  // Create highlighted span for tool
-  const toolSpan = document.createElement('span')
-  toolSpan.className = 'tool-highlight'
-  toolSpan.textContent = `/${tool.name}`
-  
-  // Insert the span
-  replaceRange.insertNode(toolSpan)
-  
-  // Add a space after
-  const spaceNode = document.createTextNode(' ')
-  toolSpan.parentNode?.insertBefore(spaceNode, toolSpan.nextSibling)
-  
-  // Move cursor after the space
-  const newRange = document.createRange()
-  newRange.setStartAfter(spaceNode)
-  newRange.collapse(true)
-  selection.removeAllRanges()
-  selection.addRange(newRange)
-  
-  // Update inputMessage
-  inputMessage.value = editorRef.value.innerText || ''
-  
-  // Hide autocomplete
-  showAutocomplete.value = false
-  mentionStartPos.value = -1
-  
-  // Focus back on editor
-  editorRef.value.focus()
 }
 
 function scrollToBottom() {
