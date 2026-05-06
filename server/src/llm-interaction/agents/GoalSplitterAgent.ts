@@ -7,6 +7,8 @@ import type { LLMConfig } from '../adapters/LLMAdapterFactory';
 import { LLMAdapterFactory } from '../adapters/LLMAdapterFactory';
 import type { PromptManager } from '../managers/PromptManager';
 import type { GeoAIStateType, AnalysisGoal } from '../workflow/GeoAIGraph';
+import type { GoalType } from '../../core/index';
+import { GOAL_TYPE_VALUES } from '../../core/index';
 
 export class GoalSplitterAgent {
   private llmConfig: LLMConfig;
@@ -34,7 +36,7 @@ export class GoalSplitterAgent {
       const goalSchema = z.object({
         id: z.string().describe('Unique identifier for the goal'),
         description: z.string().describe('Detailed description of what to accomplish'),
-        type: z.enum(['spatial_analysis', 'data_processing', 'visualization', 'general']).describe('Type of goal'),
+        type: z.enum(GOAL_TYPE_VALUES).describe('Type of goal'),
         priority: z.number().min(1).max(10).describe('Priority level (1-10)')
       });
 

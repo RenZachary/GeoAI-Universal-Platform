@@ -12,6 +12,8 @@ import { DataSourceRepository } from '../../data-access/repositories';
 import { SQLiteManagerInstance } from '../../storage/';
 import { PluginCapabilityRegistry } from '../../plugin-orchestration';
 import { GeometryAdapter } from '../../utils/GeometryAdapter';
+import type { GoalType, ExecutionCategory } from '../../core/index';
+import { GOAL_TO_EXECUTION_CATEGORY } from '../../core/index';
 
 export class TaskPlannerAgent {
   private llmConfig: LLMConfig;
@@ -85,17 +87,8 @@ export class TaskPlannerAgent {
           // STAGE 1: Rule-based filtering using PluginCapabilityRegistry
           console.log(`[Task Planner] Stage 1: Filtering plugins for goal ${goal.id} (${goal.type})`);
           
-          // Infer execution category from goal type
-          let expectedCategory: 'statistical' | 'computational' | 'visualization' | 'textual' | undefined;
-          if (goal.type === 'spatial_analysis') {
-            expectedCategory = 'computational';
-          } else if (goal.type === 'data_processing') {
-            expectedCategory = 'statistical';
-          } else if (goal.type === 'visualization') {
-            expectedCategory = 'visualization';
-          } else if (goal.type === 'general') {
-            expectedCategory = 'textual';
-          }
+          // Infer execution category from goal type using centralized mapping
+          const expectedCategory: ExecutionCategory | undefined = GOAL_TO_EXECUTION_CATEGORY[goal.type];
           
           // Detect data format and geometry type from referenced data source
           let dataFormat: 'vector' | 'raster' | undefined;
@@ -148,6 +141,29 @@ export class TaskPlannerAgent {
           
           console.log(`[Task Planner] Stage 2: LLM selection from ${compatibleTools.length} candidates`);
           
+          // Prepare previous results context for multi-goal scenarios
+          let previousResultsContext = '';
+          if (state.executionResults && state.executionResults.size > 0) {
+            // Collect results from goals that have already been planned/executed
+            const previousGoalsResults: any[] = [];
+            for (const [stepId, result] of state.executionResults.entries()) {
+              if (result.status === 'success' && result.data) {
+                previousGoalsResults.push({
+                  stepId,
+                  goalId: result.goalId,
+                  type: result.data.type,
+                  result: result.data.metadata?.result || result.data,
+                  description: result.data.metadata?.description
+                });
+              }
+            }
+            
+            if (previousGoalsResults.length > 0) {
+              previousResultsContext = JSON.stringify(previousGoalsResults, null, 2);
+              console.log(`[Task Planner] Providing ${previousGoalsResults.length} previous results as context`);
+            }
+          }
+          
           // STAGE 2: LLM-based selection from filtered candidates
           const plan = await chain.invoke({
             goalDescription: goal.description,
@@ -161,7 +177,7 @@ export class TaskPlannerAgent {
               parameters: t.parameters,
               outputSchema: t.outputSchema  // Include output schema for placeholder reference
             })), null, 2),
-            previousResults: '',  // TODO: Add previous results context
+            previousResults: previousResultsContext,
             timestamp: new Date().toISOString()
           }) as ExecutionPlan;
 
@@ -393,14 +409,17 @@ export class TaskPlannerAgent {
       };
     }
 
-    // Rule 3: Textual plugins require predecessor
+    // Rule 3: Textual plugins can work standalone or with predecessor
+    // In multi-goal scenarios, textual plugins may need to access previous goals' results
+    // This will be handled at execution time by injecting context from state.results
     const textualPluginIds = ['report_generator']; // Add other textual plugins here
     if (terminalNodeCount === 1) {
       const terminalStep = plan.steps[terminalNodeIndex];
       if (textualPluginIds.includes(terminalStep.pluginId) && plan.steps.length === 1) {
-        console.error(`[Task Planner] VALIDATION FAILED: Textual plugin '${terminalStep.pluginId}' requires a predecessor step`);
-        console.error(`[Task Planner] Textual plugins need non-terminal input (e.g., analysis result)`);
-        return null;
+        console.warn(`[Task Planner] Textual plugin '${terminalStep.pluginId}' has no predecessor in current plan`);
+        console.warn(`[Task Planner] Will attempt to inject previous results at execution time`);
+        // Don't fail validation - allow execution to proceed
+        // The executor will handle missing data gracefully
       }
     }
 

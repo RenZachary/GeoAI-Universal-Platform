@@ -442,12 +442,14 @@ export class SummaryGenerator {
    * Helper: Get icon for goal type
    */
   private getGoalTypeIcon(type: string): string {
-    switch (type) {
-      case 'spatial_analysis': return '🗺️';
-      case 'visualization': return '📊';
-      case 'data_processing': return '⚙️';
-      default: return '💬';
-    }
+    const icons: Record<string, string> = {
+      'spatial_analysis': '🗺️',
+      'visualization': '📊',
+      'data_processing': '⚙️',
+      'report': '📄',
+      'general': '💬'
+    };
+    return icons[type] || '💬';
   }
 
   /**

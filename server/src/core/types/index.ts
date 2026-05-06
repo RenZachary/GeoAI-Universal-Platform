@@ -5,6 +5,55 @@
  */
 
 // ============================================================================
+// Goal and Execution Types
+// ============================================================================
+
+/**
+ * Goal types for task splitting
+ * Represents the user's intent category
+ */
+export type GoalType = 
+  | 'spatial_analysis'   // Spatial operations (buffer, overlay, etc.)
+  | 'data_processing'    // Statistical calculations, aggregation, filtering
+  | 'visualization'      // Map rendering, thematic visualization
+  | 'report'             // Document generation, summary creation
+  | 'general';           // General queries, text-based responses
+
+/**
+ * Execution categories for plugin capability matching
+ * Maps goal types to plugin execution categories
+ */
+export type ExecutionCategory = 
+  | 'computational'  // Spatial computations
+  | 'statistical'    // Data processing and statistics
+  | 'visualization'  // Map rendering
+  | 'textual';       // Text generation and reports
+
+/**
+ * Mapping from GoalType to ExecutionCategory
+ * Used by TaskPlanner to filter compatible plugins
+ */
+export const GOAL_TO_EXECUTION_CATEGORY: Record<GoalType, ExecutionCategory> = {
+  'spatial_analysis': 'computational',
+  'data_processing': 'statistical',
+  'visualization': 'visualization',
+  'report': 'textual',
+  'general': 'textual'
+};
+
+/**
+ * Valid goal type values for Zod schema validation
+ * Must be a tuple to work with z.enum()
+ */
+export const GOAL_TYPE_VALUES = [
+  'spatial_analysis',
+  'data_processing',
+  'visualization',
+  'report',
+  'general'
+] as const;
+
+// ============================================================================
 // NativeData Principle - Keep original data formats
 // ============================================================================
 
