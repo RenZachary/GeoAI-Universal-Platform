@@ -92,7 +92,7 @@
                   :key="ds.id"
                   class="autocomplete-item"
                   :class="{ active: index === activeSuggestionIndex }"
-                  @click="selectDataSource(ds)"
+                  @mousedown.prevent="selectDataSource(ds)"
                   @mouseenter="activeSuggestionIndex = index"
                 >
                   <span class="suggestion-name">{{ ds.name }}</span>
@@ -107,7 +107,7 @@
                   :key="tool.id"
                   class="autocomplete-item"
                   :class="{ active: index === activeSuggestionIndex }"
-                  @click="selectTool(tool)"
+                  @mousedown.prevent="selectTool(tool)"
                   @mouseenter="activeSuggestionIndex = index"
                 >
                   <el-icon><Tools /></el-icon>
