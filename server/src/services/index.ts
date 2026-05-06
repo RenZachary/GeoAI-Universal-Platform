@@ -8,7 +8,10 @@
  */
 
 export { DataSourceService } from './DataSourceService';
-export type { PostGISConnectionConfig, ConnectionInfo, RegisteredDataSource } from './DataSourceService';
+export type { ConnectionInfo, RegisteredDataSource } from './DataSourceService';
+export type { PostGISConnectionConfig } from '../core';
+
+export { ResultPersistenceService } from './ResultPersistenceService';
 
 export { FileUploadService } from './FileUploadService';
 export type { UploadedFile, UploadResult, ShapefileComponents } from './FileUploadService';

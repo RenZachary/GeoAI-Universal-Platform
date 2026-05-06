@@ -9,6 +9,7 @@ import type { PoolConfig } from 'pg';
 import { Pool } from 'pg';
 import { wrapError } from '../../../core';
 import type { PostGISConnectionConfig, ParsedPostGISReference } from '../../../core';
+import { PostGISPoolManager } from '../../../data-access';
 
 export interface PostGISTileQuery {
   tableName?: string;
@@ -27,40 +28,12 @@ export interface PostGISTileResult {
  * Handles connection pooling and tile generation using ST_AsMVT()
  */
 export class PostGISTileGenerator {
-  private pool: Pool | null = null;
-  private isConnected: boolean = false;
-
   /**
    * Create and test PostGIS connection pool
+   * Delegates to PostGISPoolManager for centralized pool management
    */
   async createPool(config: PostGISConnectionConfig): Promise<Pool> {
-    if (this.pool && this.isConnected) {
-      return this.pool;
-    }
-
-    const poolConfig: PoolConfig = {
-      host: config.host,
-      port: config.port,
-      database: config.database,
-      user: config.user,
-      password: config.password,
-      max: 10,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
-    };
-
-    const pool = new Pool(poolConfig);
-
-    // Test connection
-    try {
-      await pool.query('SELECT 1');
-      this.pool = pool;
-      this.isConnected = true;
-      console.log('[PostGIS Tile Generator] Connection established');
-      return pool;
-    } catch (error) {
-      throw wrapError(error, 'Failed to connect to PostGIS');
-    }
+    return await PostGISPoolManager.getInstance().getPool(config);
   }
 
   /**
@@ -151,21 +124,19 @@ export class PostGISTileGenerator {
 
   /**
    * Close the connection pool
+   * Note: Pool lifecycle is now managed by PostGISPoolManager
    */
   async closePool(): Promise<void> {
-    if (this.pool) {
-      await this.pool.end();
-      this.pool = null;
-      this.isConnected = false;
-      console.log('[PostGIS Tile Generator] Connection pool closed');
-    }
+    console.log('[PostGIS Tile Generator] closePool called - pools are managed by PostGISPoolManager');
+    // Pool lifecycle is managed by PostGISPoolManager, no action needed here
   }
 
   /**
    * Check if connected
+   * Note: Always returns true as pool management is delegated
    */
   isReady(): boolean {
-    return this.isConnected && this.pool !== null;
+    return true;
   }
 
   /**

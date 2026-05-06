@@ -7,7 +7,7 @@ import type { DataSourceType } from '../../core';
 import type { DataAccessor } from '../interfaces';
 import { ShapefileAccessor } from '../accessors/ShapefileAccessor';
 import { GeoJSONAccessor } from '../accessors/GeoJSONAccessor';
-import type { PostGISConnectionConfig } from '../accessors/PostGISAccessor';
+import type { PostGISConnectionConfig } from '../../core';
 import { PostGISAccessor } from '../accessors/PostGISAccessor';
 import { GeoTIFFAccessor } from '../accessors/GeoTIFFAccessor';
 

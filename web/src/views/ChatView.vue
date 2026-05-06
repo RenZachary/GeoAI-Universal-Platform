@@ -142,6 +142,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick, watch, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
 import { useDataSourceStore } from '@/stores/dataSources'
 import { useToolStore } from '@/stores/tools'
@@ -153,6 +154,8 @@ import { Plus, Delete, ChatDotRound, Promotion, DArrowRight, DArrowLeft, Edit, T
 import { ElMessageBox, ElMessage } from 'element-plus'
 
 const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
 const chatStore = useChatStore()
 const dataSourceStore = useDataSourceStore()
 const toolStore = useToolStore()
@@ -209,11 +212,26 @@ watch(sidebarCollapsed, (newValue) => {
   console.log('[ChatView] Sidebar state saved:', newValue ? 'collapsed' : 'expanded')
 })
 
+// Watch route query parameter changes to load conversation
+watch(() => route.query.conversation, async (newConvId) => {
+  if (newConvId && typeof newConvId === 'string') {
+    console.log('[ChatView] Route query parameter changed, loading conversation:', newConvId)
+    await chatStore.loadConversation(newConvId)
+  }
+})
+
 // Lifecycle
 onMounted(async () => {
   await chatStore.loadConversations()
   await dataSourceStore.loadDataSources()
   await toolStore.loadTools()
+  
+  // Check if there's a conversation ID in query parameters
+  const conversationId = route.query.conversation as string
+  if (conversationId) {
+    console.log('[ChatView] Loading conversation from query parameter:', conversationId)
+    await chatStore.loadConversation(conversationId)
+  }
 })
 
 // Methods
@@ -317,6 +335,8 @@ function convertMentionsToIds(text: string): string {
 }
 
 function handleSelectConversation(conversationId: string) {
+  // Update URL query parameter
+  router.push({ query: { conversation: conversationId } })
   chatStore.loadConversation(conversationId)
 }
 
@@ -333,6 +353,11 @@ async function handleDeleteConversation(conversationId: string) {
     )
 
     await chatStore.deleteConversation(conversationId)
+    
+    // If deleted conversation was current, clear URL parameter
+    if (route.query.conversation === conversationId) {
+      router.push({ query: {} })
+    }
   } catch {
     // User cancelled
   }
@@ -362,6 +387,8 @@ async function handleRenameConversation(conversationId: string, currentTitle: st
 }
 
 function handleNewChat() {
+  // Clear conversation query parameter
+  router.push({ query: {} })
   chatStore.createNewConversation()
 }
 

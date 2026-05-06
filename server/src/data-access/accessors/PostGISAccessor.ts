@@ -7,9 +7,9 @@
 import type { NativeData, DataMetadata } from '../../core';
 import { wrapError } from '../../core';
 import type { DatabaseAccessor, TableSchema, ColumnInfo, IndexInfo, BufferOptions, OverlayOptions, FilterCondition } from '../interfaces';
-import type { PoolConfig, QueryResultRow } from 'pg';
-import { Pool } from 'pg';
+import type { Pool, QueryResultRow } from 'pg';
 import type { PostGISConnectionConfig } from '../../core';
+import { PostGISPoolManager } from '../utils/PostGISPoolManager';
 import { 
   PostGISBasicOperations,
   PostGISBufferOperation,
@@ -26,21 +26,10 @@ interface PgQueryRow extends QueryResultRow {
   [key: string]: any;
 }
 
-// Type for GeoJSON data
-interface GeoJSONData {
-  type: string;
-  features?: Array<{
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    geometry: any;
-    properties?: Record<string, unknown>;
-  }>;
-}
-
 export class PostGISAccessor implements DatabaseAccessor {
   readonly type = 'postgis' as const;
   
   private config: PostGISConnectionConfig;
-  private pool: Pool | null = null;
   
   // Operation modules
   private basicOps: PostGISBasicOperations | null = null;
@@ -56,37 +45,17 @@ export class PostGISAccessor implements DatabaseAccessor {
   }
   
   /**
-   * Get or create connection pool
+   * Get connection pool from PostGISPoolManager
    */
-  private getPool(): Pool {
-    if (!this.pool) {
-      const poolConfig: PoolConfig = {
-        host: this.config.host,
-        port: this.config.port,
-        database: this.config.database,
-        user: this.config.user,
-        password: this.config.password,
-        max: 10, // Connection pool size
-        idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 5000,
-      };
-      
-      this.pool = new Pool(poolConfig);
-      
-      // Handle pool errors
-      this.pool.on('error', (err) => {
-        console.error('[PostGISAccessor] Unexpected pool error:', err);
-      });
-    }
-    
-    return this.pool;
+  private async getPool(): Promise<Pool> {
+    return await PostGISPoolManager.getInstance().getPool(this.config);
   }
   
   /**
    * Lazy initialize operation modules
    */
-  private initOperations() {
-    const pool = this.getPool();
+  private async initOperations() {
+    const pool = await this.getPool();
     const schema = this.config.schema || 'public';
     
     if (!this.basicOps) this.basicOps = new PostGISBasicOperations(pool, schema);
@@ -102,7 +71,7 @@ export class PostGISAccessor implements DatabaseAccessor {
    * Read data from PostGIS table/query
    */
   async read(reference: string): Promise<NativeData> {
-    this.initOperations();
+    await this.initOperations();
     return this.basicOps!.read(reference);
   }
   
@@ -110,7 +79,7 @@ export class PostGISAccessor implements DatabaseAccessor {
    * Write data to PostGIS table
    */
   async write(data: unknown, metadata?: Partial<DataMetadata>): Promise<string> {
-    this.initOperations();
+    await this.initOperations();
     return this.basicOps!.write(data, metadata);
   }
   
@@ -118,7 +87,7 @@ export class PostGISAccessor implements DatabaseAccessor {
    * Delete data from PostGIS (drop table or delete rows)
    */
   async delete(reference: string): Promise<void> {
-    this.initOperations();
+    await this.initOperations();
     return this.basicOps!.delete(reference);
   }
   
@@ -126,7 +95,7 @@ export class PostGISAccessor implements DatabaseAccessor {
    * Get metadata for PostGIS table
    */
   async getMetadata(reference: string): Promise<DataMetadata> {
-    this.initOperations();
+    await this.initOperations();
     return this.basicOps!.getMetadata(reference);
   }
   
@@ -134,7 +103,7 @@ export class PostGISAccessor implements DatabaseAccessor {
    * Validate PostGIS table exists and has valid geometry
    */
   async validate(reference: string): Promise<boolean> {
-    this.initOperations();
+    await this.initOperations();
     return this.basicOps!.validate(reference);
   }
   
@@ -142,7 +111,7 @@ export class PostGISAccessor implements DatabaseAccessor {
    * Test database connection
    */
   async testConnection(): Promise<boolean> {
-    const pool = this.getPool();
+    const pool = await this.getPool();
     
     try {
       const client = await pool.connect();
@@ -159,7 +128,7 @@ export class PostGISAccessor implements DatabaseAccessor {
    * Execute raw SQL query
    */
   async executeQuery(sql: string, params?: unknown[]): Promise<PgQueryRow[]> {
-    const pool = this.getPool();
+    const pool = await this.getPool();
     
     try {
       const result = await pool.query(sql, params);
@@ -175,7 +144,7 @@ export class PostGISAccessor implements DatabaseAccessor {
    * This is used by DataSourceService for table discovery
    */
   async executeRaw(sql: string, params?: unknown[]): Promise<{ rows: PgQueryRow[] }> {
-    const pool = this.getPool();
+    const pool = await this.getPool();
     
     try {
       const result = await pool.query(sql, params);
@@ -190,7 +159,7 @@ export class PostGISAccessor implements DatabaseAccessor {
    * Get table schema information
    */
   async getSchema(tableName: string): Promise<TableSchema> {
-    const pool = this.getPool();
+    const pool = await this.getPool();
     const schema = this.config.schema || 'public';
     
     try {
@@ -240,7 +209,7 @@ export class PostGISAccessor implements DatabaseAccessor {
    * List available tables in database
    */
   async listTables(): Promise<string[]> {
-    const pool = this.getPool();
+    const pool = await this.getPool();
     const schema = this.config.schema || 'public';
     
     try {
@@ -262,7 +231,7 @@ export class PostGISAccessor implements DatabaseAccessor {
    * Get SRID for geometry column
    */
   async getSRID(tableName: string, geometryColumn: string): Promise<number> {
-    const pool = this.getPool();
+    const pool = await this.getPool();
     const schema = this.config.schema || 'public';
     
     try {
@@ -287,7 +256,7 @@ export class PostGISAccessor implements DatabaseAccessor {
    * Get spatial extent of table
    */
   async getSpatialExtent(tableName: string, geometryColumn: string): Promise<[number, number, number, number]> {
-    const pool = this.getPool();
+    const pool = await this.getPool();
     const schema = this.config.schema || 'public';
     
     try {
@@ -320,7 +289,7 @@ export class PostGISAccessor implements DatabaseAccessor {
    * Check if table has geometry column
    */
   async hasGeometryColumn(tableName: string): Promise<boolean> {
-    const pool = this.getPool();
+    const pool = await this.getPool();
     const schema = this.config.schema || 'public';
     
     try {
@@ -342,7 +311,7 @@ export class PostGISAccessor implements DatabaseAccessor {
    */
   private async ensureConnection(): Promise<void> {
     // Connection pool is lazily initialized by getPool()
-    this.getPool();
+    await this.getPool();
   }
   
   /**
@@ -352,7 +321,7 @@ export class PostGISAccessor implements DatabaseAccessor {
    * Perform buffer operation using PostGIS ST_Buffer
    */
   async buffer(reference: string, distance: number, options?: BufferOptions): Promise<NativeData> {
-    this.initOperations();
+    await this.initOperations();
     return this.bufferOp!.execute(reference, distance, options);
   }
   
@@ -360,7 +329,7 @@ export class PostGISAccessor implements DatabaseAccessor {
    * Perform overlay operation using PostGIS spatial functions
    */
   async overlay(reference1: string, reference2: string, options: OverlayOptions): Promise<NativeData> {
-    this.initOperations();
+    await this.initOperations();
     return this.overlayOp!.execute(reference1, reference2, options);
   }
   
@@ -368,7 +337,7 @@ export class PostGISAccessor implements DatabaseAccessor {
    * Filter data based on attribute or spatial conditions
    */
   async filter(reference: string, filterCondition: FilterCondition): Promise<NativeData> {
-    this.initOperations();
+    await this.initOperations();
     return this.filterOp!.execute(reference, filterCondition);
   }
   
@@ -376,7 +345,7 @@ export class PostGISAccessor implements DatabaseAccessor {
    * Aggregate data (SUM, AVG, COUNT, MAX, MIN)
    */
   async aggregate(reference: string, aggFunc: string, field: string, returnFeature: boolean = false): Promise<NativeData> {
-    this.initOperations();
+    await this.initOperations();
     return this.aggOp!.execute(reference, aggFunc, field, returnFeature);
   }
   
@@ -389,7 +358,7 @@ export class PostGISAccessor implements DatabaseAccessor {
     operation: string,
     joinType: string = 'inner'
   ): Promise<NativeData> {
-    this.initOperations();
+    await this.initOperations();
     return this.joinOp!.execute(targetReference, joinReference, operation, joinType);
   }
   
@@ -397,7 +366,7 @@ export class PostGISAccessor implements DatabaseAccessor {
    * Get unique values for a specific field (for categorical rendering)
    */
   async getUniqueValues(reference: string, fieldName: string): Promise<string[]> {
-    const pool = this.getPool();
+    const pool = await this.getPool();
     const schema = this.config.schema || 'public';
     
     // Parse reference to get table name
@@ -416,7 +385,7 @@ export class PostGISAccessor implements DatabaseAccessor {
     
     try {
       const result = await pool.query(query);
-      return result.rows.map(row => String(row[fieldName]));
+      return result.rows.map((row: PgQueryRow) => String(row[fieldName]));
     } catch (error) {
       console.error(`[PostGISAccessor] Failed to get unique values for field ${fieldName}:`, error);
       const wrappedError = new Error(`Failed to extract unique values: ${error instanceof Error ? error.message : 'Unknown error'}`);

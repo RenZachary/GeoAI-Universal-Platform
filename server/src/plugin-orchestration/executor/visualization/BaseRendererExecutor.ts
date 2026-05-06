@@ -6,7 +6,7 @@
 
 import type { NativeData } from '../../../core/index';
 import type { DataSourceRecord } from '../../../data-access/repositories';
-import { DataAccessorFactory } from '../../../data-access';
+import { DataAccessorFactory, parseConnectionConfig } from '../../../data-access';
 import { MVTStrategyPublisher } from '../../../utils/publishers/MVTStrategyPublisher';
 import { DataSourceRepository } from '../../../data-access/repositories';
 import { GeometryAdapter } from '../../../utils/GeometryAdapter';
@@ -152,16 +152,9 @@ export abstract class BaseRendererExecutor {
       // Case 1: dataSourceId is a registered data source in database
       console.log(`[${this.constructor.name}] Found data source in database: ${dataSource.name}`);
       
-      // Configure PostGIS if needed
-      if (dataSource.type === 'postgis' && dataSource.metadata?.connection) {
-        const postgisConfig = {
-          host: String(dataSource.metadata.connection.host),
-          port: Number(dataSource.metadata.connection.port) || 5432,
-          database: String(dataSource.metadata.connection.database),
-          user: String(dataSource.metadata.connection.user),
-          password: String(dataSource.metadata.connection.password),
-          schema: String(dataSource.metadata.connection.schema || 'public')
-        };
+      // Configure PostGIS if needed using shared utility
+      const postgisConfig = parseConnectionConfig(dataSource);
+      if (postgisConfig) {
         this.accessorFactory.configurePostGIS(postgisConfig);
       }
       
@@ -185,6 +178,16 @@ export abstract class BaseRendererExecutor {
           ...nativeData.metadata,
           geometryType
         };
+      }
+      
+      // CRITICAL: For PostGIS, preserve connection info in nativeData.metadata
+      // This is needed by MVTStrategyPublisher to generate tiles without querying database
+      if (dataSource.type === 'postgis' && dataSource.metadata?.connection) {
+        nativeData.metadata = {
+          ...nativeData.metadata,
+          connection: dataSource.metadata.connection
+        };
+        console.log(`[${this.constructor.name}] Preserved PostGIS connection info in nativeData.metadata`);
       }
       
       return { dataSource, nativeData, accessor };

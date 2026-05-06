@@ -24,3 +24,6 @@ export { GeoTIFFAccessor } from './accessors/GeoTIFFAccessor';
 
 // Utilities
 export { DataSourceDetector } from './utils/DataSourceDetector';
+export { PostGISPoolManager } from './utils/PostGISPoolManager';
+export { PostGISConnectionParser } from './utils/PostGISConnectionParser';
+export { parseConnectionConfig, convertDistanceUnit } from './utils/PostGISUtils';

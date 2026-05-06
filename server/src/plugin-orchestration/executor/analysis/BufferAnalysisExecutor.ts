@@ -10,11 +10,13 @@
  *   - Shapefile: Convert to GeoJSON → Turf.js buffer
  *   - PostGIS: ST_Buffer() SQL
  * - Executor focuses ONLY on orchestration
+ * - Delegates persistence to ResultPersistenceService
  */
 
 import type { NativeData } from '../../../core/index';
-import { DataAccessorFactory } from '../../../data-access';
+import { DataAccessorFactory, parseConnectionConfig } from '../../../data-access';
 import { DataSourceRepository } from '../../../data-access/repositories';
+import { ResultPersistenceService } from '../../../services/ResultPersistenceService';
 import type Database from 'better-sqlite3';
 
 export interface BufferAnalysisParams {
@@ -28,11 +30,13 @@ export class BufferAnalysisExecutor {
   private db: Database.Database;
   private dataSourceRepo: DataSourceRepository;
   private accessorFactory: DataAccessorFactory;
+  private resultPersistence: ResultPersistenceService;
 
   constructor(db: Database.Database, workspaceBase?: string) {
     this.db = db;
     this.dataSourceRepo = new DataSourceRepository(db);
     this.accessorFactory = new DataAccessorFactory(workspaceBase);
+    this.resultPersistence = new ResultPersistenceService(db);
   }
 
   /**
@@ -62,20 +66,10 @@ export class BufferAnalysisExecutor {
       reference: dataSource.reference
     });
 
-    // Step 2: Extract PostGIS connection config if needed
-    let postgisConfig = undefined;
-    if (dataSource.type === 'postgis' && dataSource.metadata?.connection) {
-      postgisConfig = {
-        host: String(dataSource.metadata.connection.host),
-        port: Number(dataSource.metadata.connection.port) || 5432,
-        database: String(dataSource.metadata.connection.database),
-        user: String(dataSource.metadata.connection.user),
-        password: String(dataSource.metadata.connection.password),
-        schema: String(dataSource.metadata.connection.schema || 'public')
-      };
-    }
+    // Extract PostGIS connection config using shared utility
+    const postgisConfig = parseConnectionConfig(dataSource) || undefined;
 
-    // Step 3: Create appropriate accessor
+    // Create appropriate accessor
     const accessor = this.accessorFactory.createAccessor(dataSource.type, postgisConfig);
 
     // Step 3: Call buffer - accessor handles ALL format-specific logic!
@@ -90,48 +84,20 @@ export class BufferAnalysisExecutor {
 
     console.log('[BufferAnalysisExecutor] Buffer completed successfully');
 
-    // Step 4: Save PostGIS result to database so subsequent steps can find it
-    if (result.type === 'postgis' && result.metadata?.result?.table) {
-      const tableName = result.metadata.result.table;
-      const schema = result.metadata.schema || 'public';
-      
-      // Preserve the original connection info from source data source
-      const connectionInfo = dataSource.metadata?.connection ? {
-        connection: {
-          host: dataSource.metadata.connection.host,
-          port: dataSource.metadata.connection.port,
-          database: dataSource.metadata.connection.database,
-          user: dataSource.metadata.connection.user,
-          password: dataSource.metadata.connection.password,
-          schema: dataSource.metadata.connection.schema || 'public'
-        }
-      } : {};
-      
-      // Create a DataSourceRecord for this temporary table
-      const dataSourceRecord = this.dataSourceRepo.create(
-        `buffer_${tableName}`,
-        'postgis',
-        `${schema}.${tableName}`,
-        {
-          ...result.metadata,
-          ...connectionInfo,  // Include connection info
-          operation: 'buffer',
-          distance: params.distance,
-          unit: params.unit,
-          description: `Buffer result (${params.distance} ${params.unit})`
-        }
-      );
-      
-      // Update result ID to match the database record
-      result.id = dataSourceRecord.id;
-    }
+    // Step 4: Delegate persistence to ResultPersistenceService
+    const persistedResult = await this.resultPersistence.persistResult(
+      result,
+      'buffer',
+      dataSource,
+      { distance: params.distance, unit: params.unit }
+    );
 
     // Ensure standardized output field exists (REQUIRED by type system)
-    if (result.metadata && result.metadata.result === undefined) {
+    if (persistedResult.metadata && persistedResult.metadata.result === undefined) {
       // For buffer analysis, result is the buffered geometry reference
-      result.metadata.result = result.reference;
+      persistedResult.metadata.result = persistedResult.reference;
     }
 
-    return result;
+    return persistedResult;
   }
 }

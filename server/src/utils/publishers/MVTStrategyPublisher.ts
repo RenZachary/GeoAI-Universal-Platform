@@ -15,10 +15,9 @@ import type Database from 'better-sqlite3';
 import { BaseMVTPublisher, type MVTPublishResult } from './base/BaseMVTPublisher';
 import type { Pool } from 'pg';
 import { PostGISTileGenerator, type PostGISTileQuery } from './base/PostGISTileGenerator';
-import { PostGISConnectionManager } from '../PostGISConnectionManager';
+import { PostGISConnectionParser } from '../../data-access';
 import type { PostGISConnectionConfig } from '../../core';
 import { type MVTTileOptions, type MVTPublishMetadata } from './base/MVTPublisherTypes';
-import { DataSourceRepository } from '../../data-access/repositories';
 
 // Type definitions for geojson-vt (library doesn't provide types)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -360,12 +359,9 @@ class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
     if (!fs.existsSync(tilesetDir)) {
       fs.mkdirSync(tilesetDir, { recursive: true });
     }
-    // 通过db查询metadata字段
-    const dsr = new DataSourceRepository(this.db).getByReferenceAndType(sourceReference, dataSourceType);
-    const metadataInDb = dsr?.metadata;
     
-    // Use the new Connection Manager to parse reference and get config
-    const connectionInfo = PostGISConnectionManager.parseReference(sourceReference, metadataInDb);
+    // Use nativeData.metadata to parse connection info (no database query needed)
+    const connectionInfo = PostGISConnectionParser.parse(sourceReference, nativeData.metadata);
     
     if (!connectionInfo) {
       throw new Error('Invalid PostGIS connection reference format');
@@ -393,7 +389,7 @@ class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
       createdAt: Date.now()
     });
     
-    // Create tileset metadata
+    // Create tileset metadata - save complete connection info for later restoration
     const metadata = {
       id: tilesetId,
       minZoom,
@@ -404,8 +400,9 @@ class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
       strategy: 'postgis',  // Must match the registered strategy key
       sourceReference,
       layerName: forcedLayerName,  // Always 'default' to match StyleFactory
-      connectionHost: connectionInfo.host,
-      connectionDatabase: connectionInfo.database
+      // Save complete connection metadata for getTile restoration
+      connectionMetadata: nativeData.metadata?.connection || null,
+      geometryColumn: nativeData.metadata?.geometryColumn || 'geom'
     };
 
     const metadataPath = path.join(tilesetDir, 'metadata.json');
@@ -423,11 +420,11 @@ class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
   async getTile(tilesetId: string, z: number, x: number, y: number): Promise<Buffer | null> {
     let cached = this.tileIndexCache.get(tilesetId);
     
-    // If not in cache, reload from database and metadata
+    // If not in cache, reload from metadata file (NOT from database)
     if (!cached) {
-      console.log(`[PostGIS MVT Strategy] Tileset not in cache, reloading from source...`);
+      console.log(`[PostGIS MVT Strategy] Tileset not in cache, reloading from metadata file...`);
       
-      // Read metadata to get source reference
+      // Read metadata to get source reference and connection info
       const tilesetDir = path.join(this.mvtOutputDir, tilesetId);
       const metadataPath = path.join(tilesetDir, 'metadata.json');
       
@@ -447,31 +444,24 @@ class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
       console.log(`[PostGIS MVT Strategy] Reloading PostGIS connection for: ${sourceReference}`);
       
       try {
-        // Query database to get full metadata with connection info
-        const dsr = new DataSourceRepository(this.db).getByReferenceAndType(
+        // Reconstruct metadata object from saved connectionMetadata
+        const reconstructedMetadata = {
+          connection: fileMetadata.connectionMetadata,
+          geometryColumn: fileMetadata.geometryColumn || 'geom'
+        };
+        
+        // Parse connection info from file metadata (no database query!)
+        const connectionInfo = PostGISConnectionParser.parse(
           sourceReference, 
-          'postgis'
-        );
-        
-        if (!dsr) {
-          console.warn(`[PostGIS MVT Strategy] Data source not found in database: ${sourceReference}`);
-          return null;
-        }
-        
-        console.log(`[PostGIS MVT Strategy] Found data source in database, reconnecting...`);
-        
-        // Parse connection info from database metadata
-        const connectionInfo = PostGISConnectionManager.parseReference(
-          sourceReference, 
-          dsr.metadata
+          reconstructedMetadata
         );
         
         if (!connectionInfo) {
-          console.warn(`[PostGIS MVT Strategy] Failed to parse connection info`);
+          console.warn(`[PostGIS MVT Strategy] Failed to parse connection info from metadata file`);
           return null;
         }
         
-        // Recreate connection pool
+        // Recreate connection pool using PostGISPoolManager
         const poolConfig: PostGISConnectionConfig = {
           host: connectionInfo.host,
           port: connectionInfo.port,
@@ -493,7 +483,7 @@ class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
         };
         this.tileIndexCache.set(tilesetId, cached);
         
-        console.log(`[PostGIS MVT Strategy] Connection restored and cached for: ${tilesetId}`);
+        console.log(`[PostGIS MVT Strategy] Connection restored from metadata file for: ${tilesetId}`);
       } catch (error) {
         console.error('[PostGIS MVT Strategy] Failed to reload connection:', error);
         return null;

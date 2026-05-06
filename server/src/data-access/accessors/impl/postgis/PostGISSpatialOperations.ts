@@ -6,6 +6,7 @@ import type { Pool } from 'pg';
 import type { NativeData, DataMetadata } from '../../../../core';
 import { generateId } from '../../../../core';
 import type { BufferOptions, OverlayOptions } from '../../../interfaces';
+import { convertDistanceUnit } from '../../../utils/PostGISUtils';
 
 export class PostGISSpatialOperations {
   constructor(private pool: Pool, private schema: string) {}
@@ -18,17 +19,8 @@ export class PostGISSpatialOperations {
     const resultTable = `buffer_${tableName}_${Date.now()}`;
     
     try {
-      // Convert distance to degrees if needed
-      let bufferDistance = distance;
-      if (options?.unit === 'meters') {
-        bufferDistance = distance / 111320; // Approximate conversion for WGS84
-      } else if (options?.unit === 'kilometers') {
-        bufferDistance = (distance * 1000) / 111320;
-      } else if (options?.unit === 'feet') {
-        bufferDistance = distance / 364567;
-      } else if (options?.unit === 'miles') {
-        bufferDistance = distance / 69.172;
-      }
+      // Convert distance to degrees if needed using shared utility
+      const bufferDistance = convertDistanceUnit(distance, options?.unit);
 
       // Create result table with buffered geometry
       if (options?.dissolve) {

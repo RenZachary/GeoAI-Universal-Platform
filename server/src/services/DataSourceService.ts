@@ -485,76 +485,6 @@ export class DataSourceService {
     }
   }
 
-  /**
-   * Discover spatial tables in a specific PostGIS schema (legacy method)
-   * @deprecated Use discoverSpatialTablesAllSchemas instead
-   */
-  private async discoverSpatialTables(config: PostGISConnectionConfig, schema: string): Promise<TableInfo[]> {
-    try {
-      const accessor = this.accessorFactory.createAccessor('postgis');
-
-      // Query geometry_columns for spatial tables
-      const query = `
-        SELECT 
-          f_table_name AS "tableName",
-          f_geometry_column AS "geometryColumn",
-          srid,
-          type AS "geometryType"
-        FROM geometry_columns
-        WHERE f_table_schema = $1
-        ORDER BY f_table_name
-      `;
-
-      const result = await (accessor as any).executeRaw(query, [schema]);
-      const tables = result.rows || [];
-
-      // Enrich with row counts and field schemas (parallel execution)
-      const enrichedTables = await Promise.all(
-        tables.map(async (table: any) => {
-          try {
-            // Get row count
-            const countQuery = `SELECT COUNT(*) as count FROM "${schema}"."${table.tableName}"`;
-            const countResult = await (accessor as any).executeRaw(countQuery);
-            const rowCount = parseInt(countResult.rows[0].count, 10);
-
-            // Get field schema from information_schema
-            const schemaQuery = `
-              SELECT 
-                column_name AS "columnName",
-                data_type AS "dataType",
-                is_nullable AS "isNullable",
-                character_maximum_length AS "maxLength"
-              FROM information_schema.columns
-              WHERE table_schema = $1 AND table_name = $2
-              ORDER BY ordinal_position
-            `;
-            const schemaResult = await (accessor as any).executeRaw(schemaQuery, [schema, table.tableName]);
-            const fields = schemaResult.rows || [];
-
-            return {
-              ...table,
-              rowCount,
-              fields,
-              description: null
-            };
-          } catch (err) {
-            console.warn(`[DataSourceService] Failed to enrich table ${table.tableName}:`, err);
-            return {
-              ...table,
-              rowCount: 0,
-              fields: [],
-              description: null
-            };
-          }
-        })
-      );
-
-      return enrichedTables;
-    } catch (error) {
-      console.error('[DataSourceService] Error discovering spatial tables:', error);
-      throw new DataSourceError(`Failed to discover tables: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
 
   /**
    * Register a single table as a data source
@@ -564,7 +494,6 @@ export class DataSourceService {
     config: PostGISConnectionConfig,
     connectionName: string
   ): Promise<RegisteredDataSource> {
-    const dataSourceId = generateId();
     const schema = table.schema || config.schema || 'public';
 
     const dataSource = this.dataSourceRepo.create(
