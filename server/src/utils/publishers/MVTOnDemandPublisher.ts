@@ -14,10 +14,9 @@ import geojsonvt from 'geojson-vt';
 import vtPbf from 'vt-pbf';
 import fs from 'fs';
 import path from 'path';
-import type { PoolConfig } from 'pg';
-import { Pool } from 'pg';
 import { wrapError } from '../../core';
 import { BaseMVTPublisher } from './base/BaseMVTPublisher';
+import { PostGISTileGenerator } from './base/PostGISTileGenerator';
 import {
   type MVTTileOptions,
   type PostGISDataSource,
@@ -81,8 +80,11 @@ export class MVTOnDemandPublisher extends BaseMVTPublisher {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private geojsonTileIndexes: Map<string, any> = new Map();
   
-  // Store PostGIS pools for PostGIS sources (tilesetId -> Pool)
-  private postgisPools: Map<string, Pool> = new Map();
+  // Store PostGIS connection configs for PostGIS sources (tilesetId -> config)
+  private postgisConfigs: Map<string, PostGISDataSource> = new Map();
+  
+  // PostGIS tile generator instance
+  private postgisGenerator: PostGISTileGenerator = new PostGISTileGenerator();
   
   // Store metadata for all published tilesets
   private tilesetMetadata: Map<string, MVTPublishMetadata> = new Map();
@@ -123,7 +125,7 @@ export class MVTOnDemandPublisher extends BaseMVTPublisher {
   /**
    * Publish a dynamic MVT service from various source types
    */
-  async publish(source: MVTSource, options: MVTTileOptions = {}, tilesetId?: string): Promise<MVTPublishResult> {
+  async publish(source: MVTSource, options: MVTTileOptions = {}, _tilesetId?: string): Promise<MVTPublishResult> {
     try {
       console.log(`[MVT On-Demand Publisher] Publishing from source type: ${source.type}`);
       
@@ -196,7 +198,7 @@ export class MVTOnDemandPublisher extends BaseMVTPublisher {
           break;
 
         default:
-          throw new Error(`Unsupported source type: ${(source as any).type}`);
+          throw new Error(`Unsupported source type: ${(source as Record<string, unknown>).type}`);
       }
 
       // Save metadata
@@ -276,13 +278,8 @@ export class MVTOnDemandPublisher extends BaseMVTPublisher {
     // Clean up GeoJSON tile index
     this.geojsonTileIndexes.delete(tilesetId);
     
-    // Clean up PostGIS pool
-    const pool = this.postgisPools.get(tilesetId);
-    if (pool) {
-      // pool.end() returns a Promise, but we don't need to wait for it during cleanup
-      void pool.end();
-      this.postgisPools.delete(tilesetId);
-    }
+    // Clean up PostGIS config (pool lifecycle managed by PostGISPoolManager)
+    this.postgisConfigs.delete(tilesetId);
     
     // Clean up cache
     this.tilesetMetadata.delete(tilesetId);
@@ -321,6 +318,7 @@ export class MVTOnDemandPublisher extends BaseMVTPublisher {
   // ============================================================================
 
   private async publishGeoJSONInMemory(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     featureCollection: any,
     options: MVTTileOptions,
     customTilesetId?: string
@@ -389,6 +387,7 @@ export class MVTOnDemandPublisher extends BaseMVTPublisher {
     }
 
     // Convert to PBF
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const layers: any = {};
     layers['default'] = {
       features: tile.features,
@@ -418,30 +417,16 @@ export class MVTOnDemandPublisher extends BaseMVTPublisher {
 
     const tilesetId = customTilesetId || this.generateTilesetId('postgis');
     
-    // Create connection pool
-    const poolConfig: PoolConfig = {
-      host: source.connection.host,
-      port: source.connection.port,
-      database: source.connection.database,
-      user: source.connection.user,
-      password: source.connection.password,
-      max: 10,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
-    };
-
-    const pool = new Pool(poolConfig);
-    
-    // Test connection
+    // Create connection pool using PostGISTileGenerator (delegates to PostGISPoolManager)
     try {
-      await pool.query('SELECT 1');
+      await this.postgisGenerator.createPool(source.connection);
       console.log('[MVT On-Demand Publisher] PostGIS connection established');
     } catch (error) {
       throw wrapError(error, 'Failed to connect to PostGIS');
     }
 
-    // Store pool for later use
-    this.postgisPools.set(tilesetId, pool);
+    // Store connection config for later tile generation
+    this.postgisConfigs.set(tilesetId, source);
 
     console.log(`[MVT On-Demand Publisher] PostGIS tileset created: ${tilesetId}`);
     console.log(`[MVT On-Demand Publisher] Source: ${source.tableName || 'Custom SQL'}`);
@@ -456,82 +441,56 @@ export class MVTOnDemandPublisher extends BaseMVTPublisher {
     y: number,
     metadata: MVTPublishMetadata
   ): Promise<Buffer | null> {
-    const pool = this.postgisPools.get(tilesetId);
+    const source = this.postgisConfigs.get(tilesetId);
     
-    if (!pool) {
-      console.warn(`[MVT On-Demand Publisher] PostGIS pool not found: ${tilesetId}`);
+    if (!source) {
+      console.warn(`[MVT On-Demand Publisher] PostGIS config not found: ${tilesetId}`);
       return null;
     }
 
     const extent = metadata.extent || 4096;
-    const geometryColumn = metadata.geometryColumn || 'geom';  // Get geometry column from metadata
-    
-    let query: string;
-    let params: any[];
-
-    if (metadata.tableName) {
-      // Use table name - Use ST_AsMVTGeom to properly transform coordinates to tile space
-      const schema = metadata.schema || 'public';  // Get schema from metadata, default to 'public'
-      console.log(`[MVT On-Demand Publisher] Querying table: ${schema}.${metadata.tableName}, geometryColumn: ${geometryColumn}`);
-      
-      // Debug: Check if table has data and get bbox
-      try {
-        const debugResult = await pool.query(
-          `SELECT COUNT(*) as count, ST_Extent(${geometryColumn}) as extent FROM ${schema}.${metadata.tableName}`
-        );
-        if (debugResult.rows.length > 0) {
-          console.log(`[MVT On-Demand Publisher] Table stats - Count: ${debugResult.rows[0].count}, Extent: ${debugResult.rows[0].extent}`);
-        }
-      } catch (debugError) {
-        console.warn('[MVT On-Demand Publisher] Debug query failed:', debugError);
-      }
-      
-      query = `
-        SELECT ST_AsMVT(q, $1, $2, 'geom') as tile
-        FROM (
-          SELECT ST_AsMVTGeom(
-            ST_Transform(${geometryColumn}, 3857),
-            ST_TileEnvelope($3, $4, $5),
-            $2,
-            0,
-            true
-          ) as geom
-          FROM ${schema}.${metadata.tableName}
-          WHERE ST_Intersects(ST_Transform(${geometryColumn}, 3857), ST_TileEnvelope($3, $4, $5))
-        ) q
-      `;
-      params = [metadata.layerName || metadata.tableName || 'default_layer', extent, z, x, y];
-    } else if (metadata.sqlQuery) {
-      // Use custom SQL query - assume the query already handles projection or returns 3857
-      query = `
-        SELECT ST_AsMVT(q, $1, $2, $3) as tile
-        FROM (
-          ${metadata.sqlQuery}
-        ) q
-        WHERE ST_Intersects(${geometryColumn}, ST_TileEnvelope($4, $5, $6))
-      `;
-      params = [metadata.layerName || 'default_layer', extent, geometryColumn, z, x, y];
-    } else {
-      throw new Error('Invalid PostGIS metadata');
-    }
+    const geometryColumn = metadata.geometryColumn || 'geom';
+    const schema = metadata.schema || 'public';
+    const layerName = metadata.layerName || source.tableName || 'default_layer';
 
     try {
-      console.log(`[MVT On-Demand Publisher] Executing query for tile ${z}/${x}/${y}`);
-      console.log(`[MVT On-Demand Publisher] Query params:`, params);
+      console.log(`[MVT On-Demand Publisher] Generating tile ${z}/${x}/${y} from PostGIS`);
       
-      const result = await pool.query(query, params);
+      // Get pool from PostGISPoolManager via PostGISTileGenerator
+      const pool = await this.postgisGenerator.createPool(source.connection);
       
-      console.log(`[MVT On-Demand Publisher] Query result rows: ${result.rows.length}`);
+      // Generate tile using shared PostGISTileGenerator
+      const result = await this.postgisGenerator.generateTile(
+        pool,
+        z,
+        x,
+        y,
+        {
+          tableName: source.tableName,
+          sqlQuery: source.sqlQuery,
+          geometryColumn: geometryColumn
+        },
+        {
+          extent: extent,
+          layerName: layerName,
+          schema: schema
+        }
+      );
       
-      if (result.rows.length === 0 || !result.rows[0].tile) {
-        console.log(`[MVT On-Demand Publisher] Empty tile returned for ${z}/${x}/${y}`);
-        return null;  // Empty tile
+      if (!result.success) {
+        console.error('[MVT On-Demand Publisher] PostGIS tile generation failed:', result.error);
+        return null;
       }
 
-      const tileSize = result.rows[0].tile.length;
+      if (!result.tileBuffer) {
+        console.log(`[MVT On-Demand Publisher] Empty tile for ${z}/${x}/${y}`);
+        return null;
+      }
+
+      const tileSize = result.tileBuffer.length;
       console.log(`[MVT On-Demand Publisher] Tile size: ${tileSize} bytes for ${z}/${x}/${y}`);
       
-      return result.rows[0].tile;
+      return result.tileBuffer;
     } catch (error) {
       console.error('[MVT On-Demand Publisher] PostGIS tile query failed:', error);
       return null;
