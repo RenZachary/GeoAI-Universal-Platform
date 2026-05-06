@@ -247,11 +247,11 @@ async function handleSendMessage() {
   scrollToBottom()
 }
 
-// Convert @mention names to data source IDs
+// Convert @mention names to data source IDs and /tool names to tool IDs
 function convertMentionsToIds(text: string): string {
   let result = text
   
-  // Find all @mentions
+  // Find all @mentions (data sources)
   const mentionRegex = /@([^\s,，]+)/g
   let match
   
@@ -265,6 +265,22 @@ function convertMentionsToIds(text: string): string {
       // Replace @name with @id format that backend can parse
       const replacement = `@[datasource:${matchedDS.id}]`
       result = result.replace(`@${mentionName}`, replacement)
+    }
+  }
+  
+  // Find all /commands (tools)
+  const toolRegex = /\/([^\s,，]+)/g
+  
+  while ((match = toolRegex.exec(text)) !== null) {
+    const toolName = match[1]
+    
+    // Find exact match in tools
+    const matchedTool = toolStore.tools.find((t: any) => t.name === toolName)
+    
+    if (matchedTool) {
+      // Replace /name with /id format that backend can parse
+      const replacement = `/[tool:${matchedTool.id}]`
+      result = result.replace(`/${toolName}`, replacement)
     }
   }
   

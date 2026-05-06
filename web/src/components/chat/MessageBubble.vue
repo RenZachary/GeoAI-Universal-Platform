@@ -78,11 +78,13 @@ import { marked } from 'marked'
 import { useChatStore } from '@/stores/chat'
 import { useMapStore } from '@/stores/map'
 import { useDataSourceStore } from '@/stores/dataSources'
+import { useToolStore } from '@/stores/tools'
 import { ElMessage } from 'element-plus'
 
 const chatStore = useChatStore()
 const mapStore = useMapStore()
 const dataSourceStore = useDataSourceStore()
+const toolStore = useToolStore()
 
 const props = defineProps<{
   message: ChatMessage
@@ -103,6 +105,19 @@ const renderedContent = computed(() => {
       if (ds) {
         // Return highlighted span with the data source name
         return `<span class="mention-highlight">@${ds.name}</span>`
+      }
+      // If not found, return the original match
+      return match
+    })
+    
+    // Find all /[tool:ID] patterns and replace with highlighted /name
+    const toolRegex = /\/\[tool:([^\]]+)\]/g
+    content = content.replace(toolRegex, (match, toolId) => {
+      // Find the tool by ID
+      const tool = toolStore.tools.find((t: any) => t.id === toolId)
+      if (tool) {
+        // Return highlighted span with the tool name
+        return `<span class="tool-highlight">/${tool.name}</span>`
       }
       // If not found, return the original match
       return match
@@ -289,6 +304,15 @@ function handleRegenerate() {
   :deep(.mention-highlight) {
     color: var(--el-color-primary);
     background: var(--el-color-primary-light-9);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+  }
+  
+  // Support for /tool highlights in user messages
+  :deep(.tool-highlight) {
+    color: var(--el-color-success);
+    background: var(--el-color-success-light-9);
     padding: 2px 6px;
     border-radius: 4px;
     font-weight: 500;
