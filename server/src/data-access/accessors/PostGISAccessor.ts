@@ -5,7 +5,7 @@
  */
 
 import type { NativeData, DataMetadata } from '../../core';
-import { generateId, wrapError } from '../../core';
+import { wrapError } from '../../core';
 import type { DatabaseAccessor, TableSchema, ColumnInfo, IndexInfo, BufferOptions, OverlayOptions, FilterCondition } from '../interfaces';
 import type { PoolConfig, QueryResultRow } from 'pg';
 import { Pool } from 'pg';

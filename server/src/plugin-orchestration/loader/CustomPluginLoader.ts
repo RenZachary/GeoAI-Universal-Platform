@@ -5,7 +5,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath, pathToFileURL } from 'url';
+import {  pathToFileURL } from 'url';
 import type { Plugin, PluginCategory } from '../../core';
 import { ToolRegistryInstance } from '../registry/ToolRegistry';
 import { ExecutorRegistryInstance } from '../registry/ExecutorRegistry';

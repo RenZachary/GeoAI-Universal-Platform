@@ -7,7 +7,6 @@
  */
 
 import type { Database } from 'better-sqlite3';
-import type { Plugin } from '../../core/index';
 
 // Executor interface that all plugin executors must implement
 export interface IPluginExecutor {

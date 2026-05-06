@@ -7,7 +7,6 @@ import type { LLMConfig } from '../adapters/LLMAdapterFactory';
 import { LLMAdapterFactory } from '../adapters/LLMAdapterFactory';
 import type { PromptManager } from '../managers/PromptManager';
 import type { GeoAIStateType, AnalysisGoal } from '../workflow/GeoAIGraph';
-import type { GoalType } from '../../core/index';
 import { GOAL_TYPE_VALUES } from '../../core/index';
 
 export class GoalSplitterAgent {

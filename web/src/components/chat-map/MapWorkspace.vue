@@ -79,7 +79,7 @@ import { useDataSourceStore } from '@/stores/dataSources'
 import { MapLocation, List, Delete, FullScreen } from '@element-plus/icons-vue'
 import LayerItemCard from '@/components/map/LayerItemCard.vue'
 import { ElMessage } from 'element-plus'
-import type { DataSource } from '@/types'
+import { DataSource, LayerType } from '@/types'
 import { getDataSourceServiceUrl } from '@/services/dataSource'
 
 const { t } = useI18n()
@@ -125,14 +125,14 @@ onMounted(async () => {
       // Get the appropriate service URL (MVT or WMS)
       const serviceInfo = await getDataSourceServiceUrl(ds.id)
 
-      let layerType: 'geojson' | 'mvt' | 'wms' | 'heatmap' | 'image'
+      let layerType: LayerType
       let url: string
 
       if (serviceInfo.serviceType === 'wms') {
-        layerType = 'wms'
+        layerType = LayerType.WMS
         url = serviceInfo.serviceUrl
       } else {
-        layerType = 'mvt'
+        layerType = LayerType.MVT
         url = serviceInfo.serviceUrl
       }
 

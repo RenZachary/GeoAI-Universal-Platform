@@ -30,12 +30,12 @@
             class="service-link-item"
           >
             <el-icon>
-              <Document v-if="service.type === 'geojson' || service.type === 'report'" />
+              <Document v-if="service.type === VisualizationServiceType.GeoJSON || service.type === VisualizationServiceType.Report" />
               <MapLocation v-else />
             </el-icon>
             <span class="service-name">{{ getServiceName(service) }}</span>
             <el-button 
-              v-if="service.type !== 'geojson'"
+              v-if="service.type !== VisualizationServiceType.GeoJSON"
               link 
               type="primary" 
               size="small"
@@ -72,6 +72,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { ChatMessage, VisualizationService } from '@/types'
+import { VisualizationServiceType } from '@/types'
 import { User, ChatDotRound, DocumentCopy, RefreshRight, Link, Document, MapLocation } from '@element-plus/icons-vue'
 import { marked } from 'marked'
 import { useChatStore } from '@/stores/chat'
@@ -114,13 +115,13 @@ function getServiceName(service: VisualizationService): string {
 }
 
 function getActionText(service: VisualizationService): string {
-  if (service.type === 'mvt' || service.type === 'wms' || service.type === 'image') {
+  if (service.type === VisualizationServiceType.MVT || service.type === VisualizationServiceType.WMS || service.type === VisualizationServiceType.Image) {
     return 'View on Map'
-  } else if (service.type === 'geojson') {
+  } else if (service.type === VisualizationServiceType.GeoJSON) {
     return 'Download'
-  } else if (service.type === 'heatmap') {
+  } else if (service.type === VisualizationServiceType.Heatmap) {
     return 'View Heatmap'
-  } else if (service.type === 'report') {
+  } else if (service.type === VisualizationServiceType.Report) {
     return 'View Report'
   }
   return 'View'
@@ -128,12 +129,12 @@ function getActionText(service: VisualizationService): string {
 
 function handleViewService(service: VisualizationService) {
   // For MVT/WMS/Image (map services), navigate to map page with layer info
-  if (service.type === 'mvt' || service.type === 'wms' || service.type === 'image') {
+  if (service.type === VisualizationServiceType.MVT || service.type === VisualizationServiceType.WMS || service.type === VisualizationServiceType.Image) {
     // Unidirectional flow: chat → map, no callback
     mapStore.addLayerFromService(service)
     
     ElMessage.success(`Layer "${service.metadata?.name || service.id}" added to map`)
-  } else if (service.type === 'report') {
+  } else if (service.type === VisualizationServiceType.Report) {
     // For reports, open in new tab - convert relative URL to absolute
     const reportUrl = service.url.startsWith('http') 
       ? service.url 

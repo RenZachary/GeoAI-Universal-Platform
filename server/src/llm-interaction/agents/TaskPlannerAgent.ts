@@ -12,7 +12,7 @@ import { DataSourceRepository } from '../../data-access/repositories';
 import { SQLiteManagerInstance } from '../../storage/';
 import { PluginCapabilityRegistry } from '../../plugin-orchestration';
 import { GeometryAdapter } from '../../utils/GeometryAdapter';
-import type { GoalType, ExecutionCategory } from '../../core/index';
+import type {  ExecutionCategory } from '../../core/index';
 import { GOAL_TO_EXECUTION_CATEGORY } from '../../core/index';
 
 export class TaskPlannerAgent {

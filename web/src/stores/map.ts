@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { MapLayer, BasemapType } from '@/types'
+import { LayerType } from '@/types'
 import { createStyleFromBasemap } from '@/config/basemaps'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
@@ -137,17 +138,17 @@ export const useMapStore = defineStore('map', () => {
     const map = mapInstance.value as any
 
     switch (layer.type) {
-      case 'geojson':
+      case LayerType.GeoJSON:
         addGeoJSONLayer(map, layer)
         break
-      case 'mvt':
+      case LayerType.MVT:
         addMVTLayer(map, layer)
         break
-      case 'wms':
-      case 'image':
+      case LayerType.WMS:
+      case LayerType.Image:
         addWMSLayer(map, layer)
         break
-      case 'heatmap':
+      case LayerType.Heatmap:
         addHeatmapLayer(map, layer)
         break
     }
@@ -425,12 +426,12 @@ export const useMapStore = defineStore('map', () => {
     }
 
     // Convert service type to map layer type
-    let layerType: 'geojson' | 'mvt' | 'wms' | 'heatmap' | 'image'
+    let layerType: LayerType
     
     if (service.type === 'mvt') {
-      layerType = 'mvt'
+      layerType = LayerType.MVT
     } else if (service.type === 'wms' || service.type === 'image') {
-      layerType = 'image'
+      layerType = LayerType.Image
     } else {
       console.warn(`[Map Store] Unsupported service type: ${service.type}`)
       return

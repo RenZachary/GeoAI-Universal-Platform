@@ -6,6 +6,14 @@
 // Map Types
 // ============================================================================
 
+export enum LayerType {
+  GeoJSON = 'geojson',
+  MVT = 'mvt',
+  WMS = 'wms',
+  Heatmap = 'heatmap',
+  Image = 'image'
+}
+
 export type BasemapType = 
   | 'cartoDark'
   | 'cartoLight'
@@ -24,7 +32,7 @@ export interface BasemapConfig {
 export interface MapLayer {
   id: string
   name?: string  // Display name for the layer
-  type: 'geojson' | 'mvt' | 'wms' | 'heatmap' | 'image'
+  type: LayerType
   url: string
   visible: boolean
   opacity?: number
@@ -48,6 +56,15 @@ export interface LayerStyle {
 // Chat Types
 // ============================================================================
 
+export enum VisualizationServiceType {
+  GeoJSON = 'geojson',
+  MVT = 'mvt',
+  WMS = 'wms',
+  Heatmap = 'heatmap',
+  Image = 'image',
+  Report = 'report'
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
@@ -58,7 +75,7 @@ export interface ChatMessage {
 
 export interface VisualizationService {
   id: string
-  type: 'geojson' | 'mvt' | 'wms' | 'heatmap' | 'image' | 'report'
+  type: VisualizationServiceType
   url: string
   goalId?: string
   stepId?: string

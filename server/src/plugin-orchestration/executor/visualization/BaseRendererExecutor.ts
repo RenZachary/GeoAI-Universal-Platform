@@ -9,7 +9,7 @@ import type { DataSourceRecord } from '../../../data-access/repositories';
 import { DataAccessorFactory } from '../../../data-access';
 import { MVTStrategyPublisher } from '../../../utils/publishers/MVTStrategyPublisher';
 import { DataSourceRepository } from '../../../data-access/repositories';
-import { GeometryAdapter, type GeometryType } from '../../../utils/GeometryAdapter';
+import { GeometryAdapter } from '../../../utils/GeometryAdapter';
 import { StyleFactory } from '../../utils/StyleFactory';
 import type Database from 'better-sqlite3';
 import path from 'path';
