@@ -13,7 +13,7 @@
  */
 
 import type { NativeData } from '../../../core';
-import { DataAccessorFactory } from '../../../data-access/factories/DataAccessorFactory';
+import { DataAccessorFactory } from '../../../data-access';
 import { DataSourceRepository } from '../../../data-access/repositories';
 import type Database from 'better-sqlite3';
 

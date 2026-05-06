@@ -5,7 +5,7 @@
 import type { Request, Response } from 'express';
 import type { GeoAIStateType } from '../../llm-interaction';
 import { compileGeoAIGraph } from '../../llm-interaction';
-import { GeoAIStreamingHandler } from '../../llm-interaction/handlers/GeoAIStreamingHandler';
+import { GeoAIStreamingHandler } from '../../llm-interaction';
 import type { LLMConfig } from '../../llm-interaction';
 import type { ConversationService } from '../../services';
 

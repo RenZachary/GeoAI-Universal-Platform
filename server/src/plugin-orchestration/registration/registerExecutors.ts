@@ -1,5 +1,5 @@
 /**
- * Executor Registration Configuration
+ * Executor Registration
  * 
  * Registers all plugin executors with the ExecutorRegistry on application startup.
  * This eliminates the need for switch-case statements in PluginToolWrapper.

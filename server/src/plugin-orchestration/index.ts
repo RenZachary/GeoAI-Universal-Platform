@@ -34,6 +34,14 @@ export { PluginToolWrapper } from './tools/PluginToolWrapper';
 // Registry
 // ============================================================================
 export { ToolRegistryInstance } from './registry/ToolRegistry';
+export { ExecutorRegistryInstance } from './registry/ExecutorRegistry';
+export { PluginCapabilityRegistry } from './registry/PluginCapabilityRegistry';
+
+// ============================================================================
+// Registration (Batch registration functions)
+// ============================================================================
+export { registerAllExecutors } from './registration/registerExecutors';
+export { registerAllPluginCapabilities } from './registration/registerPluginCapabilities';
 
 // ============================================================================
 // Loader

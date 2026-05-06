@@ -10,7 +10,7 @@ import vtPbf from 'vt-pbf';
 import fs from 'fs';
 import path from 'path';
 import type { DataSourceType, NativeData } from '../../core/index';
-import { DataAccessorFactory } from '../../data-access/factories/DataAccessorFactory';
+import { DataAccessorFactory } from '../../data-access';
 import type Database from 'better-sqlite3';
 import { BaseMVTPublisher, type MVTPublishResult } from './base/BaseMVTPublisher';
 import type { Pool } from 'pg';

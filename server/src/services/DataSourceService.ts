@@ -10,7 +10,7 @@
 
 import type { DataSourceRepository} from '../data-access/repositories';
 import { type DataSourceRecord } from '../data-access/repositories';
-import { DataAccessorFactory } from '../data-access/factories/DataAccessorFactory';
+import { DataAccessorFactory } from '../data-access';
 import { generateId } from '../core';
 
 // ============================================================================

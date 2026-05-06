@@ -10,7 +10,7 @@ import type { GeoAIStateType, ExecutionPlan} from '../workflow/GeoAIGraph';
 import { ToolRegistryInstance } from '../../plugin-orchestration';
 import { DataSourceRepository } from '../../data-access/repositories';
 import { SQLiteManagerInstance } from '../../storage/';
-import { PluginCapabilityRegistry } from '../../plugin-orchestration/registry/PluginCapabilityRegistry';
+import { PluginCapabilityRegistry } from '../../plugin-orchestration';
 import { GeometryAdapter } from '../../utils/GeometryAdapter';
 
 export class TaskPlannerAgent {

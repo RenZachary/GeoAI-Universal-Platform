@@ -6,7 +6,7 @@
 
 import type { NativeData } from '../../../core/index';
 import type { DataSourceRecord } from '../../../data-access/repositories';
-import { DataAccessorFactory } from '../../../data-access/factories/DataAccessorFactory';
+import { DataAccessorFactory } from '../../../data-access';
 import { MVTStrategyPublisher } from '../../../utils/publishers/MVTStrategyPublisher';
 import { DataSourceRepository } from '../../../data-access/repositories';
 import { GeometryAdapter, type GeometryType } from '../../../utils/GeometryAdapter';

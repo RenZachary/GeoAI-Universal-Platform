@@ -10,10 +10,9 @@ import dotenv from 'dotenv';
 import { WorkspaceManagerInstance, CleanupScheduler } from './storage';
 import { SQLiteManagerInstance } from './storage';
 import { ApiRouter } from './api/routes';
-import { CustomPluginLoader } from './plugin-orchestration';
+import { CustomPluginLoader, registerAllExecutors, registerAllPluginCapabilities } from './plugin-orchestration';
 import { LLMConfigManagerInstance } from './services/LLMConfigService';
 import { scanAndRegisterDataFiles } from './utils/DataDirectoryScanner';
-import { registerAllExecutors } from './plugin-orchestration/config/ExecutorRegistration';
 
 // Load environment variables
 const __filename = fileURLToPath(import.meta.url);
@@ -85,6 +84,11 @@ async function startServer() {
     const db = SQLiteManagerInstance.getDatabase();
     registerAllExecutors(db, WORKSPACE_BASE);
     console.log('Executor registration complete');
+    
+    // Register all plugin capabilities with PluginCapabilityRegistry
+    console.log('Registering plugin capabilities...');
+    registerAllPluginCapabilities();
+    console.log('Plugin capability registration complete');
     
     // Initialize API routes after database is ready
     const apiRouter = new ApiRouter(llmConfig, WORKSPACE_BASE, customPluginLoader);
