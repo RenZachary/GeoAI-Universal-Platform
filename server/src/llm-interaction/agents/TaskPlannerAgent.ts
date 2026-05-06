@@ -6,7 +6,7 @@ import { z } from 'zod';
 import type { LLMConfig } from '../adapters/LLMAdapterFactory';
 import { LLMAdapterFactory } from '../adapters/LLMAdapterFactory';
 import type { PromptManager } from '../managers/PromptManager';
-import type { GeoAIStateType, ExecutionPlan} from '../workflow/GeoAIGraph';
+import type { GeoAIStateType, ExecutionPlan, ExecutionStep} from '../workflow/GeoAIGraph';
 import { ToolRegistryInstance } from '../../plugin-orchestration';
 import { DataSourceRepository } from '../../data-access/repositories';
 import { SQLiteManagerInstance } from '../../storage/';
@@ -84,44 +84,18 @@ export class TaskPlannerAgent {
       // Plan each goal in parallel
       const planPromises = state.goals.map(async (goal) => {
         try {
-          // STAGE 1: Rule-based filtering using PluginCapabilityRegistry
-          console.log(`[Task Planner] Stage 1: Filtering plugins for goal ${goal.id} (${goal.type})`);
+          // STAGE 1: Use required executors from goal (no filtering needed)
+          console.log(`[Task Planner] Stage 1: Processing goal ${goal.id}`);
+          console.log(`[Task Planner] Required executors:`, goal.requiredExecutors);
           
-          // Infer execution category from goal type using centralized mapping
-          const expectedCategory: ExecutionCategory | undefined = GOAL_TO_EXECUTION_CATEGORY[goal.type];
+          // Use the required executors directly - no category filtering
+          const compatiblePluginIds = goal.requiredExecutors || [];
           
-          // Detect data format and geometry type from referenced data source
-          let dataFormat: 'vector' | 'raster' | undefined;
-          let geometryType: string | undefined;
-          
-          // Try to extract data source ID from goal description or parameters
-          const dataSourceMatch = goal.description.match(/dataSource[:\s]+([\w-]+)/i);
-          if (dataSourceMatch && dataSourceMatch[1]) {
-            const dataSourceId = dataSourceMatch[1];
-            const dataSource = dataSources.find(ds => ds.id === dataSourceId);
-            
-            if (dataSource) {
-              // Determine data format
-              if (['geojson', 'shapefile', 'postgis'].includes(dataSource.type)) {
-                dataFormat = 'vector';
-                
-                // Extract geometry type from metadata
-                geometryType = GeometryAdapter.getGeometryTypeFromMetadata(dataSource);
-              } else if (['geotiff', 'wms'].includes(dataSource.type)) {
-                dataFormat = 'raster';
-              }
-            }
+          if (compatiblePluginIds.length === 0) {
+            console.warn(`[Task Planner] No executors specified for goal ${goal.id}`);
           }
           
-          // Filter plugins by capability criteria
-          const compatiblePluginIds = PluginCapabilityRegistry.filterByCapability({
-            expectedCategory,
-            dataFormat,
-            geometryType,
-            isTerminalAllowed: true // Allow terminal nodes in initial planning
-          });
-          
-          console.log(`[Task Planner] Stage 1: Found ${compatiblePluginIds.length} compatible plugins:`, compatiblePluginIds);
+          console.log(`[Task Planner] Stage 1: Found ${compatiblePluginIds.length} required executors:`, compatiblePluginIds);
           
           // If no compatible plugins found, create fallback plan
           if (compatiblePluginIds.length === 0) {
@@ -181,9 +155,17 @@ export class TaskPlannerAgent {
             timestamp: new Date().toISOString()
           }) as ExecutionPlan;
 
+          // STAGE 2.5: Remove duplicate steps (defensive programming)
+          const deduplicatedPlan = this.removeDuplicateSteps(plan);
+          if (deduplicatedPlan.steps.length !== plan.steps.length) {
+            console.warn(`[Task Planner] Removed ${plan.steps.length - deduplicatedPlan.steps.length} duplicate steps from plan`);
+            console.log(`[Task Planner] Original steps:`, plan.steps.map(s => s.pluginId));
+            console.log(`[Task Planner] Deduplicated steps:`, deduplicatedPlan.steps.map(s => s.pluginId));
+          }
+
           // STAGE 3: Validate terminal node constraints
           console.log(`[Task Planner] Stage 3: Validating terminal node constraints for goal ${goal.id}`);
-          const validatedPlan = this.validateTerminalNodeConstraints(plan, compatiblePluginIds);
+          const validatedPlan = this.validateTerminalNodeConstraints(deduplicatedPlan, compatiblePluginIds);
           
           if (!validatedPlan) {
             console.warn(`[Task Planner] Plan failed terminal node validation, creating fallback`);
@@ -445,5 +427,41 @@ export class TaskPlannerAgent {
     }
     
     return terminalIds;
+  }
+
+  /**
+   * Remove duplicate steps from execution plan
+   * Keeps only the first occurrence of each plugin
+   * This is a defensive measure against LLM generating duplicate steps
+   * 
+   * @param plan - The execution plan to deduplicate
+   * @returns Deduplicated execution plan
+   */
+  private removeDuplicateSteps(plan: ExecutionPlan): ExecutionPlan {
+    if (!plan || !plan.steps || plan.steps.length === 0) {
+      return plan;
+    }
+
+    const seenPlugins = new Set<string>();
+    const uniqueSteps: ExecutionStep[] = [];
+    const uniquePluginIds: string[] = [];
+
+    for (const step of plan.steps) {
+      if (!seenPlugins.has(step.pluginId)) {
+        seenPlugins.add(step.pluginId);
+        uniqueSteps.push(step);
+        if (!uniquePluginIds.includes(step.pluginId)) {
+          uniquePluginIds.push(step.pluginId);
+        }
+      } else {
+        console.warn(`[Task Planner] Removing duplicate step with plugin: ${step.pluginId}`);
+      }
+    }
+
+    return {
+      ...plan,
+      steps: uniqueSteps,
+      requiredPlugins: uniquePluginIds
+    };
   }
 }

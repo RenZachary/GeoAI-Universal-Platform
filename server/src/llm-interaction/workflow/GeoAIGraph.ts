@@ -36,7 +36,7 @@ export interface GeoAIState {
 export interface AnalysisGoal {
   id: string;
   description: string;
-  type: GoalType;
+  requiredExecutors: string[]; // List of executor IDs needed for this goal
   priority: number;
   parameters?: Record<string, any>; // Optional extracted parameters (e.g., colorRamp, valueField)
 }
@@ -198,7 +198,9 @@ export function createGeoAIGraph(
               }
               
               // Resolve placeholders in parameters using previous execution results
+              console.log(`[Plugin Executor] Original parameters:`, step.parameters);
               const resolvedParameters = resolvePlaceholders(step.parameters, executionResults);
+              console.log(`[Plugin Executor] Resolved parameters:`, resolvedParameters);
               
               // Invoke the tool with resolved parameters
               console.log(`[Plugin Executor] Invoking tool with parameters:`, resolvedParameters);

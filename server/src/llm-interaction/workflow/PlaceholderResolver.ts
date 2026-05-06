@@ -80,19 +80,10 @@ function tryResolvePlaceholder(value: string, executionResults: Map<string, Exec
   // Extract the result value from metadata.result
   const resultValue = result.data.metadata?.result;
   
-  // Special case: if accessing .id field, return NativeData.id directly
-  if (fieldPath === 'id') {
+  // Special case: if accessing .id field or no field path, return NativeData.id directly
+  // This is the most common use case for passing data between steps
+  if (fieldPath === 'id' || !fieldPath) {
     return result.data.id;
-  }
-  
-  if (resultValue === undefined) {
-    console.warn(`[Placeholder Resolver] metadata.result is undefined for step: ${stepId}`);
-    return undefined;
-  }
-  
-  // If no field path, return the entire result
-  if (!fieldPath) {
-    return resultValue;
   }
   
   // Navigate the field path within resultValue

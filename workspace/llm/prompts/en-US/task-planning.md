@@ -21,6 +21,8 @@ Planning Principles:
 5. Dependency Awareness: If a step requires output from a previous step, ensure proper dependency ordering. Independent steps can execute in parallel.
 6. Plugin Compatibility: Verify that plugin parameters match the data source characteristics (type, geometry, available fields). Do not use plugins with incompatible data sources.
 7. **CRITICAL: Plugin ID Accuracy**: You MUST use the EXACT `id` field from the Available Plugins list. DO NOT invent, modify, or guess plugin IDs. The `pluginId` field in your execution plan must exactly match a plugin's `id` from the available list.
+8. **CRITICAL: No Duplicate Steps**: Each step in the plan MUST use a unique plugin. NEVER repeat the same plugin multiple times within a single goal's execution plan. If you find yourself wanting to use the same plugin twice, reconsider whether both steps are truly necessary - typically one properly configured step is sufficient.
+9. **Analysis + Visualization Pattern**: Carefully examine the goal description for ANY mention of display, show, view, map, render, or visualization terms. If found AND goal type is `spatial_analysis` or `data_processing`, you MUST create a TWO-step plan where Step 1 executes the analysis/processing plugin and Step 2 uses a visualization plugin with dataSourceId referencing Step 1's result using placeholder syntax.
 
 Referencing Previous Step Results:
 When a step needs to use results from a previous step, you MUST use this EXACT syntax:
@@ -34,7 +36,7 @@ Rules:
 
 CRITICAL RULES FOR DATA DEPENDENCIES:
 1. When a visualization plugin follows an analysis step, you MUST pass the analysis result's ID as dataSourceId using placeholder syntax.
-2. Use the pattern: "dataSourceId": "{previous_step_id.result.id}" to reference the NativeData.id from the previous step's output.
+2. Use placeholder syntax to reference the NativeData.id from the previous step's output.
 3. NEVER pass the original data source ID to visualization plugins when there's a preceding analysis step that produces new geometry.
 4. The .result.id field contains the unique identifier of the previous step's NativeData output, which is required for loading that specific processed result.
 
@@ -74,3 +76,6 @@ Validation Checklist (internal, do not output):
 - Are all steps necessary, or can some be removed without affecting goal completion?
 - Do plugin parameters match the actual data source type and structure?
 - **CRITICAL**: Does every `pluginId` EXACTLY match an `id` from the Available Plugins list?
+- **CRITICAL**: Are there any duplicate plugins in the steps array? Each plugin should appear at most once per goal.
+- **CRITICAL**: For visualization goals, is there exactly ONE visualization plugin as the final step?
+- **CRITICAL**: If goal description mentions display/show/view/map/render AND goal type is spatial_analysis/data_processing, does the plan have TWO steps (analysis + visualization)?

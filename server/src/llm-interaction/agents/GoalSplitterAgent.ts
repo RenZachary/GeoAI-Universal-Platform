@@ -7,7 +7,7 @@ import type { LLMConfig } from '../adapters/LLMAdapterFactory';
 import { LLMAdapterFactory } from '../adapters/LLMAdapterFactory';
 import type { PromptManager } from '../managers/PromptManager';
 import type { GeoAIStateType, AnalysisGoal } from '../workflow/GeoAIGraph';
-import { GOAL_TYPE_VALUES } from '../../core/index';
+import { ToolRegistryInstance } from '../../plugin-orchestration';
 
 export class GoalSplitterAgent {
   private llmConfig: LLMConfig;
@@ -31,11 +31,15 @@ export class GoalSplitterAgent {
         'en-US'
       );
 
+      // Get all available executor IDs from Tool Registry
+      const availableExecutors = ToolRegistryInstance.getToolNames();
+      console.log(`[Goal Splitter] Available executors: ${availableExecutors.length}`);
+
       // Define output schema for structured output
       const goalSchema = z.object({
         id: z.string().describe('Unique identifier for the goal'),
-        description: z.string().describe('Detailed description of what to accomplish'),
-        type: z.enum(GOAL_TYPE_VALUES).describe('Type of goal'),
+        description: z.string().describe('Detailed description of what to accomplish in natural language'),
+        requiredExecutors: z.array(z.string()).describe('List of executor IDs needed to accomplish this goal'),
         priority: z.number().min(1).max(10).describe('Priority level (1-10)')
       });
 
@@ -49,13 +53,15 @@ export class GoalSplitterAgent {
       // Create chain
       const chain = promptTemplate.pipe(modelWithStructuredOutput);
 
-      // Invoke with user input
+      // Invoke with user input and available executors
       const goals = await chain.invoke({
         userInput: state.userInput,
+        availableExecutors: availableExecutors.join(', '),
         timestamp: new Date().toISOString()
       }) as AnalysisGoal[];
 
       console.log(`[Goal Splitter] Identified ${goals.length} goals`);
+      console.log(`[Goal Splitter] Goals:`, JSON.stringify(goals, null, 2));
 
       return {
         goals,
@@ -65,11 +71,11 @@ export class GoalSplitterAgent {
     } catch (error) {
       console.error('[Goal Splitter] Failed to split goals:', error);
       
-      // Fallback: Create a single generic goal with 'general' type
+      // Fallback: Create a single generic goal
       const fallbackGoal: AnalysisGoal = {
         id: `goal_${Date.now()}`,
         description: state.userInput,
-        type: 'general',
+        requiredExecutors: [],  // Empty - let Task Planner figure it out
         priority: 5
       };
 
