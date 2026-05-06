@@ -211,6 +211,10 @@ export const useMapStore = defineStore('map', () => {
    */
   async function applyCustomStyleFromURL(map: any, layer: Omit<MapLayer, 'createdAt'>, styleUrl: string) {
     try {
+      console.log('[Map Store] === applyCustomStyleFromURL START ===')
+      console.log('[Map Store] Layer ID:', layer.id)
+      console.log('[Map Store] Style URL:', styleUrl)
+      
       // Convert relative URL to absolute
       const fullStyleUrl = styleUrl.startsWith('http')
         ? styleUrl
@@ -225,22 +229,33 @@ export const useMapStore = defineStore('map', () => {
       }
 
       const styleJson = await response.json()
+      console.log('[Map Store] Style JSON loaded:', JSON.stringify(styleJson, null, 2))
 
       // Add vector source
       const tilesUrl = layer.url.startsWith('http')
         ? layer.url
         : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${layer.url}`
 
+      console.log('[Map Store] Tiles URL:', tilesUrl)
+      console.log('[Map Store] Adding source with ID:', layer.id)
+      
       map.addSource(layer.id, {
         type: 'vector',
         tiles: [tilesUrl],
         minzoom: layer.minZoom || 0,
         maxzoom: layer.maxZoom || 22
       })
+      
+      console.log('[Map Store] Source added successfully')
+      console.log('[Map Store] Verifying source exists:', !!map.getSource(layer.id))
 
       // Add layers from style JSON
       if (styleJson.layers && Array.isArray(styleJson.layers)) {
-        styleJson.layers.forEach((styleLayer: any) => {
+        console.log(`[Map Store] Processing ${styleJson.layers.length} layers from style`)
+        
+        styleJson.layers.forEach((styleLayer: any, index: number) => {
+          console.log(`\n[Map Store] --- Layer ${index + 1} ---`)
+          
           const layerToAdd: any = {
             id: styleLayer.id,
             type: styleLayer.type,
@@ -249,24 +264,58 @@ export const useMapStore = defineStore('map', () => {
             paint: styleLayer.paint
           }
           
-          if (styleLayer.minzoom !== undefined) layerToAdd.minzoom = styleLayer.minzoom
-          if (styleLayer.maxzoom !== undefined) layerToAdd.maxzoom = styleLayer.maxzoom
-          if (styleLayer.layout) layerToAdd.layout = styleLayer.layout
-          if (styleLayer.filter) layerToAdd.filter = styleLayer.filter
+          console.log('[Map Store] Layer to add - ID:', layerToAdd.id)
+          console.log('[Map Store] Layer to add - Type:', layerToAdd.type)
+          console.log('[Map Store] Layer to add - Source:', layerToAdd.source)
+          console.log('[Map Store] Layer to add - Source-layer:', layerToAdd['source-layer'])
+          console.log('[Map Store] Layer to add - Paint:', JSON.stringify(layerToAdd.paint))
           
-          if (!map.getLayer(layerToAdd.id)) {
+          if (styleLayer.minzoom !== undefined) {
+            layerToAdd.minzoom = styleLayer.minzoom
+            console.log('[Map Store] Layer to add - Minzoom:', layerToAdd.minzoom)
+          }
+          if (styleLayer.maxzoom !== undefined) {
+            layerToAdd.maxzoom = styleLayer.maxzoom
+            console.log('[Map Store] Layer to add - Maxzoom:', layerToAdd.maxzoom)
+          }
+          if (styleLayer.layout) {
+            layerToAdd.layout = styleLayer.layout
+            console.log('[Map Store] Layer to add - Layout:', JSON.stringify(layerToAdd.layout))
+          }
+          if (styleLayer.filter) {
+            layerToAdd.filter = styleLayer.filter
+            console.log('[Map Store] Layer to add - Filter:', JSON.stringify(layerToAdd.filter))
+          }
+          
+          const layerExists = map.getLayer(layerToAdd.id)
+          console.log('[Map Store] Layer already exists?', !!layerExists)
+          
+          if (!layerExists) {
             try {
+              console.log('[Map Store] Attempting to add layer...')
               map.addLayer(layerToAdd)
+              console.log('[Map Store] ✅ Layer added successfully')
+              
+              // Verify layer was added
+              const addedLayer = map.getLayer(layerToAdd.id)
+              console.log('[Map Store] Verified layer exists:', !!addedLayer)
             } catch (error) {
-              console.error(`[Map Store] Failed to add layer ${layerToAdd.id}:`, error)
+              console.error(`[Map Store] ❌ Failed to add layer ${layerToAdd.id}:`, error)
+              console.error('[Map Store] Error details:', error instanceof Error ? error.message : error)
             }
+          } else {
+            console.warn('[Map Store] ⚠️  Layer already exists, skipping')
           }
         })
+      } else {
+        console.warn('[Map Store] No layers found in style JSON')
       }
 
+      console.log('[Map Store] === applyCustomStyleFromURL END ===')
       console.log('[Map Store] Custom style applied successfully')
     } catch (error) {
-      console.error('[Map Store] Failed to apply custom style:', error)
+      console.error('[Map Store] ❌ Failed to apply custom style:', error)
+      console.error('[Map Store] Error stack:', error instanceof Error ? error.stack : error)
       // Fallback to default style
       applyDefaultMVTStyle(map, layer)
     }

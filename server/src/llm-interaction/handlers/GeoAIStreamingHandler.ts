@@ -58,6 +58,11 @@ export class GeoAIStreamingHandler extends BaseCallbackHandler {
    * Called when a tool starts
    */
   async handleToolStart(tool: any, input: string): Promise<void> {
+    // Only send event if tool.name exists (avoid duplicate events from manual sending in GeoAIGraph)
+    if (!tool?.name) {
+      return;
+    }
+    
     this.writeSSE({
       type: 'tool_start',
       tool: tool.name,
@@ -69,12 +74,9 @@ export class GeoAIStreamingHandler extends BaseCallbackHandler {
   /**
    * Called when a tool ends
    */
-  async handleToolEnd(output: string): Promise<void> {
-    this.writeSSE({
-      type: 'tool_complete',
-      output: this.truncate(output, 2000), // Increased limit for complex results like MVT metadata
-      timestamp: Date.now(),
-    });
+  async handleToolEnd(output: string, runId?: string): Promise<void> {
+    // Don't send tool_complete from here - it's handled manually in GeoAIGraph
+    // This avoids duplicate events
   }
 
   /**

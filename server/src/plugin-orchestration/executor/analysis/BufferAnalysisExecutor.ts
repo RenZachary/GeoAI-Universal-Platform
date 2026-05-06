@@ -62,9 +62,21 @@ export class BufferAnalysisExecutor {
       reference: dataSource.reference
     });
 
-    // Step 2: Create appropriate accessor
-    const accessor = this.accessorFactory.createAccessor(dataSource.type);
-    console.log('[BufferAnalysisExecutor] Created accessor for type:', dataSource.type);
+    // Step 2: Extract PostGIS connection config if needed
+    let postgisConfig = undefined;
+    if (dataSource.type === 'postgis' && dataSource.metadata?.connection) {
+      postgisConfig = {
+        host: String(dataSource.metadata.connection.host),
+        port: Number(dataSource.metadata.connection.port) || 5432,
+        database: String(dataSource.metadata.connection.database),
+        user: String(dataSource.metadata.connection.user),
+        password: String(dataSource.metadata.connection.password),
+        schema: String(dataSource.metadata.connection.schema || 'public')
+      };
+    }
+
+    // Step 3: Create appropriate accessor
+    const accessor = this.accessorFactory.createAccessor(dataSource.type, postgisConfig);
 
     // Step 3: Call buffer - accessor handles ALL format-specific logic!
     const result = await accessor.buffer(
@@ -77,7 +89,42 @@ export class BufferAnalysisExecutor {
     );
 
     console.log('[BufferAnalysisExecutor] Buffer completed successfully');
-    console.log('[BufferAnalysisExecutor] Result:', result);
+
+    // Step 4: Save PostGIS result to database so subsequent steps can find it
+    if (result.type === 'postgis' && result.metadata?.result?.table) {
+      const tableName = result.metadata.result.table;
+      const schema = result.metadata.schema || 'public';
+      
+      // Preserve the original connection info from source data source
+      const connectionInfo = dataSource.metadata?.connection ? {
+        connection: {
+          host: dataSource.metadata.connection.host,
+          port: dataSource.metadata.connection.port,
+          database: dataSource.metadata.connection.database,
+          user: dataSource.metadata.connection.user,
+          password: dataSource.metadata.connection.password,
+          schema: dataSource.metadata.connection.schema || 'public'
+        }
+      } : {};
+      
+      // Create a DataSourceRecord for this temporary table
+      const dataSourceRecord = this.dataSourceRepo.create(
+        `buffer_${tableName}`,
+        'postgis',
+        `${schema}.${tableName}`,
+        {
+          ...result.metadata,
+          ...connectionInfo,  // Include connection info
+          operation: 'buffer',
+          distance: params.distance,
+          unit: params.unit,
+          description: `Buffer result (${params.distance} ${params.unit})`
+        }
+      );
+      
+      // Update result ID to match the database record
+      result.id = dataSourceRecord.id;
+    }
 
     // Ensure standardized output field exists (REQUIRED by type system)
     if (result.metadata && result.metadata.result === undefined) {

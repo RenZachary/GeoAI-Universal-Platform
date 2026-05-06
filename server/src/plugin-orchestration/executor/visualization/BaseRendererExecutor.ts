@@ -152,6 +152,19 @@ export abstract class BaseRendererExecutor {
       // Case 1: dataSourceId is a registered data source in database
       console.log(`[${this.constructor.name}] Found data source in database: ${dataSource.name}`);
       
+      // Configure PostGIS if needed
+      if (dataSource.type === 'postgis' && dataSource.metadata?.connection) {
+        const postgisConfig = {
+          host: String(dataSource.metadata.connection.host),
+          port: Number(dataSource.metadata.connection.port) || 5432,
+          database: String(dataSource.metadata.connection.database),
+          user: String(dataSource.metadata.connection.user),
+          password: String(dataSource.metadata.connection.password),
+          schema: String(dataSource.metadata.connection.schema || 'public')
+        };
+        this.accessorFactory.configurePostGIS(postgisConfig);
+      }
+      
       // Get geometry type from metadata (already stored in SQLite during ingestion)
       const geometryType = GeometryAdapter.getGeometryTypeFromMetadata(dataSource);
       

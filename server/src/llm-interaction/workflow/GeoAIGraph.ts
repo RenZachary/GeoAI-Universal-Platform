@@ -96,7 +96,8 @@ export type GeoAIStateType = typeof GeoAIStateAnnotation.State;
 export function createGeoAIGraph(
   llmConfig: LLMConfig, 
   workspaceBase: string, 
-  onPartialResult?: (service: VisualizationService) => void  // Callback for incremental streaming
+  onPartialResult?: (service: VisualizationService) => void,  // Callback for incremental streaming
+  streamWriter?: any  // Stream writer for sending tool events
 ) {
   // Initialize managers and agents
   const promptManager = new PromptManager(workspaceBase);
@@ -202,11 +203,31 @@ export function createGeoAIGraph(
               const resolvedParameters = resolvePlaceholders(step.parameters, executionResults);
               console.log(`[Plugin Executor] Resolved parameters:`, resolvedParameters);
               
+              // Send tool_start event via SSE if streamWriter is available
+              if (streamWriter) {
+                streamWriter.write(`data: ${JSON.stringify({
+                  type: 'tool_start',
+                  tool: step.pluginId,
+                  input: JSON.stringify(resolvedParameters).substring(0, 200),
+                  timestamp: Date.now()
+                })}\n\n`);
+              }
+              
               // Invoke the tool with resolved parameters
               console.log(`[Plugin Executor] Invoking tool with parameters:`, resolvedParameters);
               const toolResult = await tool.invoke(resolvedParameters);
               
               console.log(`[Plugin Executor] Tool execution successful`);
+              
+              // Send tool_complete event via SSE if streamWriter is available
+              if (streamWriter) {
+                streamWriter.write(`data: ${JSON.stringify({
+                  type: 'tool_complete',
+                  tool: step.pluginId,
+                  output: typeof toolResult === 'string' ? toolResult.substring(0, 2000) : JSON.stringify(toolResult).substring(0, 2000),
+                  timestamp: Date.now()
+                })}\n\n`);
+              }
               
               // Parse tool result (it's a JSON string)
               let parsedResult: any;
@@ -364,8 +385,9 @@ export function createGeoAIGraph(
 export function compileGeoAIGraph(
   llmConfig: LLMConfig, 
   workspaceBase: string, 
-  onPartialResult?: (service: VisualizationService) => void
+  onPartialResult?: (service: VisualizationService) => void,
+  streamWriter?: any // Add streamWriter for sending tool events
 ) {
-  const graph = createGeoAIGraph(llmConfig, workspaceBase, onPartialResult);
+  const graph = createGeoAIGraph(llmConfig, workspaceBase, onPartialResult, streamWriter);
   return graph.compile();
 }

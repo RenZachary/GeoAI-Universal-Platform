@@ -162,7 +162,6 @@ export const useChatStore = defineStore('chat', () => {
         }
         
         workflowStatus.value = toolDescriptions[toolName] || `Using ${toolName}...`
-        console.log('[Chat Store] Tool started:', toolName)
         break
         
       case 'tool_complete':
@@ -173,7 +172,6 @@ export const useChatStore = defineStore('chat', () => {
           try {
             const outputData = JSON.parse(output || '{}')
             completedToolName = outputData.pluginId || completedToolName
-            console.log('[Chat Store] completedToolName', completedToolName)
           } catch (e) {
             console.warn('[Chat Store] Failed to parse tool output', e)
           }
@@ -183,7 +181,6 @@ export const useChatStore = defineStore('chat', () => {
         if (completedToolName === 'Unknown tool' && activeTools.value.length > 0) {
           completedToolName = activeTools.value[activeTools.value.length - 1]
         }
-        console.log('[Chat Store] Tool completed:', completedToolName)
         activeTools.value = activeTools.value.filter(t => t !== completedToolName)
         
         // Check if the tool succeeded by parsing output

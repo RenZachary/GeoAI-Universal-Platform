@@ -346,8 +346,12 @@ class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
       extent = 4096,
       tolerance = 3,
       buffer = 64,
-      layerName = 'default'
+      layerName = 'default'  // Always use 'default' to match StyleFactory expectations
     } = options;
+    
+    // CRITICAL: Force layerName to 'default' for PostGIS tiles to match StyleFactory's 'source-layer' setting
+    // This ensures consistency with GeoJSON-based MVT tiles which always use 'default'
+    const forcedLayerName = 'default';
     
     // Generate a unique ID for this tileset
     const tilesetId = `mvt_postgis_${Date.now()}_${Math.random().toString(36).substring(7)}`;
@@ -359,7 +363,6 @@ class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
     // 通过db查询metadata字段
     const dsr = new DataSourceRepository(this.db).getByReferenceAndType(sourceReference, dataSourceType);
     const metadataInDb = dsr?.metadata;
-    console.log('[PostGIS MVT Strategy] Metadata from DB:', metadataInDb);
     
     // Use the new Connection Manager to parse reference and get config
     const connectionInfo = PostGISConnectionManager.parseReference(sourceReference, metadataInDb);
@@ -386,7 +389,7 @@ class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
     // Cache the connection info for on-demand tile generation
     this.tileIndexCache.set(tilesetId, {
       connectionInfo,
-      options: { minZoom, maxZoom, extent, tolerance, buffer, layerName },
+      options: { minZoom, maxZoom, extent, tolerance, buffer, layerName: forcedLayerName },
       createdAt: Date.now()
     });
     
@@ -400,7 +403,7 @@ class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
       format: 'pbf',
       strategy: 'postgis',  // Must match the registered strategy key
       sourceReference,
-      layerName,
+      layerName: forcedLayerName,  // Always 'default' to match StyleFactory
       connectionHost: connectionInfo.host,
       connectionDatabase: connectionInfo.database
     };
@@ -482,10 +485,10 @@ class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
         this.postgisPools.set(tilesetId, pool);
         
         // Restore cache entry
-        const { minZoom = 0, maxZoom = 22, extent = 4096, layerName = 'default' } = fileMetadata;
+        const { minZoom = 0, maxZoom = 22, extent = 4096 } = fileMetadata;
         cached = {
           connectionInfo,
-          options: { minZoom, maxZoom, extent, layerName },
+          options: { minZoom, maxZoom, extent, layerName: 'default' },  // Always use 'default'
           createdAt: Date.now()
         };
         this.tileIndexCache.set(tilesetId, cached);
@@ -500,7 +503,7 @@ class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
     console.log(`[PostGIS MVT Strategy] Found cached connection for: ${tilesetId}`);
     
     const { connectionInfo, options } = cached;
-    const { layerName = 'default', extent = 4096 } = options;
+    const { layerName = 'default', extent = 4096 } = options;  // Will always be 'default'
     
     // Get pool from cache
     const pool = this.postgisPools.get(tilesetId);

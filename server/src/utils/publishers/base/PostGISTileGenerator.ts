@@ -91,17 +91,25 @@ export class PostGISTileGenerator {
 
     try {
       if (query.tableName) {
-        // Table-based query
+        // Table-based query - Use ST_AsMVTGeom to properly transform coordinates to tile space
         sql = `
-          SELECT ST_AsMVT(q, $1, $2, $3) as tile
+          SELECT ST_AsMVT(q, $1, $2, 'geom') as tile
           FROM (
-            SELECT ST_Transform(${geometryColumn}, 3857) as ${geometryColumn}
+            SELECT ST_AsMVTGeom(
+              ST_Transform(${geometryColumn}, 3857),
+              ST_TileEnvelope($3, $4, $5),
+              $2,
+              0,
+              true
+            ) as geom
             FROM ${schema}.${query.tableName}
-            WHERE ST_Intersects(ST_Transform(${geometryColumn}, 3857), ST_TileEnvelope($4, $5, $6))
+            WHERE ST_Intersects(ST_Transform(${geometryColumn}, 3857), ST_TileEnvelope($3, $4, $5))
           ) q
         `;
         // ST_AsMVT signature: (rows, name, extent, geom_name)
-        params = [layerName, extent, geometryColumn, z, x, y];
+        // ST_AsMVTGeom signature: (geom, bounds, extent, buffer, clip_geom)
+        params = [layerName, extent, z, x, y];
+        
       } else if (query.sqlQuery) {
         // Custom SQL query - assume the query already handles projection or returns 3857
         sql = `

@@ -78,7 +78,8 @@ export class ChatController {
             },
             timestamp: Date.now()
           })}\n\n`);
-        }
+        },
+        res // Pass streamWriter for tool event streaming
       );
 
       // Prepare initial state
