@@ -186,6 +186,7 @@ onMounted(async () => {
         visible: false, // Default to invisible (user must toggle)
         opacity: 0.7,
         dataSourceId: ds.id,  // Link to data source
+        metadata: ds.metadata,  // Pass metadata including geometryType
         style: {
           fillColor: '#409eff',
           fillOpacity: 0.5

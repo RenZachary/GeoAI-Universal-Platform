@@ -336,39 +336,80 @@ export const useMapStore = defineStore('map', () => {
       minzoom: layer.minZoom || 0,
       maxzoom: layer.maxZoom || 22
     })
+
+    // Determine geometry type from metadata and map to appropriate layer type
+    const geometryType = layer.metadata?.geometryType
+    const sourceLayer = layer.sourceLayer || layer.metadata?.tableName || 'default'
     
-    map.addLayer({
-      id: layer.id,
-      type: 'fill',
-      source: layer.id,
-      'source-layer': layer.sourceLayer || layer.metadata?.tableName || 'default',
-      paint: {
-        'fill-color': layer.style?.fillColor || '#409eff',
-        'fill-opacity': layer.style?.fillOpacity || layer.opacity || 0.5
-      }
-    })
-    map.addLayer({
-      id: `${layer.id}-outline`,
-      type: 'line',
-      source: layer.id,
-      'source-layer': layer.sourceLayer || layer.metadata?.tableName || 'default',
-      paint: {
-        'line-color': '#000000',
-        'line-width': 10
-      }
-    })
-    // 点状
-    map.addLayer({
-      id: `${layer.id}-point`,
-      type: 'circle',
-      source: layer.id,
-      'source-layer': layer.sourceLayer || layer.metadata?.tableName || 'default',
-      paint: {
-        'circle-radius': 5,
-        'circle-color': '#409eff',
-        'circle-opacity': 0.5
-      }
-    })
+    // Normalize geometry type (handle variations like 'polygon', 'POLYGON', etc.)
+    const normalizedGeometryType = geometryType 
+      ? geometryType.trim().toLowerCase().replace(/[_\s]/g, '')
+      : 'polygon' // Default to polygon if not specified
+    
+    // Map geometry type to Mapbox layer type
+    let layerType: 'circle' | 'line' | 'fill'
+    if (normalizedGeometryType.includes('point')) {
+      layerType = 'circle'
+    } else if (normalizedGeometryType.includes('linestring')) {
+      layerType = 'line'
+    } else {
+      // Polygon, MultiPolygon, or unknown - use fill
+      layerType = 'fill'
+    }
+    
+    // Add appropriate layer based on geometry type
+    if (layerType === 'circle') {
+      // Point geometry - use circle layer
+      map.addLayer({
+        id: layer.id,
+        type: 'circle',
+        source: layer.id,
+        'source-layer': sourceLayer,
+        paint: {
+          'circle-radius': layer.style?.strokeWidth || 5,
+          'circle-color': layer.style?.fillColor || '#409eff',
+          'circle-opacity': layer.style?.fillOpacity || layer.opacity || 0.8
+        }
+      })
+    } else if (layerType === 'line') {
+      // Line geometry - use line layer
+      map.addLayer({
+        id: layer.id,
+        type: 'line',
+        source: layer.id,
+        'source-layer': sourceLayer,
+        paint: {
+          'line-color': layer.style?.strokeColor || layer.style?.fillColor || '#409eff',
+          'line-width': layer.style?.strokeWidth || 2,
+          'line-opacity': layer.style?.fillOpacity || layer.opacity || 0.8
+        }
+      })
+    } else {
+      // Polygon geometry - use fill layer with outline
+      map.addLayer({
+        id: layer.id,
+        type: 'fill',
+        source: layer.id,
+        'source-layer': sourceLayer,
+        paint: {
+          'fill-color': layer.style?.fillColor || '#409eff',
+          'fill-opacity': layer.style?.fillOpacity || layer.opacity || 0.5
+        }
+      })
+      
+      // Add outline layer for polygons
+      map.addLayer({
+        id: `${layer.id}-outline`,
+        type: 'line',
+        source: layer.id,
+        'source-layer': sourceLayer,
+        paint: {
+          'line-color': layer.style?.strokeColor || '#ffffff',
+          'line-width': layer.style?.strokeWidth || 1,
+          'line-opacity': 0.5
+        }
+      })
+    }
   }
 
   function addWMSLayer(map: any, layer: Omit<MapLayer, 'createdAt'>) {
