@@ -35,7 +35,11 @@ export default {
     deleteConfirm: '确定要删除此对话吗？',
     confirmDelete: '确认删除',
     delete: '删除',
-    cancel: '取消'
+    cancel: '取消',
+    rename: '重命名',
+    renameConversation: '重命名对话',
+    enterNewTitle: '输入新标题',
+    renameConfirm: '确认重命名'
   },
   map: {
     title: '地图',

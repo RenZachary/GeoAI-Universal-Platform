@@ -85,6 +85,7 @@ export class ApiRouter {
     this.router.get('/chat/conversations', (req, res) => this.chatController.listConversations(req, res));
     this.router.get('/chat/conversations/:id', (req, res) => this.chatController.getConversation(req, res));
     this.router.delete('/chat/conversations/:id', (req, res) => this.chatController.deleteConversation(req, res));
+    this.router.put('/chat/conversations/:id', (req, res) => this.chatController.renameConversation(req, res));
 
     // Tool endpoints
     this.router.get('/tools', (req, res) => this.toolController.listTools(req, res));

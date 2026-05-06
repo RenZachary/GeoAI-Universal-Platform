@@ -382,6 +382,17 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
   
+  async function renameConversation(conversationId: string, newTitle: string) {
+    try {
+      await chatService.renameConversation(conversationId, newTitle)
+      // Reload conversations to get updated title
+      await loadConversations()
+    } catch (error) {
+      console.error('Failed to rename conversation:', error)
+      throw error
+    }
+  }
+  
   return {
     conversations,
     currentConversationId,
@@ -395,6 +406,7 @@ export const useChatStore = defineStore('chat', () => {
     loadConversation,
     sendMessage,
     createNewConversation,
-    deleteConversation
+    deleteConversation,
+    renameConversation   // NEW: Expose rename conversation
   }
 })

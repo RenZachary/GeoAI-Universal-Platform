@@ -99,3 +99,10 @@ export async function listConversations(): Promise<any[]> {
 export async function deleteConversation(conversationId: string): Promise<void> {
   await api.delete(`/api/chat/conversations/${conversationId}`)
 }
+
+/**
+ * Rename a conversation
+ */
+export async function renameConversation(conversationId: string, title: string): Promise<void> {
+  await api.put(`/api/chat/conversations/${conversationId}`, { title })
+}

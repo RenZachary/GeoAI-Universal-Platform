@@ -35,7 +35,11 @@ export default {
     deleteConfirm: 'Are you sure you want to delete this conversation?',
     confirmDelete: 'Confirm Delete',
     delete: 'Delete',
-    cancel: 'Cancel'
+    cancel: 'Cancel',
+    rename: 'Rename',
+    renameConversation: 'Rename Conversation',
+    enterNewTitle: 'Enter new title',
+    renameConfirm: 'Confirm Rename'
   },
   map: {
     title: 'Map',

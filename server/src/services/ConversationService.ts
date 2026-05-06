@@ -115,6 +115,48 @@ export class ConversationService {
   }
 
   /**
+   * Rename a conversation
+   */
+  renameConversation(conversationId: string, newTitle: string): void {
+    try {
+      if (!newTitle || !newTitle.trim()) {
+        throw new Error('Title cannot be empty');
+      }
+
+      // Check if conversation exists
+      const conversation = this.db.prepare(`
+        SELECT id FROM conversation_messages
+        WHERE conversation_id = ?
+        LIMIT 1
+      `).get(conversationId);
+
+      if (!conversation) {
+        throw new Error('Conversation not found');
+      }
+
+      // Update the title in the conversations table
+      const result = this.db.prepare(`
+        UPDATE conversations
+        SET title = ?, updated_at = datetime('now')
+        WHERE id = ?
+      `).run(newTitle.trim(), conversationId);
+
+      // If no rows were updated in conversations table, insert a new record
+      if (result.changes === 0) {
+        this.db.prepare(`
+          INSERT INTO conversations (id, title, created_at, updated_at)
+          VALUES (?, ?, datetime('now'), datetime('now'))
+        `).run(conversationId, newTitle.trim());
+      }
+
+      console.log(`[ConversationService] Renamed conversation ${conversationId} to: ${newTitle}`);
+    } catch (error) {
+      console.error('[ConversationService] Error renaming conversation:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Save visualization services to the last assistant message
    */
   saveServicesToLastMessage(conversationId: string, services: any[]): void {

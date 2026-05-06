@@ -256,4 +256,37 @@ export class ChatController {
       });
     }
   }
+
+  /**
+   * PUT /api/chat/conversations/:id - Rename conversation
+   */
+  async renameConversation(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const conversationId = Array.isArray(id) ? id[0] : id;
+      const { title } = req.body;
+
+      if (!title) {
+        res.status(400).json({
+          success: false,
+          error: 'Title is required'
+        });
+        return;
+      }
+
+      this.conversationService.renameConversation(conversationId, title);
+
+      res.json({
+        success: true,
+        message: 'Conversation renamed'
+      });
+
+    } catch (error) {
+      console.error('[Chat API] Error renaming conversation:', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
 }

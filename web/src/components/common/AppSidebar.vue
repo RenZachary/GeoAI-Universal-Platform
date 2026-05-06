@@ -66,7 +66,7 @@ const activeMenu = computed(() => route.path)
   
   .collapse-btn {
     width: 100%;
-    height: 40px;
+    height: 60px;
     border-radius: 0;
     border-bottom: 1px solid var(--el-border-color);
   }

@@ -499,7 +499,7 @@ export const useMapStore = defineStore('map', () => {
           
           if (subLayers.length > 0) {
             layersToQuery = subLayers
-            console.log(`[Map Store] Querying ${subLayers.length} sub-layers for ${layer.id}`)
+            // console.log(`[Map Store] Querying ${subLayers.length} sub-layers for ${layer.id}`)
           }
         }
         
