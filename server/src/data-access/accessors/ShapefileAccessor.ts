@@ -170,4 +170,25 @@ export class ShapefileAccessor extends GeoJSONBasedAccessor implements DataAcces
       return false;
     }
   }
+  
+  /**
+   * Get unique values for a specific field (for categorical rendering)
+   */
+  async getUniqueValues(reference: string, fieldName: string): Promise<string[]> {
+    const source = await shapefile.open(reference.replace('.shp', ''));
+    const uniqueValues = new Set<string>();
+    
+    // Read all features and extract unique values
+    let result;
+    while (!(result = await source.read()).done) {
+      if (result.value && result.value.properties) {
+        const value = (result.value.properties as any)[fieldName];
+        if (value !== undefined && value !== null) {
+          uniqueValues.add(String(value));
+        }
+      }
+    }
+    
+    return Array.from(uniqueValues).sort();
+  }
 }

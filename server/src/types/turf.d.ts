@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 declare module '@turf/turf' {
   export function buffer(geojson: any, distance: number, options?: { units?: string }): any;
   export function dissolve(geojson: any): any;

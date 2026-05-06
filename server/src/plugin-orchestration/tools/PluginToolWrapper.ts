@@ -6,23 +6,8 @@ import type { DynamicStructuredTool } from '@langchain/core/tools';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import type { Plugin, ParameterSchema } from '../../core/';
-import type { BufferAnalysisParams } from '../executor/analysis/BufferAnalysisExecutor';
-import { BufferAnalysisExecutor } from '../executor/analysis/BufferAnalysisExecutor';
-import type { OverlayAnalysisParams } from '../executor/analysis/OverlayAnalysisExecutor';
-import { OverlayAnalysisExecutor } from '../executor/analysis/OverlayAnalysisExecutor';
-import type { MVTPublisherParams } from '../executor/visualization/MVTPublisherExecutor';
-import { MVTPublisherExecutor } from '../executor/visualization/MVTPublisherExecutor';
-import type { StatisticsCalculatorParams } from '../executor/analysis/StatisticsCalculatorExecutor';
-import { StatisticsCalculatorExecutor } from '../executor/analysis/StatisticsCalculatorExecutor';
-import type { FilterParams } from '../executor/analysis/FilterExecutor';
-import { FilterExecutor } from '../executor/analysis/FilterExecutor';
-import type { AggregationParams } from '../executor/analysis/AggregationExecutor';
-import { AggregationExecutor } from '../executor/analysis/AggregationExecutor';
-import type { ReportGeneratorParams } from '../executor/reporting/ReportGeneratorExecutor';
-import { ReportGeneratorExecutor } from '../executor/reporting/ReportGeneratorExecutor';
-import type { ChoroplethMVTParams } from '../executor/visualization/ChoroplethMVTExecutor';
-import { ChoroplethMVTExecutor } from '../executor/visualization/ChoroplethMVTExecutor';
 import type Database from 'better-sqlite3';
+import { ExecutorRegistryInstance } from '../registry/ExecutorRegistry';
 
 export class PluginToolWrapper {
   private static db: Database.Database;
@@ -46,85 +31,45 @@ export class PluginToolWrapper {
         try {
           console.log(`[Tool Execution] Executing plugin: ${plugin.name}`);
 
-          // Route to appropriate executor based on plugin ID
-          let result;
+          // Use ExecutorRegistry to get the appropriate executor
+          const executor = ExecutorRegistryInstance.getExecutor(
+            plugin.id,
+            this.db,
+            this.workspaceBase
+          );
 
-          switch (plugin.id) {
-            case 'buffer_analysis':
-              {
-                const bufferExecutor = new BufferAnalysisExecutor(this.db, this.workspaceBase);
-                result = await bufferExecutor.execute(input as BufferAnalysisParams);
-                break;
-              }
+          if (!executor) {
+            console.warn(`[Tool Execution] No executor registered for plugin: ${plugin.id}`);
+            
+            // Fallback: Return mock response for unimplemented plugins
+            const result = {
+              id: `mock_${Date.now()}`,
+              type: 'geojson',
+              reference: '',
+              metadata: { mock: true, pluginId: plugin.id },
+              createdAt: new Date()
+            };
 
-            case 'overlay_analysis':
-              {
-                const overlayExecutor = new OverlayAnalysisExecutor(this.db, this.workspaceBase);
-                result = await overlayExecutor.execute(input as OverlayAnalysisParams);
-                break;
-              }
-
-            case 'mvt_publisher':
-              {
-                const mvtExecutor = new MVTPublisherExecutor(this.db, this.workspaceBase);
-                result = await mvtExecutor.execute(input as MVTPublisherParams);
-                break;
-              }
-
-            case 'statistics_calculator':
-              {
-                const statsExecutor = new StatisticsCalculatorExecutor(this.db, this.workspaceBase);
-                result = await statsExecutor.execute(input as StatisticsCalculatorParams);
-                break;
-              }
-
-            case 'filter':
-              {
-                const filterExecutor = new FilterExecutor(this.db, this.workspaceBase);
-                result = await filterExecutor.execute(input as FilterParams);
-                break;
-              }
-
-            case 'aggregation':
-              {
-                const aggregationExecutor = new AggregationExecutor(this.db, this.workspaceBase);
-                result = await aggregationExecutor.execute(input as AggregationParams);
-                break;
-              }
-
-            case 'report_generator':
-              {
-                const reportExecutor = new ReportGeneratorExecutor(this.db, this.workspaceBase);
-                result = await reportExecutor.execute(input as ReportGeneratorParams);
-                break;
-              }
-
-            case 'choropleth_map':
-              {
-                const choroplethExecutor = new ChoroplethMVTExecutor(this.db, this.workspaceBase);
-                result = await choroplethExecutor.execute(input as ChoroplethMVTParams);
-                break;
-              }
-
-            default:
-              // Fallback: Return mock response for unimplemented plugins
-              console.warn(`[Tool Execution] No executor for ${plugin.id}, using mock`);
-              result = {
-                id: `mock_${Date.now()}`,
-                type: 'geojson',
-                reference: '',
-                metadata: { mock: true, pluginId: plugin.id },
-                createdAt: new Date()
-              };
+            return JSON.stringify({
+              success: true,
+              pluginId: plugin.id,
+              resultId: result.id,
+              type: result.type,
+              reference: result.reference,
+              metadata: result.metadata,
+              message: 'Plugin executed successfully (mock)'
+            });
           }
 
-          // Return complete NativeData object (not just simplified JSON)
-          // This ensures ServicePublisher can access result.data.type correctly
+          // Execute using the registered executor
+          const result = await executor.execute(input);
+
+          // Return complete NativeData object
           return JSON.stringify({
             success: true,
             pluginId: plugin.id,
             resultId: result.id,
-            type: result.type,  // Include data type for service publishing
+            type: result.type,
             reference: result.reference,
             metadata: result.metadata,
             message: 'Plugin executed successfully'

@@ -38,7 +38,7 @@ export class DataAccessorFactory {
   createAccessor(type: DataSourceType): DataAccessor {
     // Check if accessor already exists
     if (this.accessors.has(type)) {
-      return this.accessors.get(type)!;
+      return this.accessors.get(type) as DataAccessor;
     }
     
     // Create new accessor based on type

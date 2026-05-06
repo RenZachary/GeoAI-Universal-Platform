@@ -9,7 +9,6 @@
 export {
   BufferAnalysisPlugin,
   OverlayAnalysisPlugin,
-  MVTPublisherPlugin,
   StatisticsCalculatorPlugin,
   BUILT_IN_PLUGINS
 } from './plugins';
@@ -20,11 +19,9 @@ export {
 export {
   BufferAnalysisExecutor,
   OverlayAnalysisExecutor,
-  MVTPublisherExecutor,
   StatisticsCalculatorExecutor,
   type BufferAnalysisParams,
   type OverlayAnalysisParams,
-  type MVTPublisherParams,
   type StatisticsCalculatorParams
 } from './executor';
 

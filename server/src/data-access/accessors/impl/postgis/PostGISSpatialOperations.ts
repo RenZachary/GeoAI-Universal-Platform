@@ -64,7 +64,10 @@ export class PostGISSpatialOperations {
           schema: this.schema,
           operation: 'buffer',
           distance,
-          unit: options?.unit || 'degrees'
+          unit: options?.unit || 'degrees',
+          // StandardizedOutput fields
+          result: { table: resultTable, operation: 'buffer' },
+          description: `Buffer operation completed with distance ${distance}`
         },
         createdAt: new Date()
       };
@@ -121,7 +124,10 @@ export class PostGISSpatialOperations {
           database: this.pool.options.database,
           schema: this.schema,
           operation: options.operation,
-          sourceTables: [table1, table2]
+          sourceTables: [table1, table2],
+          // StandardizedOutput fields
+          result: { table: resultTable, operation: options.operation },
+          description: `${options.operation} overlay operation completed`
         },
         createdAt: new Date()
       };
@@ -172,7 +178,10 @@ export class PostGISSpatialOperations {
           database: this.pool.options.database,
           schema: this.schema,
           operation: 'filter',
-          filterApplied: this.serializeFilter(filter)
+          filterApplied: this.serializeFilter(filter),
+          // StandardizedOutput fields
+          result: { table: resultTable, operation: 'filter' },
+          description: `Filter operation applied`
         },
         createdAt: new Date()
       };
@@ -229,7 +238,10 @@ export class PostGISSpatialOperations {
             operation: 'aggregate',
             aggregatedField: field,
             aggregatedFunction: aggFunc,
-            aggregatedValue: valueResult.rows[0].result
+            aggregatedValue: valueResult.rows[0].result,
+            // StandardizedOutput fields
+            result: valueResult.rows[0].result,
+            description: `Aggregation ${aggFunc} on field ${field}`
           },
           createdAt: new Date()
         };
@@ -246,7 +258,10 @@ export class PostGISSpatialOperations {
             operation: 'aggregate',
             aggregatedField: field,
             aggregatedFunction: aggFunc,
-            aggregatedValue: result.rows[0].result
+            aggregatedValue: result.rows[0].result,
+            // StandardizedOutput fields
+            result: result.rows[0].result,
+            description: `Aggregation ${aggFunc} on field ${field}`
           },
           createdAt: new Date()
         };
@@ -307,7 +322,10 @@ export class PostGISSpatialOperations {
           spatialRelationship: operation,
           joinType,
           targetTable,
-          joinTable
+          joinTable,
+          // StandardizedOutput fields
+          result: { table: resultTable, operation: 'spatial_join' },
+          description: `Spatial join (${operation}) between ${targetTable} and ${joinTable}`
         },
         createdAt: new Date()
       };

@@ -5,8 +5,10 @@
 
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath, pathToFileURL } from 'url';
 import type { Plugin, PluginCategory } from '../../core';
 import { ToolRegistryInstance } from '../registry/ToolRegistry';
+import { ExecutorRegistryInstance } from '../registry/ExecutorRegistry';
 
 export interface PluginManifest {
   id: string;
@@ -17,7 +19,7 @@ export interface PluginManifest {
   inputSchema: any[];
   outputSchema: any;
   capabilities: string[];
-  main?: string; // Entry point file
+  main?: string; // Entry point file (executor)
   dependencies?: string[];
 }
 
@@ -121,8 +123,15 @@ export class CustomPluginLoader {
       installedAt: new Date()
     };
 
-    // Register with ToolRegistry
+    // Register with ToolRegistry (for LLM tool discovery)
     await ToolRegistryInstance.registerPlugin(plugin);
+
+    // Load and register executor if specified
+    if (manifest.main) {
+      await this.loadAndRegisterExecutor(pluginPath, manifest);
+    } else {
+      console.warn(`[CustomPluginLoader] No executor specified for plugin ${manifest.id}. Plugin will return mock data.`);
+    }
 
     // Update status
     this.pluginStatuses.set(manifest.id, {
@@ -134,6 +143,68 @@ export class CustomPluginLoader {
     });
 
     console.log(`[CustomPluginLoader] Loaded plugin: ${manifest.name} v${manifest.version}`);
+  }
+
+  /**
+   * Load executor module and register with ExecutorRegistry
+   */
+  private async loadAndRegisterExecutor(pluginPath: string, manifest: PluginManifest): Promise<void> {
+    try {
+      const executorPath = path.join(pluginPath, manifest.main!);
+      
+      // Check if executor file exists
+      if (!fs.existsSync(executorPath)) {
+        throw new Error(`Executor file not found: ${executorPath}`);
+      }
+
+      // Dynamically import the executor module
+      // Convert to file:// URL for ESM compatibility
+      const executorUrl = pathToFileURL(executorPath).href;
+      const executorModule = await import(executorUrl);
+
+      // Get the execute function (support both default export and named export)
+      const executeFunction = executorModule.default || executorModule.execute;
+
+      if (typeof executeFunction !== 'function') {
+        throw new Error(`Executor must export an execute function. Got: ${typeof executeFunction}`);
+      }
+
+      // Register executor factory with ExecutorRegistry
+      ExecutorRegistryInstance.register(
+        manifest.id,
+        (db, workspaceBase) => ({
+          execute: async (params: Record<string, any>) => {
+            try {
+              // Call the custom executor with parameters
+              const result = await executeFunction(params, { db, workspaceBase });
+              
+              // Ensure result has required fields
+              if (!result || typeof result !== 'object') {
+                throw new Error('Executor must return an object');
+              }
+
+              // Add default fields if missing
+              return {
+                id: result.id || `custom_${manifest.id}_${Date.now()}`,
+                type: result.type || 'geojson',
+                reference: result.reference || '',
+                metadata: result.metadata || {},
+                createdAt: result.createdAt || new Date(),
+                ...result
+              };
+            } catch (error) {
+              console.error(`[CustomPluginLoader] Executor execution failed for ${manifest.id}:`, error);
+              throw error;
+            }
+          }
+        })
+      );
+
+      console.log(`[CustomPluginLoader] Registered executor for plugin: ${manifest.id}`);
+    } catch (error) {
+      console.error(`[CustomPluginLoader] Failed to load executor for ${manifest.id}:`, error);
+      throw error;
+    }
   }
 
   /**
@@ -215,7 +286,7 @@ export class CustomPluginLoader {
       return;
     }
 
-    // Reload plugin
+    // Reload plugin (this will also reload the executor)
     const pluginPath = path.join(this.customPluginsDir, pluginId);
     await this.loadPlugin(pluginPath);
 

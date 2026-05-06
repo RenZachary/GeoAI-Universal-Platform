@@ -49,7 +49,10 @@ export class PostGISOverlayOperation {
           database: this.pool.options.database,
           schema: this.schema,
           operation: options.operation,
-          sourceTables: [table1, table2]
+          sourceTables: [table1, table2],
+          // StandardizedOutput fields
+          result: { table: resultTable, operation: options.operation },
+          description: `${options.operation} overlay operation completed`
         },
         createdAt: new Date()
       };

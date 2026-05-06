@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Core type definitions for GeoAI-UP platform
  * These types are shared across all layers

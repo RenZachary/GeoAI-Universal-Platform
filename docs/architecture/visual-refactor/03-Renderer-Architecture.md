@@ -868,75 +868,140 @@ abstract class BaseRendererExecutor {
 }
 ```
 
-#### 3.3.1.5 Visualization Executor架构 ⏳ 待分析和设计
+#### 3.3.1.5 Visualization Executor架构 ✅ 最终方案
 
-> **⚠️ 状态：** 本节内容需要进一步分析和设计，当前方案尚未最终确定。
-
-**现状分析：**
-
-当前系统中存在两个MVT发布器：
-1. `utils/publishers/MVTPublisher.ts` - 旧版预生成瓦片（Strategy Pattern）
-2. `utils/publishers/MVTDynamicPublisher.ts` - 新版按需生成瓦片（推荐）
-
-同时存在 `MVTPublisherExecutor` 作为Plugin执行器基类，但造成了不必要的抽象层。
-
-**待决策问题：**
-
-- [ ] 是否完全删除 `MVTPublisherExecutor`？
-- [ ] 是否弃用 `MVTPublisher.ts`？
-- [ ] 新的 Executor 如何组织（独立实现 vs 继承基类）？
-- [ ] 如何确保向后兼容性？
-
-**初步考虑方案（需验证）：**
+**最终决策：**
 
 ```
-Layer 1: utils/publishers/MVTDynamicPublisher.ts  // 统一的MVT发布引擎
-         ├── 支持 GeoJSON (内存/文件)
-         ├── 支持 PostGIS (表名/SQL查询)
-         ├── 按需生成瓦片（on-demand）
-         └── 内置缓存机制
+Layer 1: utils/publishers/
+├── MVTStrategyPublisher.ts      ✅ 统一MVT引擎（Strategy Pattern，推荐）
+│   ├── GeoJSONMVTTStrategy (按需生成)
+│   ├── ShapefileMVTTStrategy (转换后按需生成)
+│   └── PostGISMVTTStrategy (ST_AsMVT按需生成)
+└── MVTOnDemandPublisher.ts      ✅ 保留（其他模块正在使用）
 
 Layer 2: plugin-orchestration/executor/visualization/
-├── MVTServiceExecutor.ts          // MVT服务执行器（直接调用MVTDynamicPublisher）
-├── ChoroplethMapExecutor.ts       // 分级统计图执行器（MVTDynamicPublisher + StyleFactory）
-└── HeatmapExecutor.ts             // 热力图执行器（MVTDynamicPublisher）
+├── ChoroplethMapExecutor.ts       // 分级统计图执行器（直接调用MVTStrategyPublisher）
+├── HeatmapExecutor.ts             // 热力图执行器（直接调用MVTStrategyPublisher）
+└── UniformColorExecutor.ts        // 单色渲染执行器（直接调用MVTStrategyPublisher）
 
-❓ 待定: MVTPublisherExecutor.ts (是否需要删除？)
-❓ 待定: MVTPublisher.ts (是否标记为deprecated？)
+❌ 删除: MVTPublisherExecutor.ts (不再需要)
+❌ 不创建: MVTServiceExecutor.ts (不需要单独的MVT服务执行器)
 ```
 
-**待分析要点：**
+**核心原则：**
 
-1. **现有代码依赖分析**
-   - [ ] 检查哪些模块依赖 `MVTPublisherExecutor`
-   - [ ] 检查哪些模块依赖 `MVTPublisher`
-   - [ ] 评估迁移成本
+1. **统一MVT引擎**：所有Visualization Executor直接使用 `MVTStrategyPublisher`
+2. **移除中间层**：删除 `MVTPublisherExecutor`，Executor直接调用Publisher
+3. **职责清晰**：
+   - `MVTStrategyPublisher` = MVT瓦片生成与发布（工具类，Strategy Pattern）
+   - `*Executor` = Plugin执行框架集成 + 业务逻辑（样式生成、分类等）
+4. **向后兼容**：Plugin ID和API保持不变
+5. **保留MVTOnDemandPublisher**：其他模块（如DataSourcePublishingService）仍在使用
 
-2. **功能对比分析**
-   - [ ] `MVTPublisher` vs `MVTDynamicPublisher` 功能差异
-   - [ ] 性能对比（预生成 vs 按需生成）
-   - [ ] 适用场景分析
+**实现示例：**
 
-3. **兼容性评估**
-   - [ ] Plugin ID 是否需要变更
-   - [ ] API schema 是否需要调整
-   - [ ] 前端调用方式是否需要修改
+```typescript
+// ===== ChoroplethMapExecutor（直接调用Publisher）=====
+class ChoroplethMapExecutor {
+  private mvtPublisher: MVTStrategyPublisher;
+  private styleFactory: StyleFactory;
+  
+  constructor(workspaceBase: string, db?: Database) {
+    this.mvtPublisher = MVTStrategyPublisher.getInstance(workspaceBase, db);
+    this.styleFactory = new StyleFactory(workspaceBase);
+  }
+  
+  async execute(params: ChoroplethParams): Promise<NativeData> {
+    const { dataSourceId, valueField, classification, colorRamp } = params;
+    
+    // Step 1: Load data source via DataAccessor
+    const { dataSource, nativeData, accessor } = await this.loadDataSource(dataSourceId);
+    
+    // Step 2: Validate and calculate statistics
+    this.validateField(dataSource, valueField);
+    const stats = await this.calculateStatistics(accessor, dataSource, valueField);
+    const breaks = this.classify(stats.values, classification, params.numClasses);
+    
+    // Step 3: Publish MVT using MVTStrategyPublisher
+    const mvtResult = await this.mvtPublisher.publish(nativeData, {
+      minZoom: params.minZoom || 0,
+      maxZoom: params.maxZoom || 22,
+      layerName: params.layerName || 'choropleth'
+    });
+    
+    if (!mvtResult.success) {
+      throw new Error(`MVT publication failed: ${mvtResult.error}`);
+    }
+    
+    // Step 4: Generate choropleth style
+    const styleUrl = this.styleFactory.createAndSaveChoroplethStyle({
+      tilesetId: mvtResult.tilesetId,
+      valueField,
+      breaks,
+      colors: this.resolveColorRamp(colorRamp, breaks.length)
+    });
+    
+    // Step 5: Return result with style URL
+    return {
+      id: mvtResult.tilesetId,
+      type: 'mvt',
+      reference: mvtResult.serviceUrl,
+      metadata: {
+        rendererType: 'choropleth',
+        result: mvtResult.serviceUrl,  // 必需字段
+        styleUrl,
+        classification: {
+          method: classification,
+          breaks,
+          valueField
+        },
+        ...mvtResult.metadata
+      }
+    };
+  }
+}
+```
 
-4. **实施方案设计**
-   - [ ] 迁移步骤规划
-   - [ ] 回滚方案设计
-   - [ ] 测试策略制定
+**迁移步骤：**
 
-**下一步行动：**
+1. **删除旧代码**：
+   - ❌ 删除 `MVTPublisherExecutor.ts`
 
-- 📋 创建详细的迁移分析报告
-- 🔍 进行代码依赖扫描
-- 📊 完成功能对比矩阵
-- ✅ 召开技术评审会议确定最终方案
+2. **重构并重命名Executor**：
+   - 🔄 `ChoroplethMVTExecutor.ts` → 重命名为 `ChoroplethMapExecutor.ts`，并重构为直接调用 `MVTStrategyPublisher`
+   - 🔄 `HeatmapExecutor.ts` → 保持文件名，重构为直接调用 `MVTStrategyPublisher`
+   - 🆕 创建 `UniformColorExecutor.ts`（如果需要）
 
----
+3. **更新引用**：
+   - 🔄 更新 `PluginToolWrapper.ts` 中的实例化逻辑（使用新的类名）
+   - 🔄 更新 `index.ts` 导出
+   - 🔄 更新 Plugin 注册（如有需要）
 
-> **📝 注：** 具体的实现代码、迁移步骤和影响范围分析将在完成上述待办事项后补充。
+4. **测试验证**：
+   - ✅ 单元测试：验证Executor正确调用Publisher
+   - ✅ 集成测试：验证完整Plugin工作流
+   - ✅ 前端测试：验证MVT服务正常访问
+
+**影响范围：**
+
+| 文件/模块 | 操作 | 说明 |
+|----------|------|------|
+| `MVTPublisherExecutor.ts` | ❌ 删除 | 不再需要 |
+| `MVTStrategyPublisher.ts` | ✅ 核心 | 统一MVT引擎（已存在） |
+| `MVTOnDemandPublisher.ts` | ✅ 保留 | 其他模块正在使用（DataSourcePublishingService等） |
+| `ChoroplethMVTExecutor.ts` | 🔄 重命名+重构 | → `ChoroplethMapExecutor.ts`，直接调用MVTStrategyPublisher |
+| `HeatmapExecutor.ts` | 🔄 重构 | 保持文件名，直接调用MVTStrategyPublisher |
+| `PluginToolWrapper.ts` | 🔄 更新 | 移除MVTPublisherExecutor引用，使用新类名 |
+
+**兼容性保证：**
+
+- Plugin ID保持为`choropleth_map`、`heatmap`等
+- 输入参数schema保持不变
+- 输出结果格式保持不变（NativeData with MVT URL）
+- 前端调用方式无需修改
+
+**实施时间：** Phase 1（Week 1-2）
 
 #### 3.3.2 Uniform Color Executor
 

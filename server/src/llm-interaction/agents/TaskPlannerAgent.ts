@@ -10,6 +10,8 @@ import type { GeoAIStateType, ExecutionPlan} from '../workflow/GeoAIGraph';
 import { ToolRegistryInstance } from '../../plugin-orchestration';
 import { DataSourceRepository } from '../../data-access/repositories';
 import { SQLiteManagerInstance } from '../../storage/';
+import { PluginCapabilityRegistry } from '../../plugin-orchestration/registry/PluginCapabilityRegistry';
+import { GeometryAdapter } from '../../utils/GeometryAdapter';
 
 export class TaskPlannerAgent {
   private llmConfig: LLMConfig;
@@ -47,7 +49,7 @@ export class TaskPlannerAgent {
       );
 
       // Get available tools for context
-      const availableTools = ToolRegistryInstance.listToolsWithMetadata();
+      const allTools = ToolRegistryInstance.listToolsWithMetadata();
       
       // Get available data sources with metadata
       const dataSources = this.dataSourceRepo.listAll();
@@ -80,12 +82,79 @@ export class TaskPlannerAgent {
       // Plan each goal in parallel
       const planPromises = state.goals.map(async (goal) => {
         try {
+          // STAGE 1: Rule-based filtering using PluginCapabilityRegistry
+          console.log(`[Task Planner] Stage 1: Filtering plugins for goal ${goal.id} (${goal.type})`);
+          
+          // Infer execution category from goal type
+          let expectedCategory: 'statistical' | 'computational' | 'visualization' | 'textual' | undefined;
+          if (goal.type === 'spatial_analysis') {
+            expectedCategory = 'computational';
+          } else if (goal.type === 'data_processing') {
+            expectedCategory = 'statistical';
+          } else if (goal.type === 'visualization') {
+            expectedCategory = 'visualization';
+          } else if (goal.type === 'general') {
+            expectedCategory = 'textual';
+          }
+          
+          // Detect data format and geometry type from referenced data source
+          let dataFormat: 'vector' | 'raster' | undefined;
+          let geometryType: string | undefined;
+          
+          // Try to extract data source ID from goal description or parameters
+          const dataSourceMatch = goal.description.match(/dataSource[:\s]+([\w-]+)/i);
+          if (dataSourceMatch && dataSourceMatch[1]) {
+            const dataSourceId = dataSourceMatch[1];
+            const dataSource = dataSources.find(ds => ds.id === dataSourceId);
+            
+            if (dataSource) {
+              // Determine data format
+              if (['geojson', 'shapefile', 'postgis'].includes(dataSource.type)) {
+                dataFormat = 'vector';
+                
+                // Extract geometry type from metadata
+                geometryType = GeometryAdapter.getGeometryTypeFromMetadata(dataSource);
+              } else if (['geotiff', 'wms'].includes(dataSource.type)) {
+                dataFormat = 'raster';
+              }
+            }
+          }
+          
+          // Filter plugins by capability criteria
+          const compatiblePluginIds = PluginCapabilityRegistry.filterByCapability({
+            expectedCategory,
+            dataFormat,
+            geometryType,
+            isTerminalAllowed: true // Allow terminal nodes in initial planning
+          });
+          
+          console.log(`[Task Planner] Stage 1: Found ${compatiblePluginIds.length} compatible plugins:`, compatiblePluginIds);
+          
+          // If no compatible plugins found, create fallback plan
+          if (compatiblePluginIds.length === 0) {
+            console.warn(`[Task Planner] No compatible plugins found for goal ${goal.id}`);
+            const fallbackPlan: ExecutionPlan = {
+              goalId: goal.id,
+              steps: [],
+              requiredPlugins: []
+            };
+            return [goal.id, fallbackPlan] as const;
+          }
+          
+          // Filter tools to only include compatible ones
+          const compatibleTools = allTools.filter(tool => 
+            compatiblePluginIds.includes(tool.id)
+          );
+          
+          console.log(`[Task Planner] Stage 2: LLM selection from ${compatibleTools.length} candidates`);
+          
+          // STAGE 2: LLM-based selection from filtered candidates
           const plan = await chain.invoke({
             goalDescription: goal.description,
             goalType: goal.type,
-            availableTools: JSON.stringify(availableTools, null, 2),
+            availableTools: JSON.stringify(compatibleTools, null, 2),
             dataSourcesMetadata,
-            availablePlugins: JSON.stringify(availableTools.map(t => ({
+            availablePlugins: JSON.stringify(compatibleTools.map(t => ({
               id: t.id,
               name: t.name,
               description: t.description,
@@ -96,7 +165,22 @@ export class TaskPlannerAgent {
             timestamp: new Date().toISOString()
           }) as ExecutionPlan;
 
-          return [goal.id, plan] as const;
+          // STAGE 3: Validate terminal node constraints
+          console.log(`[Task Planner] Stage 3: Validating terminal node constraints for goal ${goal.id}`);
+          const validatedPlan = this.validateTerminalNodeConstraints(plan, compatiblePluginIds);
+          
+          if (!validatedPlan) {
+            console.warn(`[Task Planner] Plan failed terminal node validation, creating fallback`);
+            const fallbackPlan: ExecutionPlan = {
+              goalId: goal.id,
+              steps: [],
+              requiredPlugins: []
+            };
+            return [goal.id, fallbackPlan] as const;
+          }
+
+          console.log(`[Task Planner] Plan validated successfully with ${validatedPlan.steps.length} steps`);
+          return [goal.id, validatedPlan] as const;
         } catch (error) {
           console.error(`[Task Planner] Failed to plan goal ${goal.id}:`, error);
           
@@ -244,5 +328,103 @@ export class TaskPlannerAgent {
     }).join('\n\n');
 
     return `Available Data Sources (${dataSources.length}):\n\n${formatted}`;
+  }
+
+  /**
+   * Validate terminal node constraints in execution plan
+   * 
+   * Rules:
+   * 1. A goal can have AT MOST ONE terminal node
+   * 2. Terminal nodes (visualization, textual) MUST be the last step
+   * 3. Textual plugins require a predecessor (non-terminal) step
+   * 
+   * @param plan - The execution plan to validate
+   * @param compatiblePluginIds - List of plugin IDs that were considered
+   * @returns Validated plan or null if validation fails
+   */
+  private validateTerminalNodeConstraints(
+    plan: ExecutionPlan,
+    compatiblePluginIds: string[]
+  ): ExecutionPlan | null {
+    if (!plan || !plan.steps || plan.steps.length === 0) {
+      return plan; // Empty plan is valid
+    }
+
+    console.log(`[Task Planner] Validating plan with ${plan.steps.length} steps`);
+
+    // Step 1: Identify terminal nodes
+    const terminalPluginIds = this.getTerminalPluginIds(compatiblePluginIds);
+    console.log(`[Task Planner] Terminal plugin IDs:`, terminalPluginIds);
+
+    // Step 2: Count terminal nodes in plan
+    let terminalNodeCount = 0;
+    let terminalNodeIndex = -1;
+
+    for (let i = 0; i < plan.steps.length; i++) {
+      const step = plan.steps[i];
+      if (terminalPluginIds.includes(step.pluginId)) {
+        terminalNodeCount++;
+        terminalNodeIndex = i;
+      }
+    }
+
+    // Rule 1: At most one terminal node
+    if (terminalNodeCount > 1) {
+      console.error(`[Task Planner] VALIDATION FAILED: Plan has ${terminalNodeCount} terminal nodes (max 1 allowed)`);
+      console.error(`[Task Planner] Steps:`, plan.steps.map(s => s.pluginId));
+      return null;
+    }
+
+    // Rule 2: Terminal node must be the last step
+    if (terminalNodeCount === 1 && terminalNodeIndex !== plan.steps.length - 1) {
+      console.error(`[Task Planner] VALIDATION FAILED: Terminal node at index ${terminalNodeIndex} is not the last step`);
+      console.error(`[Task Planner] Terminal node: ${plan.steps[terminalNodeIndex].pluginId}`);
+      console.error(`[Task Planner] Expected at index: ${plan.steps.length - 1}`);
+      
+      // Fix: Move terminal node to the end
+      console.warn(`[Task Planner] Attempting to fix: Moving terminal node to last position`);
+      const fixedSteps = [...plan.steps];
+      const terminalStep = fixedSteps.splice(terminalNodeIndex, 1)[0];
+      fixedSteps.push(terminalStep);
+      
+      return {
+        ...plan,
+        steps: fixedSteps
+      };
+    }
+
+    // Rule 3: Textual plugins require predecessor
+    const textualPluginIds = ['report_generator']; // Add other textual plugins here
+    if (terminalNodeCount === 1) {
+      const terminalStep = plan.steps[terminalNodeIndex];
+      if (textualPluginIds.includes(terminalStep.pluginId) && plan.steps.length === 1) {
+        console.error(`[Task Planner] VALIDATION FAILED: Textual plugin '${terminalStep.pluginId}' requires a predecessor step`);
+        console.error(`[Task Planner] Textual plugins need non-terminal input (e.g., analysis result)`);
+        return null;
+      }
+    }
+
+    console.log(`[Task Planner] Terminal node validation PASSED`);
+    return plan;
+  }
+
+  /**
+   * Get list of plugin IDs that are terminal nodes
+   * Terminal nodes: visualization and textual plugins
+   */
+  private getTerminalPluginIds(pluginIds: string[]): string[] {
+    // These are known terminal node categories
+    const terminalCategories = ['visualization', 'textual'];
+    
+    const terminalIds: string[] = [];
+    
+    for (const pluginId of pluginIds) {
+      const capability = PluginCapabilityRegistry.getCapability(pluginId);
+      if (capability && terminalCategories.includes(capability.executionCategory)) {
+        terminalIds.push(pluginId);
+      }
+    }
+    
+    return terminalIds;
   }
 }

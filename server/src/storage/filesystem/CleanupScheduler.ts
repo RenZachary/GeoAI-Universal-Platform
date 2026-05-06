@@ -6,7 +6,6 @@
 import { WorkspaceManagerInstance } from './WorkspaceManager';
 import { MVTStrategyPublisher } from '../../utils/publishers/MVTStrategyPublisher';
 import { WMSPublisher } from '../../utils/publishers/WMSPublisher';
-import type Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { SQLiteManagerInstance } from '../database/SQLiteManager';
@@ -34,7 +33,6 @@ export interface CleanupResult {
 export class CleanupScheduler {
   private mvtPublisher: MVTStrategyPublisher;
   private wmsPublisher: WMSPublisher;
-  private db?: Database.Database;
   private config: CleanupConfig;
   private intervalId?: NodeJS.Timeout;
   private isRunning: boolean = false;
@@ -388,8 +386,6 @@ export class CleanupScheduler {
   } {
     const tempDir = WorkspaceManagerInstance.getDirectoryPath('TEMP');
     const dataLocalDir = WorkspaceManagerInstance.getDirectoryPath('DATA_LOCAL');
-    const mvtDir = WorkspaceManagerInstance.getDirectoryPath('RESULTS_MVT');
-    const wmsDir = WorkspaceManagerInstance.getDirectoryPath('RESULTS_WMS');
 
     return {
       tempDirSize: this.getDirectorySize(tempDir),

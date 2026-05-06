@@ -384,4 +384,36 @@ export class PostGISAccessor implements DatabaseAccessor {
     this.initOperations();
     return this.joinOp!.execute(targetReference, joinReference, operation, joinType);
   }
+  
+  /**
+   * Get unique values for a specific field (for categorical rendering)
+   */
+  async getUniqueValues(reference: string, fieldName: string): Promise<string[]> {
+    const pool = this.getPool();
+    const schema = this.config.schema || 'public';
+    
+    // Parse reference to get table name
+    // Format: "schema.tableName" or just "tableName"
+    const parts = reference.split('.');
+    const tableName = parts.length > 1 ? parts[1] : parts[0];
+    const actualSchema = parts.length > 1 ? parts[0] : schema;
+    
+    // Query distinct values from the table
+    const query = `
+      SELECT DISTINCT "${fieldName}"
+      FROM "${actualSchema}"."${tableName}"
+      WHERE "${fieldName}" IS NOT NULL
+      ORDER BY "${fieldName}"
+    `;
+    
+    try {
+      const result = await pool.query(query);
+      return result.rows.map(row => String(row[fieldName]));
+    } catch (error) {
+      console.error(`[PostGISAccessor] Failed to get unique values for field ${fieldName}:`, error);
+      const wrappedError = new Error(`Failed to extract unique values: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      (wrappedError as any).cause = error;
+      throw wrappedError;
+    }
+  }
 }

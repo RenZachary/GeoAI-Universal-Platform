@@ -211,6 +211,14 @@ export interface DataAccessor {
    * @returns Promise resolving to NativeData with joined result
    */
   spatialJoin(targetReference: string, joinReference: string, operation: string, joinType?: string): Promise<NativeData>;
+  
+  /**
+   * Get unique values for a specific field (for categorical rendering)
+   * @param reference - Data source reference
+   * @param fieldName - Field name to extract unique values from
+   * @returns Promise resolving to array of unique string values
+   */
+  getUniqueValues(reference: string, fieldName: string): Promise<string[]>;
 }
 
 // ============================================================================

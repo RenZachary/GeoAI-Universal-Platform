@@ -46,7 +46,10 @@ export class PostGISFilterOperation {
           database: this.pool.options.database,
           schema: this.schema,
           operation: 'filter',
-          filterApplied: JSON.stringify(filter)
+          filterApplied: JSON.stringify(filter),
+          // StandardizedOutput fields
+          result: { table: resultTable, operation: 'filter' },
+          description: `Filter operation applied`
         },
         createdAt: new Date()
       };

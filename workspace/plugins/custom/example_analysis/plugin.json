@@ -1,0 +1,39 @@
+{
+  "id": "example_analysis",
+  "name": "Example Analysis Plugin",
+  "version": "1.0.0",
+  "description": "A simple example custom plugin that demonstrates the custom plugin architecture",
+  "category": "analysis",
+  "main": "executor.js",
+  "inputSchema": [
+    {
+      "name": "dataSourceId",
+      "type": "string",
+      "required": true,
+      "description": "ID of the data source to analyze"
+    },
+    {
+      "name": "multiplier",
+      "type": "number",
+      "required": false,
+      "defaultValue": 2,
+      "description": "Multiplier for the analysis calculation"
+    },
+    {
+      "name": "operation",
+      "type": "string",
+      "required": false,
+      "defaultValue": "count",
+      "description": "Type of operation: count, sum, or average"
+    }
+  ],
+  "outputSchema": {
+    "type": "geojson",
+    "description": "Analysis result with computed statistics"
+  },
+  "capabilities": [
+    "analysis",
+    "custom_plugin",
+    "example"
+  ]
+}

@@ -13,6 +13,7 @@ import { ApiRouter } from './api/routes';
 import { CustomPluginLoader } from './plugin-orchestration';
 import { LLMConfigManagerInstance } from './services/LLMConfigService';
 import { scanAndRegisterDataFiles } from './utils/DataDirectoryScanner';
+import { registerAllExecutors } from './plugin-orchestration/config/ExecutorRegistration';
 
 // Load environment variables
 const __filename = fileURLToPath(import.meta.url);
@@ -78,6 +79,12 @@ async function startServer() {
     const customPluginLoader = new CustomPluginLoader(WORKSPACE_BASE);
     await customPluginLoader.loadAllPlugins();
     console.log(`Plugin system initialized with ${customPluginLoader.getAllPluginStatuses().length} plugins`);
+    
+    // Register all executors with ExecutorRegistry
+    console.log('Registering plugin executors...');
+    const db = SQLiteManagerInstance.getDatabase();
+    registerAllExecutors(db, WORKSPACE_BASE);
+    console.log('Executor registration complete');
     
     // Initialize API routes after database is ready
     const apiRouter = new ApiRouter(llmConfig, WORKSPACE_BASE, customPluginLoader);

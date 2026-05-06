@@ -70,6 +70,9 @@ export class PostGISBasicOperations {
           fields,
           database: this.pool.options.database,
           schema: this.schema,
+          // StandardizedOutput fields for data source
+          result: null, // Data source has no computation result
+          description: 'PostGIS data source loaded successfully'
         },
         createdAt: new Date(),
       };

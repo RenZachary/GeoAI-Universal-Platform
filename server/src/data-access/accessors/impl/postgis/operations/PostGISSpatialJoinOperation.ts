@@ -52,7 +52,10 @@ export class PostGISSpatialJoinOperation {
           spatialRelationship: operation,
           joinType,
           targetTable,
-          joinTable
+          joinTable,
+          // StandardizedOutput fields
+          result: { table: resultTable, operation: 'spatial_join' },
+          description: `Spatial join (${operation}) between ${targetTable} and ${joinTable}`
         },
         createdAt: new Date()
       };

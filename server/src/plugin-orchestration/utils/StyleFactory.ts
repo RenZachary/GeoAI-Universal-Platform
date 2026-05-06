@@ -8,6 +8,8 @@
 import fs from 'fs';
 import path from 'path';
 import { WorkspaceManagerInstance } from '../../storage';
+import { colorEngine } from '../../utils/ColorResolutionEngine';
+import { GeometryAdapter, type GeometryType } from '../../utils/GeometryAdapter';
 
 // ============================================================================
 // Type Definitions
@@ -45,6 +47,45 @@ export interface GraduatedSymbolStyleConfig {
   maxZoom?: number;
 }
 
+// New renderer configs for Phase 2
+export interface UniformStyleConfig {
+  tilesetId: string;
+  layerName: string;
+  color: string;               // hex, CSS name, Chinese word, or ramp name
+  strokeWidth?: number;        // for lines/polygons
+  pointSize?: number;          // for points
+  opacity?: number;
+  geometryType?: GeometryType; // auto-detected from metadata
+  minZoom?: number;
+  maxZoom?: number;
+}
+
+export interface CategoricalStyleConfig {
+  tilesetId: string;
+  layerName: string;
+  categoryField: string;
+  categories: string[];
+  colorScheme?: string;        // set1, set2, etc.
+  customColors?: Record<string, string>; // optional custom mapping
+  opacity?: number;
+  geometryType?: GeometryType;
+  minZoom?: number;
+  maxZoom?: number;
+}
+
+export interface ChoroplethStyleConfigNew {
+  tilesetId: string;
+  layerName: string;
+  valueField: string;
+  breaks: number[];
+  colorRamp: string;           // Changed from 'colors' to 'colorRamp'
+  numClasses: number;
+  opacity?: number;
+  geometryType?: GeometryType;
+  minZoom?: number;
+  maxZoom?: number;
+}
+
 export type MapboxStyle = {
   version: number;
   sources: Record<string, any>;
@@ -70,9 +111,11 @@ export class StyleFactory {
   }
 
   /**
-   * Generate choropleth (thematic) map style
+   * Generate choropleth (thematic) map style - DEPRECATED
+   * Use generateChoroplethStyle(config: ChoroplethStyleConfigNew) instead
+   * @deprecated This method will be removed in future versions
    */
-  static generateChoroplethStyle(config: ChoroplethStyleConfig): MapboxStyle {
+  static generateChoroplethStyleOld(config: ChoroplethStyleConfig): MapboxStyle {
     const {
       tilesetId,
       layerName,
@@ -284,13 +327,14 @@ export class StyleFactory {
   }
 
   /**
-   * Generate and save choropleth style in one step
+   * Generate and save choropleth style in one step - DEPRECATED
+   * @deprecated Use generateChoroplethStyle(config: ChoroplethStyleConfigNew) directly instead
    */
-  static createAndSaveChoroplethStyle(
+  static createAndSaveChoroplethStyleOld(
     config: ChoroplethStyleConfig,
     filename?: string
   ): string {
-    const style = this.generateChoroplethStyle(config);
+    const style = this.generateChoroplethStyleOld(config);
     const defaultFilename = `choropleth_${config.tilesetId}.json`;
     return this.saveStyle(style, filename || defaultFilename);
   }
@@ -305,6 +349,375 @@ export class StyleFactory {
     const style = this.generateHeatmapStyle(config);
     const defaultFilename = `heatmap_${config.tilesetId}.json`;
     return this.saveStyle(style, filename || defaultFilename);
+  }
+
+  // ============================================================================
+  // Phase 2: New Renderer Methods
+  // ============================================================================
+
+  /**
+   * Generate uniform color style
+   * @returns URL path to saved style JSON file
+   */
+  static async generateUniformStyle(config: UniformStyleConfig): Promise<string> {
+    const {
+      tilesetId,
+      layerName,
+      color,
+      strokeWidth = 2,
+      pointSize = 5,
+      opacity = 0.8,
+      geometryType,
+      minZoom = 0,
+      maxZoom = 22
+    } = config;
+
+    // Resolve color using ColorResolutionEngine
+    const resolvedColor = await colorEngine.resolveColor(color);
+
+    // Determine Mapbox layer type based on geometry
+    const mapboxLayerType = geometryType 
+      ? GeometryAdapter.getMapboxLayerType(geometryType)
+      : 'fill'; // default to fill
+
+    let layers: any[];
+
+    if (mapboxLayerType === 'circle') {
+      // Point geometry - use circle layer
+      layers = [{
+        id: `${layerName}-points`,
+        type: 'circle',
+        source: tilesetId,
+        'source-layer': 'default',
+        minzoom: minZoom,
+        maxzoom: maxZoom,
+        paint: {
+          'circle-radius': pointSize,
+          'circle-color': resolvedColor,
+          'circle-opacity': opacity,
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 1
+        }
+      }];
+    } else if (mapboxLayerType === 'line') {
+      // Line geometry - use line layer
+      layers = [
+        {
+          id: `${layerName}-line`,
+          type: 'line',
+          source: tilesetId,
+          'source-layer': 'default',
+          minzoom: minZoom,
+          maxzoom: maxZoom,
+          paint: {
+            'line-color': resolvedColor,
+            'line-width': strokeWidth,
+            'line-opacity': opacity
+          }
+        }
+      ];
+    } else {
+      // Polygon geometry - use fill layer with outline
+      layers = [
+        {
+          id: `${layerName}-fill`,
+          type: 'fill',
+          source: tilesetId,
+          'source-layer': 'default',
+          minzoom: minZoom,
+          maxzoom: maxZoom,
+          paint: {
+            'fill-color': resolvedColor,
+            'fill-opacity': opacity
+          }
+        },
+        {
+          id: `${layerName}-outline`,
+          type: 'line',
+          source: tilesetId,
+          'source-layer': 'default',
+          minzoom: minZoom,
+          maxzoom: maxZoom,
+          paint: {
+            'line-color': '#ffffff',
+            'line-width': 1,
+            'line-opacity': 0.5
+          }
+        }
+      ];
+    }
+
+    const style: MapboxStyle = {
+      version: 8,
+      sources: {
+        [tilesetId]: {
+          type: 'vector',
+          tiles: [`/api/services/mvt/${tilesetId}/{z}/{x}/{y}.pbf`],
+          minzoom: minZoom,
+          maxzoom: maxZoom
+        }
+      },
+      layers,
+      metadata: {
+        type: 'uniform',
+        color: resolvedColor,
+        originalColor: color,
+        geometryType,
+        generatedAt: new Date().toISOString()
+      }
+    };
+
+    // Save and return URL
+    const filename = `uniform_${tilesetId}.json`;
+    return this.saveStyle(style, filename);
+  }
+
+  /**
+   * Generate categorical style
+   * @returns URL path to saved style JSON file
+   */
+  static async generateCategoricalStyle(config: CategoricalStyleConfig): Promise<string> {
+    const {
+      tilesetId,
+      layerName,
+      categoryField,
+      categories,
+      colorScheme = 'set1',
+      customColors,
+      opacity = 0.8,
+      geometryType,
+      minZoom = 0,
+      maxZoom = 22
+    } = config;
+
+    if (categories.length === 0) {
+      throw new Error('Categories array cannot be empty');
+    }
+
+    // Resolve colors for each category
+    const colors = await colorEngine.resolveColorRamp(colorScheme, categories.length);
+    
+    // Build color mapping (custom colors override scheme colors)
+    const colorMapping: Record<string, string> = {};
+    categories.forEach((category, index) => {
+      colorMapping[category] = customColors?.[category] || colors[index % colors.length];
+    });
+
+    // Determine Mapbox layer type
+    const mapboxLayerType = geometryType 
+      ? GeometryAdapter.getMapboxLayerType(geometryType)
+      : 'fill';
+
+    // Build match expression for categorical coloring
+    const matchExpr: any[] = ['match', ['get', categoryField]];
+    categories.forEach(category => {
+      matchExpr.push(category);
+      matchExpr.push(colorMapping[category]);
+    });
+    matchExpr.push('#cccccc'); // default color for unmatched values
+
+    let layers: any[];
+
+    if (mapboxLayerType === 'circle') {
+      layers = [{
+        id: `${layerName}-points`,
+        type: 'circle',
+        source: tilesetId,
+        'source-layer': 'default',
+        minzoom: minZoom,
+        maxzoom: maxZoom,
+        paint: {
+          'circle-radius': 5,
+          'circle-color': matchExpr,
+          'circle-opacity': opacity,
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 1
+        }
+      }];
+    } else if (mapboxLayerType === 'line') {
+      layers = [{
+        id: `${layerName}-line`,
+        type: 'line',
+        source: tilesetId,
+        'source-layer': 'default',
+        minzoom: minZoom,
+        maxzoom: maxZoom,
+        paint: {
+          'line-color': matchExpr,
+          'line-width': 2,
+          'line-opacity': opacity
+        }
+      }];
+    } else {
+      layers = [
+        {
+          id: `${layerName}-fill`,
+          type: 'fill',
+          source: tilesetId,
+          'source-layer': 'default',
+          minzoom: minZoom,
+          maxzoom: maxZoom,
+          paint: {
+            'fill-color': matchExpr,
+            'fill-opacity': opacity
+          }
+        },
+        {
+          id: `${layerName}-outline`,
+          type: 'line',
+          source: tilesetId,
+          'source-layer': 'default',
+          minzoom: minZoom,
+          maxzoom: maxZoom,
+          paint: {
+            'line-color': '#ffffff',
+            'line-width': 1,
+            'line-opacity': 0.5
+          }
+        }
+      ];
+    }
+
+    // Build legend
+    const legend = categories.map((category, index) => ({
+      label: category,
+      color: colorMapping[category]
+    }));
+
+    const style: MapboxStyle = {
+      version: 8,
+      sources: {
+        [tilesetId]: {
+          type: 'vector',
+          tiles: [`/api/services/mvt/${tilesetId}/{z}/{x}/{y}.pbf`],
+          minzoom: minZoom,
+          maxzoom: maxZoom
+        }
+      },
+      layers,
+      metadata: {
+        type: 'categorical',
+        categoryField,
+        categories,
+        colorMapping,
+        colorScheme,
+        legend,
+        geometryType,
+        generatedAt: new Date().toISOString()
+      }
+    };
+
+    // Save and return URL
+    const filename = `categorical_${tilesetId}.json`;
+    return this.saveStyle(style, filename);
+  }
+
+  /**
+   * Generate choropleth style (refactored to use colorRamp instead of colors)
+   * @returns URL path to saved style JSON file
+   */
+  static async generateChoroplethStyle(config: ChoroplethStyleConfigNew): Promise<string> {
+    const {
+      tilesetId,
+      layerName,
+      valueField,
+      breaks,
+      colorRamp,
+      numClasses,
+      opacity = 0.8,
+      geometryType,
+      minZoom = 0,
+      maxZoom = 22
+    } = config;
+
+    if (breaks.length < 2) {
+      throw new Error('Breaks array must have at least 2 values');
+    }
+
+    // Resolve color ramp to actual colors
+    const colors = await colorEngine.resolveColorRamp(colorRamp, numClasses);
+
+    // Validate inputs
+    if (colors.length !== breaks.length - 1 && colors.length !== breaks.length) {
+      throw new Error(`Color count (${colors.length}) must equal breaks length (${breaks.length}) or breaks - 1 (${breaks.length - 1})`);
+    }
+
+    // Build interpolate expression
+    const interpolateExpr = this.buildInterpolateExpression(valueField, breaks, colors);
+
+    const style: MapboxStyle = {
+      version: 8,
+      sources: {
+        [tilesetId]: {
+          type: 'vector',
+          tiles: [`/api/services/mvt/${tilesetId}/{z}/{x}/{y}.pbf`],
+          minzoom: minZoom,
+          maxzoom: maxZoom
+        }
+      },
+      layers: [
+        {
+          id: `${layerName}-fill`,
+          type: 'fill',
+          source: tilesetId,
+          'source-layer': 'default',
+          minzoom: minZoom,
+          maxzoom: maxZoom,
+          paint: {
+            'fill-color': interpolateExpr,
+            'fill-opacity': opacity
+          }
+        },
+        {
+          id: `${layerName}-outline`,
+          type: 'line',
+          source: tilesetId,
+          'source-layer': 'default',
+          minzoom: minZoom,
+          maxzoom: maxZoom,
+          paint: {
+            'line-color': '#ffffff',
+            'line-width': 1,
+            'line-opacity': 0.5
+          }
+        }
+      ],
+      metadata: {
+        type: 'choropleth',
+        valueField,
+        breaks,
+        colorRamp,
+        colors,
+        numClasses,
+        legend: this.buildChoroplethLegend(breaks, colors),
+        geometryType,
+        generatedAt: new Date().toISOString()
+      }
+    };
+
+    // Save and return URL
+    const filename = `choropleth_${tilesetId}.json`;
+    return this.saveStyle(style, filename);
+  }
+
+  /**
+   * Build legend for choropleth map
+   */
+  private static buildChoroplethLegend(breaks: number[], colors: string[]): Array<{label: string; color: string}> {
+    const legend: Array<{label: string; color: string}> = [];
+    
+    for (let i = 0; i < breaks.length - 1; i++) {
+      const lower = i === 0 ? '' : breaks[i].toFixed(2);
+      const upper = breaks[i + 1].toFixed(2);
+      const label = i === 0 ? `< ${upper}` : `${lower} - ${upper}`;
+      
+      legend.push({
+        label,
+        color: colors[i] || colors[colors.length - 1]
+      });
+    }
+    
+    return legend;
   }
 
   // ============================================================================

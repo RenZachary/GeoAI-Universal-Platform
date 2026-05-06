@@ -231,7 +231,8 @@ interface ChoroplethParams { dataSourceId, valueField, classification?, colorRam
 - ✅ 统计类和运算类可串联形成pipeline
 - ✅ 运算类单输出（如需多种结果，重复调用）
 - ❌ 不支持分支执行（通过重复执行实现）
-- ⏳ **MVTPublisherExecutor架构**：⚠️ 待分析和设计（见 [03-Renderer-Architecture.md](./03-Renderer-Architecture.md) Section 3.3.1.5）
+- ✅ **MVTPublisherExecutor架构**：❌ 删除，Executor直接调用 `MVTStrategyPublisher`
+- ✅ **Publisher模块**：`MVTStrategyPublisher`（Plugin用） + `MVTOnDemandPublisher`（其他模块用）
 
 ---
 

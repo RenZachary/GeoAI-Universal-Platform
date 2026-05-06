@@ -31,7 +31,12 @@ export class GeoJSONAccessor extends GeoJSONBasedAccessor implements DataAccesso
       id: generateId(),
       type: 'geojson',
       reference,
-      metadata,
+      metadata: {
+        ...metadata,
+        // StandardizedOutput fields for data source (no computation result)
+        result: null, // Data source has no computation result
+        description: 'GeoJSON data source loaded successfully'
+      },
       createdAt: new Date(),
     };
   }
@@ -79,7 +84,7 @@ export class GeoJSONAccessor extends GeoJSONBasedAccessor implements DataAccesso
   /**
    * Write GeoJSON data to file
    */
-  async write(data: any, metadata?: Partial<DataMetadata>): Promise<string> {
+  async write(data: GeoJSONFeatureCollection, _metadata?: Partial<DataMetadata>): Promise<string> {
     const resultPath = await this.saveGeoJSON(data, 'write');
     return resultPath;
   }
@@ -139,22 +144,19 @@ export class GeoJSONAccessor extends GeoJSONBasedAccessor implements DataAccesso
   /**
    * Check if object is valid GeoJSON
    */
-  private isValidGeoJSON(obj: any): boolean {
+  private isValidGeoJSON(obj: unknown): boolean {
     if (!obj || typeof obj !== 'object') {
       return false;
     }
     
-    const validTypes = ['Point', 'MultiPoint', 'LineString', 'MultiLineString', 
-                       'Polygon', 'MultiPolygon', 'GeometryCollection',
-                       'Feature', 'FeatureCollection'];
-    
-    return validTypes.includes(obj.type);
+    const geojson = obj as Record<string, unknown>;
+    return geojson.type === 'FeatureCollection' && Array.isArray(geojson.features);
   }
   
   /**
    * Count features in GeoJSON
    */
-  private countFeatures(geojson: any): number {
+  private countFeatures(geojson: GeoJSONFeatureCollection): number {
     if (geojson.type === 'FeatureCollection') {
       return geojson.features?.length || 0;
     } else if (geojson.type === 'Feature') {
@@ -166,19 +168,39 @@ export class GeoJSONAccessor extends GeoJSONBasedAccessor implements DataAccesso
   /**
    * Extract field names from GeoJSON properties
    */
-  private extractGeoJSONFields(geojson: any): string[] {
+  private extractGeoJSONFields(geojson: GeoJSONFeatureCollection): string[] {
     const fields = new Set<string>();
-    
+
     if (geojson.type === 'FeatureCollection' && geojson.features) {
       for (const feature of geojson.features) {
         if (feature.properties && typeof feature.properties === 'object') {
           Object.keys(feature.properties).forEach(key => fields.add(key));
         }
       }
-    } else if (geojson.type === 'Feature' && geojson.properties) {
-      Object.keys(geojson.properties).forEach(key => fields.add(key));
     }
     
     return Array.from(fields);
+  }
+  
+  /**
+   * Get unique values for a specific field (for categorical rendering)
+   */
+  async getUniqueValues(reference: string, fieldName: string): Promise<string[]> {
+    const geojson = await this.loadGeoJSON(reference);
+    const uniqueValues = new Set<string>();
+    
+    // Handle FeatureCollection
+    if (geojson.type === 'FeatureCollection' && geojson.features) {
+      for (const feature of geojson.features) {
+        if (feature.properties && typeof feature.properties === 'object') {
+          const value = (feature.properties as Record<string, unknown>)[fieldName];
+          if (value !== undefined && value !== null) {
+            uniqueValues.add(String(value));
+          }
+        }
+      }
+    }
+    
+    return Array.from(uniqueValues).sort();
   }
 }

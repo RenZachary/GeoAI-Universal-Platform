@@ -65,7 +65,12 @@ export class GeoTIFFAccessor implements FileAccessor {
         id: generateId(),
         type: 'tif',
         reference,
-        metadata,
+        metadata: {
+          ...metadata,
+          // StandardizedOutput fields for data source (no computation result)
+          result: null, // Data source has no computation result
+          description: 'GeoTIFF data source loaded successfully'
+        },
         createdAt: new Date(),
       };
     } catch (error) {
@@ -205,6 +210,13 @@ export class GeoTIFFAccessor implements FileAccessor {
       console.error('GeoTIFF validation failed:', error);
       return false;
     }
+  }
+  
+  /**
+   * Get unique values for a field (not applicable for raster data)
+   */
+  async getUniqueValues(_reference: string, _fieldName: string): Promise<string[]> {
+    throw new Error('getUniqueValues is not supported for raster GeoTIFF files');
   }
   
   /**

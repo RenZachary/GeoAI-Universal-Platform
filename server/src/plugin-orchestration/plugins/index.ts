@@ -7,31 +7,39 @@ export { BufferAnalysisPlugin } from './analysis/BufferAnalysisPlugin';
 export { OverlayAnalysisPlugin } from './analysis/OverlayAnalysisPlugin';
 export { FilterPlugin } from './analysis/FilterPlugin';
 export { AggregationPlugin } from './analysis/AggregationPlugin';
-export { MVTPublisherPlugin } from './visualization/MVTPublisherPlugin';
 export { StatisticsCalculatorPlugin } from './analysis/StatisticsCalculatorPlugin';
 export { ReportGeneratorPlugin } from './reporting/ReportGeneratorPlugin';
 export { HeatmapPlugin } from './visualization/HeatmapPlugin';
-export { ChoroplethMapPlugin } from './visualization/ChoroplethMapPlugin';
+
+// Phase 2: New visualization renderers
+export { UniformColorRendererPlugin } from './visualization/UniformColorRendererPlugin';
+export { CategoricalRendererPlugin } from './visualization/CategoricalRendererPlugin';
+export { ChoroplethRendererPlugin } from './visualization/ChoroplethRendererPlugin';
 
 // Aggregate all built-in plugins for easy import
 import { BufferAnalysisPlugin } from './analysis/BufferAnalysisPlugin';
 import { OverlayAnalysisPlugin } from './analysis/OverlayAnalysisPlugin';
 import { FilterPlugin } from './analysis/FilterPlugin';
 import { AggregationPlugin } from './analysis/AggregationPlugin';
-import { MVTPublisherPlugin } from './visualization/MVTPublisherPlugin';
 import { StatisticsCalculatorPlugin } from './analysis/StatisticsCalculatorPlugin';
 import { ReportGeneratorPlugin } from './reporting/ReportGeneratorPlugin';
 import { HeatmapPlugin } from './visualization/HeatmapPlugin';
-import { ChoroplethMapPlugin } from './visualization/ChoroplethMapPlugin';
+
+// Phase 2: New visualization renderers
+import { UniformColorRendererPlugin } from './visualization/UniformColorRendererPlugin';
+import { CategoricalRendererPlugin } from './visualization/CategoricalRendererPlugin';
+import { ChoroplethRendererPlugin } from './visualization/ChoroplethRendererPlugin';
 
 export const BUILT_IN_PLUGINS = [
   BufferAnalysisPlugin,
   OverlayAnalysisPlugin,
   FilterPlugin,
   AggregationPlugin,
-  MVTPublisherPlugin,
   StatisticsCalculatorPlugin,
   ReportGeneratorPlugin,
   HeatmapPlugin,
-  ChoroplethMapPlugin
+  // Phase 2: New renderers
+  UniformColorRendererPlugin,
+  CategoricalRendererPlugin,
+  ChoroplethRendererPlugin
 ];

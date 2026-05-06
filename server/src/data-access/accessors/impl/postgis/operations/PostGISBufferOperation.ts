@@ -54,7 +54,10 @@ export class PostGISBufferOperation {
           schema: this.schema,
           operation: 'buffer',
           distance,
-          unit: options?.unit || 'degrees'
+          unit: options?.unit || 'degrees',
+          // StandardizedOutput fields
+          result: { table: resultTable, operation: 'buffer' },
+          description: `Buffer operation completed with distance ${distance}`
         },
         createdAt: new Date()
       };

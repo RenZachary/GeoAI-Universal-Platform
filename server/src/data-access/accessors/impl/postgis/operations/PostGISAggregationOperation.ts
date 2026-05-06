@@ -63,7 +63,10 @@ export class PostGISAggregationOperation {
         operation: 'aggregate',
         aggregatedField: field,
         aggregatedFunction: aggFunc,
-        aggregatedValue: valueResult.rows[0].result
+        aggregatedValue: valueResult.rows[0].result,
+        // StandardizedOutput fields
+        result: valueResult.rows[0].result,
+        description: `Aggregation ${aggFunc} on field ${field}`
       },
       createdAt: new Date()
     };
@@ -81,7 +84,10 @@ export class PostGISAggregationOperation {
         operation: 'aggregate',
         aggregatedField: field,
         aggregatedFunction: aggFunc,
-        aggregatedValue: result.rows[0].result
+        aggregatedValue: result.rows[0].result,
+        // StandardizedOutput fields
+        result: result.rows[0].result,
+        description: `Aggregation ${aggFunc} on field ${field}`
       },
       createdAt: new Date()
     };

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * GeoJSON-Based Accessor Base Class
  * 
@@ -136,7 +137,10 @@ export abstract class GeoJSONBasedAccessor {
         aggregatedField: field,
         aggregatedFunction: aggFunc,
         aggregatedValue: result.value,
-        feature: result.feature || null
+        feature: result.feature || null,
+        // StandardizedOutput fields
+        result: result.value, // The aggregation result value
+        description: `Aggregation ${aggFunc} on field ${field}`
       },
       createdAt: new Date()
     };
@@ -317,7 +321,7 @@ export abstract class GeoJSONBasedAccessor {
             fieldType = 'date';
           }
           
-          fieldTypes.get(key)!.add(fieldType);
+          fieldTypes.get(key)?.add(fieldType);
         }
       }
     }
