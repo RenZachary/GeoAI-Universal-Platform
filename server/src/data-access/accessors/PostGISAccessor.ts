@@ -9,6 +9,7 @@ import { wrapError } from '../../core';
 import type { DatabaseAccessor, TableSchema, ColumnInfo, IndexInfo, BufferOptions, OverlayOptions, FilterCondition } from '../interfaces';
 import type { PoolConfig, QueryResultRow } from 'pg';
 import { Pool } from 'pg';
+import type { PostGISConnectionConfig } from '../../core';
 import { 
   PostGISBasicOperations,
   PostGISBufferOperation,
@@ -33,15 +34,6 @@ interface GeoJSONData {
     geometry: any;
     properties?: Record<string, unknown>;
   }>;
-}
-
-export interface PostGISConnectionConfig {
-  host: string;
-  port: number;
-  database: string;
-  user: string;
-  password: string;
-  schema?: string; // Default: 'public'
 }
 
 export class PostGISAccessor implements DatabaseAccessor {

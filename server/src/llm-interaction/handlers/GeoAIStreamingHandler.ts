@@ -72,7 +72,7 @@ export class GeoAIStreamingHandler extends BaseCallbackHandler {
   async handleToolEnd(output: string): Promise<void> {
     this.writeSSE({
       type: 'tool_complete',
-      output: this.truncate(output, 500),
+      output: this.truncate(output, 2000), // Increased limit for complex results like MVT metadata
       timestamp: Date.now(),
     });
   }

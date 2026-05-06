@@ -163,7 +163,7 @@ export abstract class BaseRendererExecutor {
       }
       
       // Create appropriate accessor and read data
-      const accessor = this.accessorFactory.createAccessor(dataSource.type);
+      const accessor = this.accessorFactory.createAccessor(dataSource.type, dataSource.metadata?.connection);
       const nativeData = await accessor.read(dataSource.reference);
       
       // Store geometry type in nativeData metadata for StyleFactory to use

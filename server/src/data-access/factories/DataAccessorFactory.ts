@@ -35,7 +35,7 @@ export class DataAccessorFactory {
   /**
    * Create or retrieve accessor for given type
    */
-  createAccessor(type: DataSourceType): DataAccessor {
+  createAccessor(type: DataSourceType,config?: PostGISConnectionConfig): DataAccessor {
     // Check if accessor already exists
     if (this.accessors.has(type)) {
       return this.accessors.get(type) as DataAccessor;
@@ -52,6 +52,7 @@ export class DataAccessorFactory {
         accessor = new GeoJSONAccessor(this.workspaceBase);
         break;
       case 'postgis':
+        if (config) this.configurePostGIS(config);
         if (!this.postGISConfig) {
           throw new Error('PostGIS not configured. Call configurePostGIS() first.');
         }

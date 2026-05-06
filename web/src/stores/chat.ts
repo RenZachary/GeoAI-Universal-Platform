@@ -104,7 +104,7 @@ export const useChatStore = defineStore('chat', () => {
   }
   
   function handleSSEEvent(event: any) {
-    const { type, data, step, tool, service, services, summary } = event
+    const { type, data, step, tool, service, services, summary,output } = event
     
     if (!currentConversationId.value && data?.conversationId) {
       currentConversationId.value = data.conversationId
@@ -169,10 +169,11 @@ export const useChatStore = defineStore('chat', () => {
         // Remove from active tools with detailed status
         // Try to get tool name from output first, then fall back to activeTools
         let completedToolName = 'Unknown tool'
-        if (data?.output) {
+        if (output) {
           try {
-            const output = JSON.parse(data.output)
-            completedToolName = output.pluginId || completedToolName
+            const outputData = JSON.parse(output || '{}')
+            completedToolName = outputData.pluginId || completedToolName
+            console.log('[Chat Store] completedToolName', completedToolName)
           } catch (e) {
             console.warn('[Chat Store] Failed to parse tool output', e)
           }
@@ -182,7 +183,7 @@ export const useChatStore = defineStore('chat', () => {
         if (completedToolName === 'Unknown tool' && activeTools.value.length > 0) {
           completedToolName = activeTools.value[activeTools.value.length - 1]
         }
-        
+        console.log('[Chat Store] Tool completed:', completedToolName)
         activeTools.value = activeTools.value.filter(t => t !== completedToolName)
         
         // Check if the tool succeeded by parsing output

@@ -226,11 +226,40 @@ function shouldShowStreaming(msg: any, index: number): boolean {
   return isStreaming && isAssistant && isLastMessage
 }
 
+// Convert editor HTML to text with datasource IDs
+function extractTextWithIds(editor: HTMLElement): string {
+  let result = ''
+  
+  // Walk through all child nodes
+  editor.childNodes.forEach(node => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      result += node.textContent
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      const element = node as HTMLElement
+      
+      // Check if it's a datasource mention span
+      if (element.classList.contains('mention-highlight') && element.hasAttribute('data-datasource-id')) {
+        const dsId = element.getAttribute('data-datasource-id')
+        const dsName = element.textContent?.replace('@', '') || ''
+        result += `@[datasourceId:${dsId}](${dsName})`
+      } else {
+        // For other elements, recursively extract text
+        result += extractTextWithIds(element)
+      }
+    }
+  })
+  
+  return result
+}
+
 async function handleSendMessage() {
   if (!inputMessage.value.trim() || chatStore.isStreaming) return
 
-  // Convert @mentions to data source IDs for backend processing
-  const messageWithIds = convertMentionsToIds(inputMessage.value)
+  // Extract text with datasource IDs from editor DOM
+  let messageWithIds = inputMessage.value
+  if (editorRef.value) {
+    messageWithIds = extractTextWithIds(editorRef.value)
+  }
   
   // Clear the editor
   if (editorRef.value) {
@@ -507,9 +536,10 @@ function selectDataSource(ds: any) {
     // Delete the old @mention
     replaceRange.deleteContents()
     
-    // Create highlighted span
+    // Create highlighted span with data attribute for ID
     const mentionSpan = document.createElement('span')
     mentionSpan.className = 'mention-highlight'
+    mentionSpan.setAttribute('data-datasource-id', ds.id)
     mentionSpan.textContent = `@${ds.name}`
     
     // Insert the span at the collapsed range position

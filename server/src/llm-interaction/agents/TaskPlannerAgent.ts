@@ -137,6 +137,8 @@ export class TaskPlannerAgent {
 
           // STAGE 2: LLM-based selection from filtered candidates
           const plan = await chain.invoke({
+            goalId: goal.id,
+            goalType: goal.type || 'query', // Default to query if type is missing
             goalDescription: goal.description,
             availableTools: JSON.stringify(compatibleTools, null, 2),
             dataSourcesMetadata,

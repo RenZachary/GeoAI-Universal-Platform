@@ -8,15 +8,7 @@
 import type { PoolConfig } from 'pg';
 import { Pool } from 'pg';
 import { wrapError } from '../../../core';
-
-export interface PostGISConnectionConfig {
-  host: string;
-  port: number;
-  database: string;
-  user: string;
-  password: string;
-  schema?: string;
-}
+import type { PostGISConnectionConfig, ParsedPostGISReference } from '../../../core';
 
 export interface PostGISTileQuery {
   tableName?: string;
@@ -28,18 +20,6 @@ export interface PostGISTileResult {
   success: boolean;
   tileBuffer?: Buffer;
   error?: string;
-}
-
-export interface ParsedPostGISReference {
-  user: string;
-  password: string;
-  host: string;
-  port: number;
-  database: string;
-  schema?: string;
-  tableName?: string;
-  sqlQuery?: string;
-  geometryColumn?: string;
 }
 
 /**
@@ -115,14 +95,15 @@ export class PostGISTileGenerator {
         sql = `
           SELECT ST_AsMVT(q, $1, $2, $3) as tile
           FROM (
-            SELECT ${geometryColumn}
+            SELECT ST_Transform(${geometryColumn}, 3857) as ${geometryColumn}
             FROM ${schema}.${query.tableName}
-            WHERE ST_Intersects(${geometryColumn}, ST_TileEnvelope($4, $5, $6))
+            WHERE ST_Intersects(ST_Transform(${geometryColumn}, 3857), ST_TileEnvelope($4, $5, $6))
           ) q
         `;
-        params = [extent, layerName, geometryColumn, z, x, y];
+        // ST_AsMVT signature: (rows, name, extent, geom_name)
+        params = [layerName, extent, geometryColumn, z, x, y];
       } else if (query.sqlQuery) {
-        // Custom SQL query
+        // Custom SQL query - assume the query already handles projection or returns 3857
         sql = `
           SELECT ST_AsMVT(q, $1, $2, $3) as tile
           FROM (
@@ -130,7 +111,8 @@ export class PostGISTileGenerator {
           ) q
           WHERE ST_Intersects(${geometryColumn}, ST_TileEnvelope($4, $5, $6))
         `;
-        params = [extent, layerName, geometryColumn, z, x, y];
+        // ST_AsMVT signature: (rows, name, extent, geom_name)
+        params = [layerName, extent, geometryColumn, z, x, y];
       } else {
         return {
           success: false,

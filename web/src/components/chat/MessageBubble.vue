@@ -97,17 +97,11 @@ const renderedContent = computed(() => {
     // For user messages, convert @[datasource:ID] back to @name with highlights
     let content = props.message.content
     
-    // Find all @[datasource:ID] patterns and replace with highlighted @name
-    const datasourceRegex = /@\[datasource:([^\]]+)\]/g
-    content = content.replace(datasourceRegex, (match, datasourceId) => {
-      // Find the data source by ID
-      const ds = dataSourceStore.dataSources.find((d: any) => d.id === datasourceId)
-      if (ds) {
-        // Return highlighted span with the data source name
-        return `<span class="mention-highlight">@${ds.name}</span>`
-      }
-      // If not found, return the original match
-      return match
+    // Find all @[datasourceId:UUID](Name) patterns and replace with highlighted @name
+    const datasourceRegex = /@\[datasourceId:([^\]]+)\]\(([^)]+)\)/g
+    content = content.replace(datasourceRegex, (match, datasourceId, dsName) => {
+      // Return highlighted span with the data source name
+      return `<span class="mention-highlight" data-datasource-id="${datasourceId}">@${dsName}</span>`
     })
     
     // Find all /[tool:ID] patterns and replace with highlighted /name

@@ -472,3 +472,29 @@ export interface AnalysisHistoryEntity {
   createdAt: string;
   completedAt: string | null;
 }
+
+// ============================================================================
+// PostGIS Types
+// ============================================================================
+
+export interface PostGISConnectionConfig {
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  password: string;
+  schema?: string;
+  name?: string; // Optional display name for the connection
+}
+
+export interface ParsedPostGISReference {
+  user: string;
+  password: string;
+  host: string;
+  port: number;
+  database: string;
+  schema: string;
+  tableName?: string;
+  sqlQuery?: string;
+  geometryColumn: string;
+}

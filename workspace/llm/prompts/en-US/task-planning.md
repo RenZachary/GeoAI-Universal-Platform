@@ -1,7 +1,9 @@
 <!-- Create execution plan for goals using available plugins and data sources -->
 Create an execution plan for the given goal using available plugins and data sources.
 
-Goal: {{goalDescription}}
+Goal ID: {{goalId}}
+Goal Type: {{goalType}}
+Goal Description: {{goalDescription}}
 
 Available Data Sources:
 {{dataSourcesMetadata}}
@@ -21,7 +23,8 @@ Planning Principles:
 6. Plugin Compatibility: Verify that plugin parameters match the data source characteristics (type, geometry, available fields). Do not use plugins with incompatible data sources.
 7. **CRITICAL: Plugin ID Accuracy**: You MUST use the EXACT `id` field from the Available Plugins list. DO NOT invent, modify, or guess plugin IDs. The `pluginId` field in your execution plan must exactly match a plugin's `id` from the available list.
 8. **CRITICAL: No Duplicate Steps**: Each step in the plan MUST use a unique plugin. NEVER repeat the same plugin multiple times within a single goal's execution plan. If you find yourself wanting to use the same plugin twice, reconsider whether both steps are truly necessary - typically one properly configured step is sufficient.
-9. **Analysis + Visualization Pattern**: Carefully examine the goal description for ANY mention of display, show, view, map, render, or visualization terms. If found AND goal type is `spatial_analysis` or `data_processing`, you MUST create a TWO-step plan where Step 1 executes the analysis/processing plugin and Step 2 uses a visualization plugin with dataSourceId referencing Step 1's result using placeholder syntax.
+9. **Goal Type Enforcement**: 
+   - If Goal Type is 'visualization': The final step MUST be a visualization plugin (e.g., map renderer, chart generator). Do NOT end with a query or analysis plugin.
 
 Referencing Previous Step Results:
 When a step needs to use results from a previous step, you MUST use this EXACT syntax:

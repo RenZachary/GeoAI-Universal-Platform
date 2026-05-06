@@ -14,8 +14,12 @@ import { DataAccessorFactory } from '../../data-access';
 import type Database from 'better-sqlite3';
 import { BaseMVTPublisher, type MVTPublishResult } from './base/BaseMVTPublisher';
 import type { Pool } from 'pg';
-import { PostGISTileGenerator, type PostGISConnectionConfig, type PostGISTileQuery } from './base/PostGISTileGenerator';
+import { PostGISTileGenerator, type PostGISTileQuery } from './base/PostGISTileGenerator';
+import { PostGISConnectionManager } from '../PostGISConnectionManager';
+import type { PostGISConnectionConfig } from '../../core';
 import { type MVTTileOptions, type MVTPublishMetadata } from './base/MVTPublisherTypes';
+import { SQLiteManagerInstance } from '../../storage';
+import { DataSourceRepository } from '../../data-access/repositories';
 
 // Type definitions for geojson-vt (library doesn't provide types)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -35,6 +39,7 @@ export interface MVTTileGenerationStrategy {
   generateTiles(
     sourceReference: string,
     dataSourceType: DataSourceType,
+    nativeData: NativeData,
     options: MVTTileOptions
   ): Promise<string>;
   
@@ -62,6 +67,7 @@ class GeoJSONMVTTStrategy implements MVTTileGenerationStrategy {
   async generateTiles(
     sourceReference: string,
     dataSourceType: DataSourceType,
+    nativeData: NativeData,
     options: MVTTileOptions
   ): Promise<string> {
     const {
@@ -246,6 +252,7 @@ class ShapefileMVTTStrategy implements MVTTileGenerationStrategy {
   async generateTiles(
     sourceReference: string,
     dataSourceType: DataSourceType,
+    nativeData: NativeData,
     options: MVTTileOptions
   ): Promise<string> {
     console.log('[Shapefile MVT Strategy] Converting Shapefile to GeoJSON...');
@@ -296,7 +303,7 @@ class ShapefileMVTTStrategy implements MVTTileGenerationStrategy {
     
     try {
       // Generate tiles from the converted GeoJSON file
-      return await geojsonStrategy.generateTiles(convertedGeoJsonPath, 'geojson', options);
+      return await geojsonStrategy.generateTiles(convertedGeoJsonPath, 'geojson', nativeData, options);
     } catch (error) {
       // Only clean up if tile generation failed
       if (fs.existsSync(convertedGeoJsonPath)) {
@@ -320,7 +327,7 @@ class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
   
   constructor(
     private mvtOutputDir: string,
-    private db?: Database.Database
+    private db: Database.Database
   ) {
     this.tileGenerator = new PostGISTileGenerator();
   }
@@ -328,6 +335,7 @@ class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
   async generateTiles(
     sourceReference: string,
     dataSourceType: DataSourceType,
+    nativeData: NativeData,
     options: MVTTileOptions
   ): Promise<string> {
     console.log('[PostGIS MVT Strategy] Setting up PostGIS MVT generation...');
@@ -349,18 +357,19 @@ class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
     if (!fs.existsSync(tilesetDir)) {
       fs.mkdirSync(tilesetDir, { recursive: true });
     }
+    // 通过db查询metadata字段
+    const dsr = new DataSourceRepository(this.db).getByReferenceAndType(sourceReference, dataSourceType);
+    const metadataInDb = dsr?.metadata;
+    console.log('[PostGIS MVT Strategy] Metadata from DB:', metadataInDb);
     
-    // Parse sourceReference to extract connection info and table/query
-    // Format: "postgis://user:pass@host:port/database?table=tablename&geom=geom"
-    // Or: "postgis://user:pass@host:port/database?query=SELECT..."
-    
-    const connectionInfo = PostGISTileGenerator.parseReference(sourceReference);
+    // Use the new Connection Manager to parse reference and get config
+    const connectionInfo = PostGISConnectionManager.parseReference(sourceReference, metadataInDb);
     
     if (!connectionInfo) {
       throw new Error('Invalid PostGIS connection reference format');
     }
     
-    // Create connection pool using shared generator
+    // Create connection pool using shared manager
     const poolConfig: PostGISConnectionConfig = {
       host: connectionInfo.host,
       port: connectionInfo.port,
@@ -576,6 +585,7 @@ export class MVTStrategyPublisher extends BaseMVTPublisher {
     return strategy.generateTiles(
       nativeData.reference,
       nativeData.type,
+      nativeData,      
       options
     );
   }

@@ -25,6 +25,33 @@ export class DataSourceRepository {
   }
 
   /**
+   * Get data source by reference and type
+   * @param reference - The reference of the data source
+   * @param type - The type of the data source
+   */
+  getByReferenceAndType(reference: string, type: DataSourceType): DataSourceRecord | null {
+    const row = this.db.prepare(`
+      SELECT id, name, type, reference, metadata, created_at, updated_at
+      FROM data_sources
+      WHERE reference = ? AND type = ?
+    `).get(reference, type) as any;
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      id: row.id,
+      name: row.name,
+      type: row.type as DataSourceType,
+      reference: row.reference,
+      metadata: JSON.parse(row.metadata),
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+    };
+  }
+
+  /**
    * Get data source by ID
    */
   getById(id: string): DataSourceRecord | null {

@@ -12,20 +12,11 @@ import type { DataSourceRepository} from '../data-access/repositories';
 import { type DataSourceRecord } from '../data-access/repositories';
 import { DataAccessorFactory } from '../data-access';
 import { generateId } from '../core';
+import type { PostGISConnectionConfig } from '../core';
 
 // ============================================================================
 // Type Definitions
 // ============================================================================
-
-export interface PostGISConnectionConfig {
-  host: string;
-  port?: number;
-  database: string;
-  user: string;
-  password: string;
-  schema?: string;
-  name?: string;
-}
 
 export interface ConnectionInfo {
   host: string;
@@ -586,8 +577,9 @@ export class DataSourceService {
           port: config.port || 5432,
           database: config.database,
           user: config.user,
+          password: config.password, // Note: In production, use encryption or external vault
           schema,
-          password_encrypted: true
+          password_encrypted: false
         },
         tableName: table.tableName,
         geometryColumn: table.geometryColumn,
