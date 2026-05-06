@@ -18,10 +18,31 @@ export async function getDataSource(id: string): Promise<DataSource> {
 }
 
 /**
- * Delete a data source
+ * Delete a data source (not allowed for PostGIS tables)
  */
 export async function deleteDataSource(id: string): Promise<void> {
   await api.delete(`/api/data-sources/${id}`)
+}
+
+/**
+ * Get list of PostGIS connections
+ */
+export async function getPostGISConnections(): Promise<Array<{
+  id: string
+  name: string
+  host: string
+  database: string
+  tableCount: number
+}>> {
+  const response = await api.get('/api/data-sources/connections')
+  return response.data.connections || []
+}
+
+/**
+ * Remove a PostGIS connection and all its tables
+ */
+export async function removePostGISConnection(connectionId: string): Promise<void> {
+  await api.delete(`/api/data-sources/connections/${connectionId}`)
 }
 
 /**

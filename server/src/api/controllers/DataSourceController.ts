@@ -252,6 +252,43 @@ export class DataSourceController {
   }
 
   /**
+   * Get list of PostGIS connections
+   * GET /api/data-sources/connections
+   */
+  async getPostGISConnections(req: Request, res: Response): Promise<void> {
+    try {
+      const connections = this.dataSourceService.getPostGISConnections();
+      
+      res.json({
+        success: true,
+        connections
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Remove PostGIS connection and all its tables
+   * DELETE /api/data-sources/connections/:connectionId
+   */
+  async removePostGISConnection(req: Request, res: Response): Promise<void> {
+    try {
+      const { connectionId } = req.params;
+      const id = Array.isArray(connectionId) ? connectionId[0] : connectionId;
+      
+      await this.dataSourceService.removePostGISConnection(id);
+      
+      res.json({
+        success: true,
+        message: 'PostGIS connection removed successfully'
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
    * Search data sources by name
    * GET /api/data-sources/search?q=query
    */

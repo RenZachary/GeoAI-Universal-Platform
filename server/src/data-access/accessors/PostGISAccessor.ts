@@ -179,6 +179,22 @@ export class PostGISAccessor implements DatabaseAccessor {
   }
   
   /**
+   * Execute raw SQL query and return full result (with rows property)
+   * This is used by DataSourceService for table discovery
+   */
+  async executeRaw(sql: string, params?: unknown[]): Promise<{ rows: PgQueryRow[] }> {
+    const pool = this.getPool();
+    
+    try {
+      const result = await pool.query(sql, params);
+      return { rows: result.rows };
+    } catch (error) {
+      console.error('[PostGISAccessor] Raw query execution error:', error);
+      throw wrapError(error, 'Failed to execute raw query');
+    }
+  }
+  
+  /**
    * Get table schema information
    */
   async getSchema(tableName: string): Promise<TableSchema> {

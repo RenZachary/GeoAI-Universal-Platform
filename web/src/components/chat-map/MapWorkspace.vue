@@ -431,7 +431,7 @@ function closeFeaturePopup() {
 
 .layer-item {
   border-radius: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 4px;
   background: var(--el-fill-color-lighter);
 }
 

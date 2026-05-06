@@ -146,7 +146,7 @@ const featuresLabel = computed(() => {
 
 <style scoped lang="scss">
 .layer-item-card {
-  padding: 12px;
+  padding: 0px 4px;
   border: 1px solid var(--el-border-color);
   border-radius: 6px;
   background: var(--el-bg-color);
@@ -166,7 +166,7 @@ const featuresLabel = computed(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 2px;
   
   .layer-checkbox {
     flex: 1;
@@ -192,7 +192,7 @@ const featuresLabel = computed(() => {
 }
 
 .card-metadata {
-  margin-bottom: 8px;
+  margin-bottom: 0px;
   display: flex;
   gap: 8px;
   

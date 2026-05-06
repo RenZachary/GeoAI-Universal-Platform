@@ -43,12 +43,13 @@ export interface RegisteredDataSource {
 }
 
 export interface TableInfo {
+  schema: string;
   tableName: string;
   geometryColumn: string;
   srid: number;
   geometryType: string;
   rowCount: number;
-  fields: FieldInfo[];
+  fields: UnifiedFieldInfo[];
   description: string | null;
 }
 
@@ -57,6 +58,11 @@ export interface FieldInfo {
   dataType: string;
   isNullable: string;
   maxLength?: number;
+}
+
+export interface UnifiedFieldInfo {
+  name: string;
+  type: string;
 }
 
 // ============================================================================
@@ -152,11 +158,10 @@ export class DataSourceService {
     // Step 2: Test connection
     await this.testConnection(config);
 
-    // Step 3: Discover spatial tables with schemas
-    const schema = config.schema || 'public';
-    const tables = await this.discoverSpatialTables(config, schema);
+    // Step 3: Discover spatial tables from ALL schemas
+    const tables = await this.discoverSpatialTablesAllSchemas(config);
 
-    console.log(`[DataSourceService] Discovered ${tables.length} spatial tables`);
+    console.log(`[DataSourceService] Discovered ${tables.length} spatial tables across all schemas`);
 
     // Step 4: Register each table as a data source
     const connectionName = config.name || `PostGIS_${config.host}_${config.database}`;
@@ -171,7 +176,7 @@ export class DataSourceService {
       connectionInfo: {
         host: config.host,
         database: config.database,
-        schema,
+        schema: 'all', // Indicates all schemas were scanned
         tableCount: registeredSources.length
       },
       dataSources: registeredSources
@@ -224,9 +229,91 @@ export class DataSourceService {
 
   /**
    * Delete data source
+   * Prevents deletion of PostGIS data sources (tables)
    */
   async deleteDataSource(id: string): Promise<void> {
+    const dataSource = this.dataSourceRepo.getById(id);
+    
+    if (!dataSource) {
+      throw new ValidationError(`Data source not found: ${id}`);
+    }
+
+    // Prevent deletion of PostGIS data sources
+    if (dataSource.type === 'postgis') {
+      throw new ValidationError('Cannot delete individual PostGIS tables. Please remove the entire connection instead.');
+    }
+
     this.dataSourceRepo.delete(id);
+  }
+
+  /**
+   * Remove PostGIS connection and all its associated data sources
+   */
+  async removePostGISConnection(connectionId: string): Promise<void> {
+    const allSources = this.dataSourceRepo.listAll();
+    
+    // Find all data sources belonging to this connection
+    const connectionSources = allSources.filter(ds => {
+      return ds.type === 'postgis' && 
+             ds.metadata?.connection &&
+             this.getConnectionId(ds) === connectionId;
+    });
+
+    if (connectionSources.length === 0) {
+      throw new ValidationError(`No data sources found for connection: ${connectionId}`);
+    }
+
+    // Delete all data sources in this connection
+    for (const source of connectionSources) {
+      this.dataSourceRepo.delete(source.id);
+    }
+
+    console.log(`[DataSourceService] Removed connection ${connectionId} with ${connectionSources.length} tables`);
+  }
+
+  /**
+   * Get list of PostGIS connections
+   */
+  getPostGISConnections(): Array<{ id: string; name: string; host: string; database: string; tableCount: number }> {
+    const allSources = this.dataSourceRepo.listAll();
+    const postgisSources = allSources.filter(ds => ds.type === 'postgis');
+    
+    // Group by connection
+    const connectionMap = new Map<string, {
+      id: string;
+      name: string;
+      host: string;
+      database: string;
+      tableCount: number;
+    }>();
+
+    for (const source of postgisSources) {
+      const connectionId = this.getConnectionId(source);
+      
+      if (!connectionMap.has(connectionId)) {
+        const connection = source.metadata?.connection;
+        connectionMap.set(connectionId, {
+          id: connectionId,
+          name: source.name.split('.')[0], // Extract connection name from "connection.schema.table"
+          host: connection?.host || 'unknown',
+          database: connection?.database || 'unknown',
+          tableCount: 0
+        });
+      }
+      const connection = connectionMap.get(connectionId);
+      if(connection) connection.tableCount++;
+    }
+
+    return Array.from(connectionMap.values());
+  }
+
+  /**
+   * Extract connection ID from data source
+   * Format: "connectionName.schema.tableName" -> "connectionName"
+   */
+  private getConnectionId(dataSource: DataSourceRecord): string {
+    const parts = dataSource.name.split('.');
+    return parts.length > 0 ? parts[0] : dataSource.id;
   }
 
   // ==========================================================================
@@ -281,7 +368,135 @@ export class DataSourceService {
   }
 
   /**
-   * Discover spatial tables in PostGIS database
+   * Map PostGIS data types to unified field types
+   */
+  private mapPostGISDataType(postgisType: string): string {
+    const typeMap: Record<string, string> = {
+      'integer': 'number',
+      'bigint': 'number',
+      'smallint': 'number',
+      'numeric': 'number',
+      'decimal': 'number',
+      'real': 'number',
+      'double precision': 'number',
+      'float': 'number',
+      'text': 'string',
+      'character varying': 'string',
+      'varchar': 'string',
+      'char': 'string',
+      'character': 'string',
+      'boolean': 'boolean',
+      'bool': 'boolean',
+      'date': 'date',
+      'timestamp': 'date',
+      'timestamptz': 'date',
+      'time': 'date',
+      'json': 'object',
+      'jsonb': 'object',
+      'bytea': 'binary',
+      'uuid': 'string',
+      'USER-DEFINED': 'geometry' // PostGIS geometry types
+    };
+
+    return typeMap[postgisType.toLowerCase()] || 'string';
+  }
+
+  /**
+   * Discover spatial tables in ALL PostGIS schemas
+   */
+  private async discoverSpatialTablesAllSchemas(config: PostGISConnectionConfig): Promise<TableInfo[]> {
+    try {
+      const accessor = this.accessorFactory.createAccessor('postgis');
+
+      // Query geometry_columns for ALL spatial tables (no schema filter)
+      const query = `
+        SELECT 
+          f_table_schema AS "schema",
+          f_table_name AS "tableName",
+          f_geometry_column AS "geometryColumn",
+          srid,
+          type AS "geometryType"
+        FROM geometry_columns
+        ORDER BY f_table_schema, f_table_name
+      `;
+
+      const result = await (accessor as any).executeRaw(query);
+      const tables = result.rows || [];
+
+      console.log(`[DataSourceService] Found ${tables.length} spatial tables in geometry_columns`);
+
+      // Enrich with row counts and field schemas (parallel execution)
+      const enrichedTables = await Promise.all(
+        tables.map(async (table: any) => {
+          try {
+            const schema = table.schema;
+            const tableName = table.tableName;
+            console.log(`[DataSourceService] Enriching table: ${schema}.${tableName}`);
+
+            // Get row count
+            const countQuery = `SELECT COUNT(*) as count FROM "${schema}"."${tableName}"`;
+            console.log(`[DataSourceService] Executing count query for ${schema}.${tableName}`);
+            const countResult = await (accessor as any).executeRaw(countQuery);
+            const rowCount = parseInt(countResult.rows[0].count, 10);
+            console.log(`[DataSourceService] Row count for ${schema}.${tableName}: ${rowCount}`);
+
+            // Get field schema from information_schema
+            const schemaQuery = `
+              SELECT 
+                column_name AS "columnName",
+                data_type AS "dataType",
+                is_nullable AS "isNullable",
+                character_maximum_length AS "maxLength"
+              FROM information_schema.columns
+              WHERE table_schema = $1 AND table_name = $2
+              ORDER BY ordinal_position
+            `;
+            console.log(`[DataSourceService] Fetching schema for ${schema}.${tableName}`);
+            const schemaResult = await (accessor as any).executeRaw(schemaQuery, [schema, tableName]);
+            const fieldSchemas = schemaResult.rows || [];
+            
+            // Convert to unified format: [{name, type}, ...]
+            const fields = fieldSchemas.map((f: any) => ({
+              name: f.columnName,
+              type: this.mapPostGISDataType(f.dataType)
+            }));
+            
+            console.log(`[DataSourceService] Found ${fields.length} fields for ${schema}.${tableName}`);
+
+            return {
+              ...table,
+              rowCount,
+              fields, // Store as object array
+              description: null
+            };
+          } catch (err) {
+            console.warn(`[DataSourceService] Failed to enrich table ${table.schema}.${table.tableName}:`, err);
+            return {
+              ...table,
+              rowCount: 0,
+              fields: [],
+              description: null
+            };
+          }
+        })
+      );
+
+      console.log(`[DataSourceService] Successfully enriched ${enrichedTables.length} tables`);
+      // Log summary of first few tables
+      enrichedTables.slice(0, 3).forEach(table => {
+        console.log(`[DataSourceService] Table ${table.schema}.${table.tableName}: rowCount=${table.rowCount}, fields=${table.fields.length}`);
+      });
+
+      return enrichedTables;
+    } catch (error) {
+      console.error('[DataSourceService] Error discovering spatial tables:', error);
+      throw new DataSourceError(`Failed to discover tables: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Discover spatial tables in a specific PostGIS schema (legacy method)
+   * @deprecated Use discoverSpatialTablesAllSchemas instead
    */
   private async discoverSpatialTables(config: PostGISConnectionConfig, schema: string): Promise<TableInfo[]> {
     try {
@@ -359,10 +574,10 @@ export class DataSourceService {
     connectionName: string
   ): Promise<RegisteredDataSource> {
     const dataSourceId = generateId();
-    const schema = config.schema || 'public';
+    const schema = table.schema || config.schema || 'public';
 
     const dataSource = this.dataSourceRepo.create(
-      `${connectionName}.${table.tableName}`,
+      `${connectionName}.${schema}.${table.tableName}`,
       'postgis',
       `${schema}.${table.tableName}`,
       {
@@ -377,11 +592,13 @@ export class DataSourceService {
         tableName: table.tableName,
         geometryColumn: table.geometryColumn,
         srid: table.srid,
+        crs: `EPSG:${table.srid}`, // Convert SRID to CRS format (e.g., EPSG:4326)
         geometryType: table.geometryType,
         rowCount: table.rowCount,
+        featureCount: table.rowCount, // Alias for consistency with file-based sources
         description: table.description,
-        fields: table.fields.map(f => f.columnName), // Store field names as string array
-        fieldSchemas: table.fields || [] // Store detailed schema separately
+        fields: table.fields, // Store as object array [{name, type}, ...]
+        fieldSchemas: table.fields || [] // Keep detailed schema for backward compatibility
       }
     );
 

@@ -120,6 +120,7 @@ export default {
     schemaTitle: 'Field Schema',
     postgis: {
       addConnection: 'Add PostGIS Connection',
+      connections: 'PostGIS Connections',
       dialogTitle: 'Add PostGIS Connection',
       connectionName: 'Connection Name',
       host: 'Host',
@@ -145,7 +146,8 @@ export default {
       messages: {
         connected: 'Connected successfully! Registered {count} tables',
         connectionFailed: 'Failed to connect to PostGIS',
-        connectionError: 'Failed to connect to PostGIS database'
+        connectionError: 'Failed to connect to PostGIS database',
+        removeConnection: 'Remove connection and all its tables'
       }
     }
   },

@@ -120,6 +120,7 @@ export default {
     schemaTitle: '字段结构',
     postgis: {
       addConnection: '添加 PostGIS 连接',
+      connections: 'PostGIS 连接管理',
       dialogTitle: '添加 PostGIS 连接',
       connectionName: '连接名称',
       host: '主机',
@@ -145,7 +146,8 @@ export default {
       messages: {
         connected: '连接成功！已注册 {count} 个表',
         connectionFailed: '连接 PostGIS 失败',
-        connectionError: '无法连接到 PostGIS 数据库'
+        connectionError: '无法连接到 PostGIS 数据库',
+        removeConnection: '移除连接及其所有表'
       }
     }
   },

@@ -56,14 +56,16 @@
         </template>
       </el-table-column>
       
-      <el-table-column :label="$t('common.actions')" width="180" fixed="right">
+      <el-table-column :label="$t('common.actions')" fixed="right">
         <template #default="{ row }">
           <div class="action-buttons">
             <el-button size="small" type="primary" text @click="handleViewMetadata(row)">
               <el-icon><InfoFilled /></el-icon>
               {{ $t('data.viewMetadata') }}
             </el-button>
+            <!-- Only show delete button for non-PostGIS data sources -->
             <el-popconfirm
+              v-if="row.type !== 'postgis'"
               :title="$t('data.deleteConfirm', { name: row.name })"
               @confirm="handleDelete(row.id)"
             >
@@ -73,10 +75,72 @@
                 </el-button>
               </template>
             </el-popconfirm>
+            <!-- Show tooltip for PostGIS tables -->
+            <el-tooltip v-else content="Cannot delete individual PostGIS tables. Remove the entire connection instead." placement="top">
+              <el-button size="small" type="info" text disabled>
+                {{ $t('common.delete') }}
+              </el-button>
+            </el-tooltip>
           </div>
         </template>
       </el-table-column>
     </el-table>
+    
+    <!-- PostGIS Connections Section -->
+    <div class="connections-section">
+      <h3>{{ $t('data.postgis.connections') }}</h3>
+      
+      <el-empty 
+        v-if="postgisConnections.length === 0"
+        description="No PostGIS connections registered yet. Click 'Add PostGIS Connection' button above to get started."
+        :image-size="60"
+      />
+      
+      <el-table v-else :data="postgisConnections" stripe style="width: 100%">
+        <el-table-column prop="name" label="Connection Name" min-width="200">
+          <template #default="{ row }">
+            <div class="connection-name">
+              <el-icon><Connection /></el-icon>
+              <span>{{ row.name }}</span>
+            </div>
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="host" label="Host" width="150">
+          <template #default="{ row }">
+            {{ row.host }}
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="database" label="Database" width="150">
+          <template #default="{ row }">
+            {{ row.database }}
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="tableCount" label="Tables" width="100" align="right">
+          <template #default="{ row }">
+            <el-tag size="small" type="info">{{ row.tableCount }}</el-tag>
+          </template>
+        </el-table-column>
+        
+        <el-table-column label="Actions" width="150" align="center">
+          <template #default="{ row }">
+            <el-popconfirm
+              :title="`Remove connection '${row.name}' and all ${row.tableCount} tables? This cannot be undone.`"
+              @confirm="handleRemoveConnection(row.id)"
+            >
+              <template #reference>
+                <el-button size="small" type="danger" text>
+                  <el-icon><Delete /></el-icon>
+                  Remove Connection
+                </el-button>
+              </template>
+            </el-popconfirm>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
     
     <el-empty 
       v-if="!dataSourceStore.isLoading && dataSourceStore.dataSources.length === 0"
@@ -279,12 +343,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDataSourceStore } from '@/stores/dataSources'
 import { ElMessage } from 'element-plus'
-import { Upload, Document, UploadFilled, Connection, InfoFilled } from '@element-plus/icons-vue'
+import { Upload, Document, UploadFilled, Connection, InfoFilled, Delete } from '@element-plus/icons-vue'
 import type { UploadUserFile } from 'element-plus'
+import * as dataSourceService from '@/services/dataSource'
 
 const { t } = useI18n()
 const dataSourceStore = useDataSourceStore()
@@ -296,6 +361,13 @@ const selectedDataSource = ref<any>(null)
 const selectedFiles = ref<File[]>([])
 const isUploading = ref(false)
 const isConnecting = ref(false)
+const postgisConnections = ref<Array<{
+  id: string
+  name: string
+  host: string
+  database: string
+  tableCount: number
+}>>([])
 
 // PostGIS Connection Form
 const postGISForm = reactive({
@@ -309,9 +381,9 @@ const postGISForm = reactive({
 })
 
 // Lifecycle
-import { onMounted } from 'vue'
 onMounted(() => {
   dataSourceStore.loadDataSources()
+  loadPostGISConnections()
 })
 
 // Methods
@@ -440,7 +512,34 @@ async function handleDelete(id: string) {
     await dataSourceStore.deleteDataSource(id)
     ElMessage.success(t('data.deleteSuccess'))
   } catch (error) {
-    ElMessage.error(t('plugins.operationFailed'))
+    // Check if error is about PostGIS deletion restriction
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    if (errorMessage.includes('PostGIS') || errorMessage.includes('connection')) {
+      ElMessage.warning('Cannot delete individual PostGIS tables. Please remove the entire connection instead.')
+    } else {
+      ElMessage.error(t('plugins.operationFailed'))
+    }
+  }
+}
+
+async function loadPostGISConnections() {
+  try {
+    postgisConnections.value = await dataSourceService.getPostGISConnections()
+  } catch (error) {
+    console.error('Failed to load PostGIS connections:', error)
+  }
+}
+
+async function handleRemoveConnection(connectionId: string) {
+  try {
+    await dataSourceService.removePostGISConnection(connectionId)
+    ElMessage.success('PostGIS connection removed successfully')
+    
+    // Reload both connections and data sources
+    await loadPostGISConnections()
+    await dataSourceStore.loadDataSources()
+  } catch (error) {
+    ElMessage.error('Failed to remove connection')
   }
 }
 
@@ -568,6 +667,22 @@ function formatDate(dateString: string): string {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.connections-section {
+  margin-top: 32px;
+  
+  h3 {
+    margin-bottom: 16px;
+    font-size: 16px;
+    font-weight: 600;
+  }
+}
+
+.connection-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .metadata-content {

@@ -98,6 +98,12 @@ export class ApiRouter {
     this.router.get('/data-sources', (req, res) => this.dataSourceController.listDataSources(req, res));
     this.router.get('/data-sources/available', (req, res) => this.dataSourceController.getAvailableDataSources(req, res));
     this.router.get('/data-sources/search', (req, res) => this.dataSourceController.searchDataSources(req, res));
+    
+    // PostGIS connection management endpoints (must be before /:id routes)
+    this.router.get('/data-sources/connections', (req, res) => this.dataSourceController.getPostGISConnections(req, res));
+    this.router.delete('/data-sources/connections/:connectionId', (req, res) => this.dataSourceController.removePostGISConnection(req, res));
+    
+    // Dynamic ID routes (must be after specific routes)
     this.router.get('/data-sources/:id', (req, res) => this.dataSourceController.getDataSource(req, res));
     this.router.get('/data-sources/:id/schema', (req, res) => this.dataSourceController.getDataSourceSchema(req, res));
     this.router.get('/data-sources/:id/service-url', (req, res) => this.dataSourceController.getServiceUrl(req, res));
