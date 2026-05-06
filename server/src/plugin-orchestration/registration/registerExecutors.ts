@@ -7,77 +7,30 @@
 
 import type { Database } from 'better-sqlite3';
 import { ExecutorRegistryInstance, type ExecutorRegistration } from '../registry/ExecutorRegistry';
-
-// Import all executor classes
-import { BufferAnalysisExecutor } from '../executor/analysis/BufferAnalysisExecutor';
-import { OverlayAnalysisExecutor } from '../executor/analysis/OverlayAnalysisExecutor';
-import { StatisticsCalculatorExecutor } from '../executor/analysis/StatisticsCalculatorExecutor';
-import { FilterExecutor } from '../executor/analysis/FilterExecutor';
-import { AggregationExecutor } from '../executor/analysis/AggregationExecutor';
-import { ReportGeneratorExecutor } from '../executor/reporting/ReportGeneratorExecutor';
-import { HeatmapExecutor } from '../executor/visualization/HeatmapExecutor';
-
-// Phase 2: New visualization renderers
-import { UniformColorExecutor } from '../executor/visualization/UniformColorExecutor';
-import { CategoricalExecutor } from '../executor/visualization/CategoricalExecutor';
-import { ChoroplethExecutor } from '../executor/visualization/ChoroplethExecutor';
+import { BUILTIN_EXECUTORS } from '../config/executor-config';
 
 /**
  * Register all built-in executors
  * Call this function during application initialization
  */
-export function registerAllExecutors(db: Database, workspaceBase: string): void {
+export function registerAllExecutors(): void {
   console.log('[Executor Registration] Registering all built-in executors...');
 
-  const registrations: ExecutorRegistration[] = [
-    // Analysis Executors
-    {
-      pluginId: 'buffer_analysis',
-      factory: (db, workspaceBase) => new BufferAnalysisExecutor(db, workspaceBase)
-    },
-    {
-      pluginId: 'overlay_analysis',
-      factory: (db, workspaceBase) => new OverlayAnalysisExecutor(db, workspaceBase)
-    },
-    {
-      pluginId: 'statistics_calculator',
-      factory: (db, workspaceBase) => new StatisticsCalculatorExecutor(db, workspaceBase)
-    },
-    {
-      pluginId: 'filter',
-      factory: (db, workspaceBase) => new FilterExecutor(db, workspaceBase)
-    },
-    {
-      pluginId: 'aggregation',
-      factory: (db, workspaceBase) => new AggregationExecutor(db, workspaceBase)
-    },
-
-    // Visualization Executors
-    {
-      pluginId: 'heatmap',
-      factory: (_db, workspaceBase) => new HeatmapExecutor(workspaceBase)
-    },
-
-    // Phase 2: New visualization renderers
-    {
-      pluginId: 'uniform_color_renderer',
-      factory: (db, workspaceBase) => new UniformColorExecutor(db, workspaceBase)
-    },
-    {
-      pluginId: 'categorical_renderer',
-      factory: (db, workspaceBase) => new CategoricalExecutor(db, workspaceBase)
-    },
-    {
-      pluginId: 'choropleth_renderer',
-      factory: (db, workspaceBase) => new ChoroplethExecutor(db, workspaceBase)
-    },
-
-    // Reporting Executors
-    {
-      pluginId: 'report_generator',
-      factory: (db, workspaceBase) => new ReportGeneratorExecutor(db, workspaceBase)
+  const registrations: ExecutorRegistration[] = BUILTIN_EXECUTORS.map(config => ({
+    pluginId: config.pluginId,
+    factory: (db, workspaceBase) => {
+      // Create executor instance based on configuration
+      if (config.requiresDb && config.requiresWorkspace) {
+        return new config.executorClass(db, workspaceBase);
+      } else if (config.requiresWorkspace) {
+        return new config.executorClass(workspaceBase);
+      } else if (config.requiresDb) {
+        return new config.executorClass(db);
+      } else {
+        return new config.executorClass();
+      }
     }
-  ];
+  }));
 
   // Register all executors at once
   ExecutorRegistryInstance.registerMany(registrations);
@@ -91,7 +44,7 @@ export function registerAllExecutors(db: Database, workspaceBase: string): void 
  */
 export function registerExecutor(
   pluginId: string,
-  factory: (db: Database, workspaceBase: string) => any
+  factory: (db: Database, workspaceBase: string) => import('../registry/ExecutorRegistry').IPluginExecutor
 ): void {
   ExecutorRegistryInstance.register(pluginId, factory);
 }

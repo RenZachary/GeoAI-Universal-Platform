@@ -40,8 +40,13 @@ export { PluginCapabilityRegistry } from './registry/PluginCapabilityRegistry';
 // ============================================================================
 // Registration (Batch registration functions)
 // ============================================================================
-export { registerAllExecutors } from './registration/registerExecutors';
-export { registerAllPluginCapabilities } from './registration/registerPluginCapabilities';
+export {
+  registerAllExecutors,
+  registerAllPluginCapabilities,
+  registerExecutor,
+  unregisterExecutor,
+  getRegisteredExecutorIds
+} from './registration';
 
 // ============================================================================
 // Loader

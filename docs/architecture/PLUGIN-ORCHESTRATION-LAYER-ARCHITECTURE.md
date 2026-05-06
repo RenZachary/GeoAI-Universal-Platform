@@ -22,8 +22,13 @@ plugin-orchestration/
 │   └── PluginCapabilityRegistry.ts   # 插件能力注册表
 │
 ├── registration/        # 批量注册配置
+│   ├── index.ts                        # 注册函数统一导出
 │   ├── registerExecutors.ts              # 注册所有执行器
 │   └── registerPluginCapabilities.ts     # 注册所有插件能力
+│
+├── config/              # 纯配置数据
+│   ├── index.ts                        # 配置数据统一导出
+│   └── executor-config.ts              # 执行器配置数据
 │
 ├── loader/              # 插件加载器
 │   └── CustomPluginLoader.ts    # 自定义插件加载器
@@ -31,7 +36,6 @@ plugin-orchestration/
 ├── tools/               # 工具封装
 │   └── PluginToolWrapper.ts       # LangChain 工具包装器
 │
-├── config/              # 配置（预留）
 ├── utils/               # 工具函数
 └── index.ts             # 统一导出入口
 ```
@@ -56,15 +60,21 @@ plugin-orchestration/
   - `ToolRegistry`: 管理 LangChain 工具
   - `PluginCapabilityRegistry`: 管理插件能力元数据（用于智能规划）
 
-### 4. **Registration（批量注册）**
+### 4. **Config（配置数据）**
+- 位置：`config/`
+- 职责：存储纯配置数据，不包含业务逻辑
+- 示例：`executor-config.ts` - 定义插件ID与执行器类的映射关系
+- 特点：可被registration文件引用，用于简化注册逻辑
+
+### 5. **Registration（批量注册）**
 - 位置：`registration/`
 - 职责：在应用启动时批量注册对象到注册表
 - 命名规范：`register*.ts`（动词开头，表示执行注册操作）
 - 两个注册函数：
-  - `registerExecutors()`: 注册所有执行器到 ExecutorRegistry
+  - `registerExecutors()`: 使用config中的配置注册所有执行器到 ExecutorRegistry
   - `registerPluginCapabilities()`: 注册所有插件能力到 PluginCapabilityRegistry
 
-### 5. **Loader（加载器）**
+### 6. **Loader（加载器）**
 - 位置：`loader/`
 - 职责：动态加载自定义插件（从文件系统）
 - 示例：`CustomPluginLoader.ts`
@@ -221,7 +231,15 @@ PluginToolWrapper:
 1. **创建插件定义**：`plugins/{category}/{Name}Plugin.ts`
 2. **创建执行器**：`executor/{category}/{Name}Executor.ts`
 3. **在 `plugins/index.ts` 中导出**
-4. **在 `registration/registerExecutors.ts` 中注册执行器**
+4. **在 `config/executor-config.ts` 中添加配置**
+   ```typescript
+   {
+     pluginId: 'your_plugin_id',
+     executorClass: YourExecutor,
+     requiresDb: true,
+     requiresWorkspace: true
+   }
+   ```
 5. **在 `registration/registerPluginCapabilities.ts` 中注册能力**
 
 ### 添加新注册表
@@ -229,5 +247,6 @@ PluginToolWrapper:
 1. **创建注册表类**：`registry/{Name}Registry.ts`
 2. **实现单例模式和注册/查询方法**
 3. **创建批量注册函数**：`registration/register{Name}s.ts`
-4. **在 `index.ts` 中导出**
-5. **在 `server/src/index.ts` 中调用注册函数**
+4. **在 `registration/index.ts` 中导出**
+5. **在 `index.ts` 中导出**
+6. **在 `server/src/index.ts` 中调用注册函数**

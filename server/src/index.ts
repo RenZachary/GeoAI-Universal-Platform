@@ -81,8 +81,7 @@ async function startServer() {
     
     // Register all executors with ExecutorRegistry
     console.log('Registering plugin executors...');
-    const db = SQLiteManagerInstance.getDatabase();
-    registerAllExecutors(db, WORKSPACE_BASE);
+    registerAllExecutors();
     console.log('Executor registration complete');
     
     // Register all plugin capabilities with PluginCapabilityRegistry
