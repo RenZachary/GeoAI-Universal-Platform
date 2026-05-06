@@ -71,6 +71,7 @@ GeoAI-UP:
 - **Context Awareness**: Understands data schemas and available plugins
 - **Conversational Memory**: Maintains context across multiple interactions
 - **Streaming Output**: Real-time token-by-token response generation
+- **Auto Report Generation**: Automatically generates comprehensive analysis reports with visualizations and insights
 
 ### Comprehensive Spatial Analysis
 - **Buffer Analysis**: Create distance-based zones around features
