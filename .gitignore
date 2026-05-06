@@ -39,6 +39,7 @@ workspace/database/*.db-wal
 workspace/data/local/
 workspace/results/
 workspace/temp/
+workspace/llm/
 
 # LLM related files
 workspace/llm/config/
