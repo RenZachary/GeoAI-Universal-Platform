@@ -8,6 +8,10 @@ pnpm-lock.yaml
 dist/
 out/
 *.tsbuildinfo
+package/
+vendor/node-*
+GeoAI-UP-v*
+dist-bundled/
 
 # Environment files (keep .env.example but ignore actual env files)
 .env

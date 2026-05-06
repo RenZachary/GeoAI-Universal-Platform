@@ -1,0 +1,26 @@
+{
+  "name": "geoai-up",
+  "version": "1.0.0",
+  "description": "GeoAI-UP - Geographic Information AI Assistant Platform",
+  "private": true,
+  "scripts": {
+    "package": "node package.js",
+    "dev:server": "cd server && npm run dev",
+    "dev:web": "cd web && npm run dev",
+    "build:server": "cd server && npm run build",
+    "build:web": "cd web && npm run build"
+  },
+  "keywords": [
+    "gis",
+    "ai",
+    "spatial-analysis"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "dependencies": {
+    "fs-extra": "^11.3.5"
+  }
+}

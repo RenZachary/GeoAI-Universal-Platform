@@ -18,6 +18,7 @@ Implementation reports and technical documentation for specific features:
 - Technical solutions and fixes
 - Integration guides
 - Code walkthroughs
+- Test reports (in `test-reports/` subdirectory)
 
 Files follow the pattern: `IMPLEMENTATION-{FEATURE-NAME}.md`
 
@@ -52,3 +53,9 @@ Requirements documentation:
 ## Recent Organization
 
 All markdown files have been consolidated into this `docs` directory from the project root. Files were categorized and moved on 2026-05-04 to improve project organization and maintainability.
+
+On 2026-05-07, additional documentation from the `scripts/` directory was archived:
+- Test reports moved to `implementation/test-reports/`
+- Fix summaries and implementation notes moved to `implementation/`
+- Quick reference guides moved to `implementation/`
+- Redundant README removed from scripts directory

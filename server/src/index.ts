@@ -7,6 +7,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import fs from 'fs';
 import { WorkspaceManagerInstance, CleanupScheduler } from './storage';
 import { SQLiteManagerInstance } from './storage';
 import { ApiRouter } from './api/routes';
@@ -26,6 +27,25 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static files from client directory (for packaged deployment)
+const CLIENT_PATH = process.env.CLIENT_PATH || path.join(__dirname, '..', 'client');
+if (fs.existsSync(CLIENT_PATH)) {
+  // Serve at root path
+  app.use(express.static(CLIENT_PATH));
+  
+  // Also serve at /geo-ai path if configured in frontend
+  const VITE_BASE_URL = process.env.VITE_BASE_URL || '/';
+  if (VITE_BASE_URL !== '/' && VITE_BASE_URL !== '') {
+    const basePath = VITE_BASE_URL.startsWith('/') ? VITE_BASE_URL : `/${VITE_BASE_URL}`;
+    app.use(basePath, express.static(CLIENT_PATH));
+    console.log(`Serving static files from: ${CLIENT_PATH} (at paths: / and ${basePath})`);
+  } else {
+    console.log(`Serving static files from: ${CLIENT_PATH}`);
+  }
+} else {
+  console.log(`Client directory not found at: ${CLIENT_PATH}, skipping static file serving`);
+}
 
 // Initialize workspace and database from .env configuration
 const WORKSPACE_BASE = process.env.WORKSPACE_DIR 
@@ -57,7 +77,7 @@ async function startServer() {
     SQLiteManagerInstance.initialize();
       
     // Scan and register existing files in data directory
-    console.log('Scanning data directory for existing files...');
+    console.log('Scanning data directory for existing files... in', WORKSPACE_BASE);
     await scanAndRegisterDataFiles(WORKSPACE_BASE);
     
     // Initialize cleanup scheduler

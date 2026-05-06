@@ -30,6 +30,8 @@ export async function scanAndRegisterDataFiles(
   
   // Read all files in directory
   const files = fs.readdirSync(dataDir).filter(file => {
+    const fullPath = path.join(dataDir, file);
+    console.log('  Reading file, full path ', fullPath);
     const ext = path.extname(file).toLowerCase();
     return supportedExtensions.includes(ext);
   });
