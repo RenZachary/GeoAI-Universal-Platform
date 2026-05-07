@@ -44,6 +44,13 @@ export class ResultPersistenceService {
     const tableName = result.metadata.result.table;
     const schema = result.metadata.schema || 'public';
 
+    // CRITICAL: Do NOT register geoai_temp schema tables as formal data sources
+    // These are ephemeral intermediates and should not appear in the UI's data management list.
+    if (schema === 'geoai_temp') {
+      console.log(`[ResultPersistenceService] Skipping registration for temp table: ${schema}.${tableName}`);
+      return result;
+    }
+
     console.log(`[ResultPersistenceService] Persisting PostGIS result table: ${schema}.${tableName}`);
 
     // Preserve original connection info from source data source
