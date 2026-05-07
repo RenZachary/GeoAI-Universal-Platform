@@ -6,6 +6,7 @@
 import { Pool } from 'pg';
 import { PostGISPoolManager } from '../../data-access';
 import type { PostGISConnectionConfig } from '../../core';
+import type Database from 'better-sqlite3';
 
 export interface PostGISCleanupConfig {
   maxAge: number;        // Max age for temp tables in milliseconds (default: 24 hours)
@@ -18,11 +19,14 @@ export class PostGISCleanupScheduler {
   private intervalId?: NodeJS.Timeout;
   private isRunning: boolean = false;
   private pool: Pool | null = null;
+  private db?: Database.Database;  // Optional SQLite DB for cleaning up metadata records
 
   constructor(
     private connectionConfig: PostGISConnectionConfig,
-    config?: Partial<PostGISCleanupConfig>
+    config?: Partial<PostGISCleanupConfig>,
+    db?: Database.Database
   ) {
+    this.db = db;
     this.config = {
       maxAge: 24 * 60 * 60 * 1000,           // 24 hours
       interval: 60 * 60 * 1000,              // 1 hour
@@ -117,6 +121,11 @@ export class PostGISCleanupScheduler {
           await this.pool.query(`DROP TABLE IF EXISTS geoai_temp.${tableName} CASCADE`);
           deletedCount++;
           console.log(`[PostGIS Cleanup Scheduler] Deleted temp table: ${tableName}`);
+          
+          // Also remove the corresponding SQLite record if DB is available
+          if (this.db) {
+            this.cleanupSQLiteRecord(tableName);
+          }
         } catch (error) {
           console.warn(`[PostGIS Cleanup Scheduler] Failed to delete table ${tableName}:`, error);
         }
@@ -128,6 +137,29 @@ export class PostGISCleanupScheduler {
       console.error('[PostGIS Cleanup Scheduler] Cleanup failed:', error);
     } finally {
       this.isRunning = false;
+    }
+  }
+
+  /**
+   * Clean up SQLite metadata record for a deleted temp table
+   */
+  private cleanupSQLiteRecord(tableName: string): void {
+    if (!this.db) return;
+    
+    try {
+      // Find and delete the data source record that references this table
+      const referencePattern = `%geoai_temp.${tableName}`;
+      const stmt = this.db.prepare(`
+        DELETE FROM data_sources 
+        WHERE reference LIKE ? AND type = 'postgis'
+      `);
+      const result = stmt.run(referencePattern);
+      
+      if (result.changes > 0) {
+        console.log(`[PostGIS Cleanup Scheduler] Removed ${result.changes} SQLite record(s) for table: ${tableName}`);
+      }
+    } catch (error) {
+      console.warn(`[PostGIS Cleanup Scheduler] Failed to cleanup SQLite record for ${tableName}:`, error);
     }
   }
 

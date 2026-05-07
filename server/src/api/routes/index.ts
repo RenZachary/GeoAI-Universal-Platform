@@ -41,7 +41,7 @@ export class ApiRouter {
     const dataSourceRepo = new DataSourceRepository(db);
     
     // Initialize services (dependency injection)
-    const dataSourceService = new DataSourceService(dataSourceRepo, workspaceBase);
+    const dataSourceService = new DataSourceService(dataSourceRepo, workspaceBase, db);
     const fileUploadService = new FileUploadService(dataSourceRepo, workspaceBase);
     const promptTemplateService = new PromptTemplateService(workspaceBase);
     const conversationService = new ConversationService(db);

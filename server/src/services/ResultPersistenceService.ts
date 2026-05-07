@@ -44,14 +44,14 @@ export class ResultPersistenceService {
     const tableName = result.metadata.result.table;
     const schema = result.metadata.schema || 'public';
 
-    // CRITICAL: Do NOT register geoai_temp schema tables as formal data sources
-    // These are ephemeral intermediates and should not appear in the UI's data management list.
-    if (schema === 'geoai_temp') {
-      console.log(`[ResultPersistenceService] Skipping registration for temp table: ${schema}.${tableName}`);
-      return result;
+    // Mark geoai_temp tables as temporary intermediates
+    // They will be registered in SQLite for workflow continuity but filtered from UI
+    const isTemporary = schema === 'geoai_temp';
+    if (isTemporary) {
+      console.log(`[ResultPersistenceService] Registering temp table (will be hidden from UI): ${schema}.${tableName}`);
+    } else {
+      console.log(`[ResultPersistenceService] Persisting PostGIS result table: ${schema}.${tableName}`);
     }
-
-    console.log(`[ResultPersistenceService] Persisting PostGIS result table: ${schema}.${tableName}`);
 
     // Preserve original connection info from source data source
     const connectionInfo = sourceDataSource.metadata?.connection ? {
@@ -65,7 +65,7 @@ export class ResultPersistenceService {
       }
     } : {};
 
-    // Create DataSourceRecord for this temporary table
+    // Create DataSourceRecord for this result table
     const dataSourceRecord = this.dataSourceRepo.create(
       `${operation}_${tableName}`,
       'postgis',
@@ -76,6 +76,7 @@ export class ResultPersistenceService {
         operation,
         distance: params?.distance,
         unit: params?.unit,
+        isTemporary,  // Flag to indicate this is an intermediate result
         description: `${operation} result (${params?.distance ? `${params.distance} ${params.unit}` : ''})`
       }
     );

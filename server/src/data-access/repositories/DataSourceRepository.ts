@@ -138,7 +138,7 @@ export class DataSourceRepository {
   }
 
   /**
-   * List all data sources
+   * List all data sources (excluding temporary/intermediate results)
    */
   listAll(): DataSourceRecord[] {
     const rows = this.db.prepare(`
@@ -147,15 +147,28 @@ export class DataSourceRepository {
       ORDER BY created_at DESC
     `).all() as any[];
 
-    return rows.map(row => ({
-      id: row.id,
-      name: row.name,
-      type: row.type as DataSourceType,
-      reference: row.reference,
-      metadata: JSON.parse(row.metadata),
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at),
-    }));
+    return rows
+      .map(row => ({
+        id: row.id,
+        name: row.name,
+        type: row.type as DataSourceType,
+        reference: row.reference,
+        metadata: JSON.parse(row.metadata),
+        createdAt: new Date(row.created_at),
+        updatedAt: new Date(row.updated_at),
+      }))
+      // Filter out temporary/intermediate results (geoai_temp schema tables)
+      .filter(source => {
+        // Check if marked as temporary in metadata
+        if (source.metadata?.isTemporary) {
+          return false;
+        }
+        // Also check if reference points to geoai_temp schema
+        if (source.reference?.startsWith('geoai_temp.')) {
+          return false;
+        }
+        return true;
+      });
   }
 
   /**

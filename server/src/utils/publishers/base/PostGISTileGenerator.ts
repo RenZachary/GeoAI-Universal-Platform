@@ -65,16 +65,19 @@ export class PostGISTileGenerator {
     try {
       if (query.tableName) {
         // Table-based query - Use ST_AsMVTGeom to properly transform coordinates to tile space
+        // Select all attributes and the transformed geometry, renaming geom to mvt_geom to avoid conflicts
         sql = `
-          SELECT ST_AsMVT(q, $1, $2, 'geom') as tile
+          SELECT ST_AsMVT(q, $1, $2, 'mvt_geom') as tile
           FROM (
-            SELECT ST_AsMVTGeom(
-              ST_Transform(${geometryColumn}, 3857),
-              ST_TileEnvelope($3, $4, $5),
-              $2,
-              0,
-              true
-            ) as geom
+            SELECT 
+              *,
+              ST_AsMVTGeom(
+                ST_Transform(${geometryColumn}, 3857),
+                ST_TileEnvelope($3, $4, $5),
+                $2,
+                0,
+                true
+              ) as mvt_geom
             FROM ${schema}.${query.tableName}
             WHERE ST_Intersects(ST_Transform(${geometryColumn}, 3857), ST_TileEnvelope($3, $4, $5))
           ) q

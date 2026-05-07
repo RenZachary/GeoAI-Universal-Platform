@@ -13,6 +13,7 @@ import { type DataSourceRecord } from '../data-access/repositories';
 import { DataAccessorFactory } from '../data-access';
 import type { PostGISConnectionConfig } from '../core';
 import { PostGISCleanupScheduler } from '../storage';
+import type Database from 'better-sqlite3';
 
 // ============================================================================
 // Type Definitions
@@ -89,10 +90,12 @@ export class DataSourceService {
   private dataSourceRepo: DataSourceRepository;
   private accessorFactory: DataAccessorFactory;
   private cleanupSchedulers: Map<string, PostGISCleanupScheduler> = new Map();
+  private db?: Database.Database;  // Optional SQLite DB for cleanup scheduler
 
-  constructor(dataSourceRepo: DataSourceRepository, workspaceBase?: string) {
+  constructor(dataSourceRepo: DataSourceRepository, workspaceBase?: string, db?: Database.Database) {
     this.dataSourceRepo = dataSourceRepo;
     this.accessorFactory = new DataAccessorFactory(workspaceBase);
+    this.db = db;
   }
 
   // ==========================================================================
@@ -108,9 +111,10 @@ export class DataSourceService {
 
   /**
    * Get available data sources for LLM context (simplified format)
+   * Excludes temporary/intermediate results
    */
   async getAvailableDataSources(): Promise<any[]> {
-    const sources = this.dataSourceRepo.listAll();
+    const sources = this.dataSourceRepo.listAll();  // listAll already filters temp tables
     
     return sources.map(source => ({
       id: source.id,
@@ -151,7 +155,7 @@ export class DataSourceService {
     await this.testConnection(config);
 
     // Step 3: Discover spatial tables from ALL schemas
-    const tables = await this.discoverSpatialTablesAllSchemas(config);
+    const tables = await this.discoverSpatialTablesAllSchemas();
 
     console.log(`[DataSourceService] Discovered ${tables.length} spatial tables across all schemas`);
 
@@ -171,7 +175,7 @@ export class DataSourceService {
         maxAge: 24 * 60 * 60 * 1000,
         interval: 60 * 60 * 1000,
         enableAutoCleanup: true
-      });
+      }, this.db);  // Pass SQLite DB for metadata cleanup
       await scheduler.start();
       this.cleanupSchedulers.set(connectionKey, scheduler);
       console.log(`[DataSourceService] Started temp table cleanup for connection: ${connectionKey}`);
@@ -409,7 +413,7 @@ export class DataSourceService {
   /**
    * Discover spatial tables in ALL PostGIS schemas
    */
-  private async discoverSpatialTablesAllSchemas(config: PostGISConnectionConfig): Promise<TableInfo[]> {
+  private async discoverSpatialTablesAllSchemas(): Promise<TableInfo[]> {
     try {
       const accessor = this.accessorFactory.createAccessor('postgis');
 
