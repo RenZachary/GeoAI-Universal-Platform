@@ -7,19 +7,21 @@ import type { NativeData } from '../../../../../core';
 import { generateId } from '../../../../../core';
 import type { OverlayOptions } from '../../../../interfaces';
 
+const TEMP_SCHEMA = 'geoai_temp';
+
 export class PostGISOverlayOperation {
   constructor(private pool: Pool, private schema: string) {}
 
   async execute(reference1: string, reference2: string, options: OverlayOptions): Promise<NativeData> {
     const table1 = reference1.split('.').pop() || reference1;
     const table2 = reference2.split('.').pop() || reference2;
-    const resultTable = `overlay_${table1}_${table2}_${Date.now()}`;
+    const resultTable = `geoai_temp_overlay_${Date.now()}`;
 
     try {
       const spatialFunc = this.mapOperationToPostGIS(options.operation);
 
       await this.pool.query(`
-        CREATE TABLE ${this.schema}.${resultTable} AS
+        CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
         SELECT 
           t1.id as id1,
           t2.id as id2,
@@ -30,24 +32,19 @@ export class PostGISOverlayOperation {
         WHERE ST_${spatialFunc}(t1.geom, t2.geom) IS NOT NULL
       `);
 
-      await this.pool.query(
-        `SELECT AddGeometryColumn($1, $2, 'geom', 4326, 'GEOMETRY', 2)`,
-        [this.schema, resultTable]
-      );
-
       const featureCount = await this.getFeatureCount(resultTable);
 
       return {
         id: generateId(),
         type: 'postgis',
-        reference: `${this.schema}.${resultTable}`,
+        reference: `${TEMP_SCHEMA}.${resultTable}`,
         metadata: {
           crs: 'EPSG:4326',
           srid: 4326,
           geometryType: this.inferResultGeometryType(options.operation),
           featureCount,
           database: this.pool.options.database,
-          schema: this.schema,
+          schema: TEMP_SCHEMA,
           operation: options.operation,
           sourceTables: [table1, table2],
           // StandardizedOutput fields
@@ -78,7 +75,7 @@ export class PostGISOverlayOperation {
 
   private async getFeatureCount(tableName: string): Promise<number> {
     const result = await this.pool.query(
-      `SELECT COUNT(*) as count FROM ${this.schema}.${tableName}`
+      `SELECT COUNT(*) as count FROM ${TEMP_SCHEMA}.${tableName}`
     );
     return parseInt(result.rows[0].count);
   }

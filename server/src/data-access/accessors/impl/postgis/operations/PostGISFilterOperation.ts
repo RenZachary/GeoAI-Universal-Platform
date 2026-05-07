@@ -7,44 +7,37 @@ import type { NativeData } from '../../../../../core';
 import { generateId } from '../../../../../core';
 import type { FilterCondition, AttributeFilter, SpatialFilter } from '../../../../interfaces';
 
+const TEMP_SCHEMA = 'geoai_temp';
+
 export class PostGISFilterOperation {
   constructor(private pool: Pool, private schema: string) { }
 
   async execute(reference: string, filter: FilterCondition): Promise<NativeData> {
     const tableName = reference.split('.').pop() || reference;
-    const resultTable = `filtered_${tableName}_${Date.now()}`;
+    const resultTable = `geoai_temp_filtered_${Date.now()}`;
 
     try {
       const { whereClause, params } = this.buildWhereClause(filter, tableName);
 
       await this.pool.query(`
-        CREATE TABLE ${this.schema}.${resultTable} AS
+        CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
         SELECT *
         FROM ${this.schema}.${tableName}
         WHERE ${whereClause}
       `, params);
-
-      // Register geometry column if source has it
-      const hasGeom = await this.hasGeometryColumn(tableName);
-      if (hasGeom) {
-        await this.pool.query(
-          `SELECT AddGeometryColumn($1, $2, 'geom', 4326, 'GEOMETRY', 2)`,
-          [this.schema, resultTable]
-        );
-      }
 
       const featureCount = await this.getFeatureCount(resultTable);
 
       return {
         id: generateId(),
         type: 'postgis',
-        reference: `${this.schema}.${resultTable}`,
+        reference: `${TEMP_SCHEMA}.${resultTable}`,
         metadata: {
           crs: 'EPSG:4326',
           srid: 4326,
           featureCount,
           database: this.pool.options.database,
-          schema: this.schema,
+          schema: TEMP_SCHEMA,
           operation: 'filter',
           filterApplied: JSON.stringify(filter),
           // StandardizedOutput fields
@@ -135,17 +128,9 @@ export class PostGISFilterOperation {
     }
   }
 
-  private async hasGeometryColumn(tableName: string): Promise<boolean> {
-    const result = await this.pool.query(
-      `SELECT EXISTS (SELECT FROM geometry_columns WHERE f_table_schema = $1 AND f_table_name = $2)`,
-      [this.schema, tableName]
-    );
-    return result.rows[0].exists;
-  }
-
   private async getFeatureCount(tableName: string): Promise<number> {
     const result = await this.pool.query(
-      `SELECT COUNT(*) as count FROM ${this.schema}.${tableName}`
+      `SELECT COUNT(*) as count FROM ${TEMP_SCHEMA}.${tableName}`
     );
     return parseInt(result.rows[0].count);
   }

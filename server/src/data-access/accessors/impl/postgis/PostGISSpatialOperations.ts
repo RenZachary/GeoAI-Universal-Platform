@@ -8,6 +8,8 @@ import { generateId } from '../../../../core';
 import type { BufferOptions, OverlayOptions } from '../../../interfaces';
 import { convertDistanceUnit } from '../../../utils/PostGISUtils';
 
+const TEMP_SCHEMA = 'geoai_temp';
+
 export class PostGISSpatialOperations {
   constructor(private pool: Pool, private schema: string) {}
 
@@ -16,44 +18,38 @@ export class PostGISSpatialOperations {
    */
   async buffer(reference: string, distance: number, options?: BufferOptions): Promise<NativeData> {
     const tableName = reference.split('.').pop() || reference;
-    const resultTable = `buffer_${tableName}_${Date.now()}`;
+    const resultTable = `geoai_temp_buffer_${Date.now()}`;
     
     try {
       // Convert distance to degrees if needed using shared utility
       const bufferDistance = convertDistanceUnit(distance, options?.unit);
 
-      // Create result table with buffered geometry
+      // Create result table with buffered geometry in temp schema
       if (options?.dissolve) {
         await this.pool.query(`
-          CREATE TABLE ${this.schema}.${resultTable} AS
+          CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
           SELECT ST_Union(ST_Buffer(geom, ${bufferDistance})) as geom
           FROM ${this.schema}.${tableName}
         `);
       } else {
         await this.pool.query(`
-          CREATE TABLE ${this.schema}.${resultTable} AS
+          CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
           SELECT id, ST_Buffer(geom, ${bufferDistance}) as geom, properties
           FROM ${this.schema}.${tableName}
         `);
       }
 
-      // Register geometry column
-      await this.pool.query(
-        `SELECT AddGeometryColumn($1, $2, 'geom', 4326, 'GEOMETRY', 2)`,
-        [this.schema, resultTable]
-      );
-
       return {
         id: generateId(),
         type: 'postgis',
-        reference: `${this.schema}.${resultTable}`,
+        reference: `${TEMP_SCHEMA}.${resultTable}`,
         metadata: {
           crs: 'EPSG:4326',
           srid: 4326,
           geometryType: 'Polygon',
           featureCount: await this.getFeatureCount(resultTable),
           database: this.pool.options.database,
-          schema: this.schema,
+          schema: TEMP_SCHEMA,
           operation: 'buffer',
           distance,
           unit: options?.unit || 'degrees',
@@ -79,7 +75,7 @@ export class PostGISSpatialOperations {
   ): Promise<NativeData> {
     const table1 = reference1.split('.').pop() || reference1;
     const table2 = reference2.split('.').pop() || reference2;
-    const resultTable = `overlay_${table1}_${table2}_${Date.now()}`;
+    const resultTable = `geoai_temp_overlay_${Date.now()}`;
 
     try {
       // Map operation to PostGIS function
@@ -87,7 +83,7 @@ export class PostGISSpatialOperations {
 
       // Execute overlay operation
       await this.pool.query(`
-        CREATE TABLE ${this.schema}.${resultTable} AS
+        CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
         SELECT 
           t1.id as id1,
           t2.id as id2,
@@ -98,23 +94,17 @@ export class PostGISSpatialOperations {
         WHERE ST_${spatialFunc}(t1.geom, t2.geom) IS NOT NULL
       `);
 
-      // Register geometry column
-      await this.pool.query(
-        `SELECT AddGeometryColumn($1, $2, 'geom', 4326, 'GEOMETRY', 2)`,
-        [this.schema, resultTable]
-      );
-
       return {
         id: generateId(),
         type: 'postgis',
-        reference: `${this.schema}.${resultTable}`,
+        reference: `${TEMP_SCHEMA}.${resultTable}`,
         metadata: {
           crs: 'EPSG:4326',
           srid: 4326,
           geometryType: this.inferResultGeometryType(options.operation),
           featureCount: await this.getFeatureCount(resultTable),
           database: this.pool.options.database,
-          schema: this.schema,
+          schema: TEMP_SCHEMA,
           operation: options.operation,
           sourceTables: [table1, table2],
           // StandardizedOutput fields
@@ -134,7 +124,7 @@ export class PostGISSpatialOperations {
    */
   async filter(reference: string, filter: any): Promise<NativeData> {
     const tableName = reference.split('.').pop() || reference;
-    const resultTable = `filtered_${tableName}_${Date.now()}`;
+    const resultTable = `geoai_temp_filtered_${Date.now()}`;
 
     try {
       // Build WHERE clause from filter condition
@@ -142,7 +132,7 @@ export class PostGISSpatialOperations {
 
       // Execute filtered query
       const query = `
-        CREATE TABLE ${this.schema}.${resultTable} AS
+        CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
         SELECT *
         FROM ${this.schema}.${tableName}
         WHERE ${whereClause}
@@ -150,25 +140,16 @@ export class PostGISSpatialOperations {
 
       await this.pool.query(query, params);
 
-      // Register geometry column if source has it
-      const hasGeom = await this.hasGeometryColumn(tableName);
-      if (hasGeom) {
-        await this.pool.query(
-          `SELECT AddGeometryColumn($1, $2, 'geom', 4326, 'GEOMETRY', 2)`,
-          [this.schema, resultTable]
-        );
-      }
-
       return {
         id: generateId(),
         type: 'postgis',
-        reference: `${this.schema}.${resultTable}`,
+        reference: `${TEMP_SCHEMA}.${resultTable}`,
         metadata: {
           crs: 'EPSG:4326',
           srid: 4326,
           featureCount: await this.getFeatureCount(resultTable),
           database: this.pool.options.database,
-          schema: this.schema,
+          schema: TEMP_SCHEMA,
           operation: 'filter',
           filterApplied: this.serializeFilter(filter),
           // StandardizedOutput fields
@@ -193,24 +174,15 @@ export class PostGISSpatialOperations {
       if (returnFeature && (aggFunc === 'MAX' || aggFunc === 'MIN')) {
         // Return the feature with max/min value
         const order = aggFunc === 'MAX' ? 'DESC' : 'ASC';
-        const resultTable = `agg_${tableName}_${Date.now()}`;
+        const resultTable = `geoai_temp_agg_${Date.now()}`;
 
         await this.pool.query(`
-          CREATE TABLE ${this.schema}.${resultTable} AS
+          CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
           SELECT *
           FROM ${this.schema}.${tableName}
           ORDER BY ${field} ${order}
           LIMIT 1
         `);
-
-        // Register geometry column
-        const hasGeom = await this.hasGeometryColumn(tableName);
-        if (hasGeom) {
-          await this.pool.query(
-            `SELECT AddGeometryColumn($1, $2, 'geom', 4326, 'GEOMETRY', 2)`,
-            [this.schema, resultTable]
-          );
-        }
 
         // Get the aggregated value
         const valueResult = await this.pool.query(
@@ -220,13 +192,13 @@ export class PostGISSpatialOperations {
         return {
           id: generateId(),
           type: 'postgis',
-          reference: `${this.schema}.${resultTable}`,
+          reference: `${TEMP_SCHEMA}.${resultTable}`,
           metadata: {
             crs: 'EPSG:4326',
             srid: 4326,
             featureCount: 1,
             database: this.pool.options.database,
-            schema: this.schema,
+            schema: TEMP_SCHEMA,
             operation: 'aggregate',
             aggregatedField: field,
             aggregatedFunction: aggFunc,
@@ -275,7 +247,7 @@ export class PostGISSpatialOperations {
   ): Promise<NativeData> {
     const targetTable = targetReference.split('.').pop() || targetReference;
     const joinTable = joinReference.split('.').pop() || joinReference;
-    const resultTable = `join_${targetTable}_${Date.now()}`;
+    const resultTable = `geoai_temp_join_${Date.now()}`;
 
     try {
       // Map operation to PostGIS function
@@ -287,29 +259,23 @@ export class PostGISSpatialOperations {
                         'INNER JOIN';
 
       await this.pool.query(`
-        CREATE TABLE ${this.schema}.${resultTable} AS
+        CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
         SELECT t.*, ST_AsGeoJSON(t.geom) as geometry
         FROM ${this.schema}.${targetTable} t
         ${joinClause} ${this.schema}.${joinTable} j
         ON ST_${spatialFunc}(t.geom, j.geom)
       `);
 
-      // Register geometry column
-      await this.pool.query(
-        `SELECT AddGeometryColumn($1, $2, 'geom', 4326, 'GEOMETRY', 2)`,
-        [this.schema, resultTable]
-      );
-
       return {
         id: generateId(),
         type: 'postgis',
-        reference: `${this.schema}.${resultTable}`,
+        reference: `${TEMP_SCHEMA}.${resultTable}`,
         metadata: {
           crs: 'EPSG:4326',
           srid: 4326,
           featureCount: await this.getFeatureCount(resultTable),
           database: this.pool.options.database,
-          schema: this.schema,
+          schema: TEMP_SCHEMA,
           operation: 'spatial_join',
           spatialRelationship: operation,
           joinType,

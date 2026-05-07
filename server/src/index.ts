@@ -8,7 +8,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import fs from 'fs';
-import { WorkspaceManagerInstance, CleanupScheduler } from './storage';
+import { WorkspaceManagerInstance, CleanupScheduler, PostGISCleanupScheduler } from './storage';
 import { SQLiteManagerInstance } from './storage';
 import { ApiRouter } from './api/routes';
 import { CustomPluginLoader, registerAllExecutors, registerAllPluginCapabilities } from './plugin-orchestration';
@@ -91,7 +91,7 @@ async function startServer() {
       enableAutoCleanup: true
     });
     cleanupScheduler.start();
-    console.log('Cleanup scheduler started');
+    console.log('Filesystem cleanup scheduler started');
     
     // Initialize plugin system
     console.log('Initializing plugin system...');

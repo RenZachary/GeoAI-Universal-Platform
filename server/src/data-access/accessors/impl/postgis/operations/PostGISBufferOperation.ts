@@ -8,21 +8,23 @@ import { generateId } from '../../../../../core';
 import type { BufferOptions } from '../../../../interfaces';
 import { convertDistanceUnit } from '../../../../utils/PostGISUtils';
 
+const TEMP_SCHEMA = 'geoai_temp';
+
 export class PostGISBufferOperation {
   constructor(private pool: Pool, private schema: string) {}
 
   async execute(reference: string, distance: number, options?: BufferOptions): Promise<NativeData> {
     const tableName = reference.split('.').pop() || reference;
-    const resultTable = `buffer_${tableName}_${Date.now()}`;
+    const resultTable = `geoai_temp_buffer_${Date.now()}`;
     
     try {
       // Convert distance to degrees if needed using shared utility
       const bufferDistance = convertDistanceUnit(distance, options?.unit);
 
-      // Create result table with buffered geometry
+      // Create result table with buffered geometry in temp schema
       if (options?.dissolve) {
         await this.pool.query(`
-          CREATE TABLE ${this.schema}.${resultTable} AS
+          CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
           SELECT ST_Union(ST_Buffer(geom, ${bufferDistance})) as geom
           FROM ${this.schema}.${tableName}
         `);
@@ -38,28 +40,25 @@ export class PostGISBufferOperation {
         const nonGeomColumns = columnsResult.rows.map(row => row.column_name).join(', ');
         
         await this.pool.query(`
-          CREATE TABLE ${this.schema}.${resultTable} AS
+          CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
           SELECT ${nonGeomColumns}, ST_Buffer(geom, ${bufferDistance}) as geom
           FROM ${this.schema}.${tableName}
         `);
       }
-
-      // Note: CTAS automatically preserves geometry column type and SRID,
-      // so we don't need to call AddGeometryColumn
 
       const featureCount = await this.getFeatureCount(resultTable);
 
       return {
         id: generateId(),
         type: 'postgis',
-        reference: `${this.schema}.${resultTable}`,
+        reference: `${TEMP_SCHEMA}.${resultTable}`,
         metadata: {
           crs: 'EPSG:4326',
           srid: 4326,
           geometryType: 'Polygon',
           featureCount,
           database: this.pool.options.database,
-          schema: this.schema,
+          schema: TEMP_SCHEMA,
           operation: 'buffer',
           distance,
           unit: options?.unit || 'degrees',
@@ -77,7 +76,7 @@ export class PostGISBufferOperation {
 
   private async getFeatureCount(tableName: string): Promise<number> {
     const result = await this.pool.query(
-      `SELECT COUNT(*) as count FROM ${this.schema}.${tableName}`
+      `SELECT COUNT(*) as count FROM ${TEMP_SCHEMA}.${tableName}`
     );
     return parseInt(result.rows[0].count);
   }

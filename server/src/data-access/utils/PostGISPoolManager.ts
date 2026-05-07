@@ -62,15 +62,28 @@ export class PostGISPoolManager {
 
     const pool = new Pool(poolConfig);
 
-    // Test connection
+    // Test connection and ensure temp schema exists
     try {
       await pool.query('SELECT 1');
+      await this.ensureTempSchema(pool);
       this.pools.set(key, pool);
       console.log(`[PostGISPoolManager] Pool created successfully for: ${key}`);
       return pool;
     } catch (error) {
       await pool.end(); // Clean up failed pool
       throw wrapError(error, `Failed to connect to PostGIS (${key})`);
+    }
+  }
+
+  /**
+   * Ensure the geoai_temp schema exists in the database
+   */
+  private async ensureTempSchema(pool: Pool): Promise<void> {
+    try {
+      await pool.query('CREATE SCHEMA IF NOT EXISTS geoai_temp;');
+      console.log('[PostGISPoolManager] Ensured geoai_temp schema exists');
+    } catch (error) {
+      console.warn('[PostGISPoolManager] Failed to create geoai_temp schema:', error);
     }
   }
 

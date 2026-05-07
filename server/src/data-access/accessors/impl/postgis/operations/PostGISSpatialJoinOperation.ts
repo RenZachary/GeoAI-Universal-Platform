@@ -6,6 +6,8 @@ import type { Pool } from 'pg';
 import type { NativeData } from '../../../../../core';
 import { generateId } from '../../../../../core';
 
+const TEMP_SCHEMA = 'geoai_temp';
+
 export class PostGISSpatialJoinOperation {
   constructor(private pool: Pool, private schema: string) {}
 
@@ -17,37 +19,32 @@ export class PostGISSpatialJoinOperation {
   ): Promise<NativeData> {
     const targetTable = targetReference.split('.').pop() || targetReference;
     const joinTable = joinReference.split('.').pop() || joinReference;
-    const resultTable = `join_${targetTable}_${Date.now()}`;
+    const resultTable = `geoai_temp_join_${Date.now()}`;
 
     try {
       const spatialFunc = this.mapOperationToPostGIS(operation);
       const joinClause = this.getJoinClause(joinType);
 
       await this.pool.query(`
-        CREATE TABLE ${this.schema}.${resultTable} AS
+        CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
         SELECT t.*, ST_AsGeoJSON(t.geom) as geometry
         FROM ${this.schema}.${targetTable} t
         ${joinClause} ${this.schema}.${joinTable} j
         ON ST_${spatialFunc}(t.geom, j.geom)
       `);
 
-      await this.pool.query(
-        `SELECT AddGeometryColumn($1, $2, 'geom', 4326, 'GEOMETRY', 2)`,
-        [this.schema, resultTable]
-      );
-
       const featureCount = await this.getFeatureCount(resultTable);
 
       return {
         id: generateId(),
         type: 'postgis',
-        reference: `${this.schema}.${resultTable}`,
+        reference: `${TEMP_SCHEMA}.${resultTable}`,
         metadata: {
           crs: 'EPSG:4326',
           srid: 4326,
           featureCount,
           database: this.pool.options.database,
-          schema: this.schema,
+          schema: TEMP_SCHEMA,
           operation: 'spatial_join',
           spatialRelationship: operation,
           joinType,
@@ -87,7 +84,7 @@ export class PostGISSpatialJoinOperation {
 
   private async getFeatureCount(tableName: string): Promise<number> {
     const result = await this.pool.query(
-      `SELECT COUNT(*) as count FROM ${this.schema}.${tableName}`
+      `SELECT COUNT(*) as count FROM ${TEMP_SCHEMA}.${tableName}`
     );
     return parseInt(result.rows[0].count);
   }

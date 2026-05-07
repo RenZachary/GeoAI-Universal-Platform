@@ -18,6 +18,8 @@ export class PostGISBasicOperations {
       let featureCount = 0;
       let fields: string[] = [];
       let srid = 4326;
+      let actualSchema = this.schema;
+      let tableName = reference;
 
       // Check if reference is a table name or SQL query
       if (reference.trim().toUpperCase().startsWith('SELECT')) {
@@ -28,12 +30,18 @@ export class PostGISBasicOperations {
         featureCount = parseInt(countResult.rows[0].count);
         fields = ['query_result'];
       } else {
-        // It's a table name - get metadata
-        const tableName = reference.split('.')[1] || reference;
+        // It's a table name - parse schema and table
+        const parts = reference.split('.');
+        if (parts.length > 1) {
+          actualSchema = parts[0];
+          tableName = parts[1];
+        } else {
+          tableName = parts[0];
+        }
 
         // Get feature count
         const countResult = await this.pool.query(
-          `SELECT COUNT(*) as count FROM ${this.schema}.${tableName}`
+          `SELECT COUNT(*) as count FROM "${actualSchema}"."${tableName}"`
         );
         featureCount = parseInt(countResult.rows[0].count);
 
@@ -42,7 +50,7 @@ export class PostGISBasicOperations {
           `SELECT column_name FROM information_schema.columns 
            WHERE table_schema = $1 AND table_name = $2
            ORDER BY ordinal_position`,
-          [this.schema, tableName]
+          [actualSchema, tableName]
         );
         fields = columnsResult.rows.map((row: any) => row.column_name as string);
 
@@ -51,7 +59,7 @@ export class PostGISBasicOperations {
           `SELECT srid FROM geometry_columns 
            WHERE f_table_schema = $1 AND f_table_name = $2
            LIMIT 1`,
-          [this.schema, tableName]
+          [actualSchema, tableName]
         );
 
         if (sridResult.rows.length > 0) {
@@ -69,7 +77,7 @@ export class PostGISBasicOperations {
           featureCount,
           fields,
           database: this.pool.options.database,
-          schema: this.schema,
+          schema: actualSchema,
           // StandardizedOutput fields for data source
           result: null, // Data source has no computation result
           description: 'PostGIS data source loaded successfully'

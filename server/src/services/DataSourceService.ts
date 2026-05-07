@@ -11,8 +11,8 @@
 import type { DataSourceRepository} from '../data-access/repositories';
 import { type DataSourceRecord } from '../data-access/repositories';
 import { DataAccessorFactory } from '../data-access';
-import { generateId } from '../core';
 import type { PostGISConnectionConfig } from '../core';
+import { PostGISCleanupScheduler } from '../storage';
 
 // ============================================================================
 // Type Definitions
@@ -88,6 +88,7 @@ export class ValidationError extends DataSourceError {
 export class DataSourceService {
   private dataSourceRepo: DataSourceRepository;
   private accessorFactory: DataAccessorFactory;
+  private cleanupSchedulers: Map<string, PostGISCleanupScheduler> = new Map();
 
   constructor(dataSourceRepo: DataSourceRepository, workspaceBase?: string) {
     this.dataSourceRepo = dataSourceRepo;
@@ -161,6 +162,19 @@ export class DataSourceService {
     for (const table of tables) {
       const dataSource = await this.registerTableAsDataSource(table, config, connectionName);
       registeredSources.push(dataSource);
+    }
+
+    // Step 5: Start cleanup scheduler for this connection
+    const connectionKey = `${config.host}:${config.port || 5432}:${config.database}`;
+    if (!this.cleanupSchedulers.has(connectionKey)) {
+      const scheduler = new PostGISCleanupScheduler(config, {
+        maxAge: 24 * 60 * 60 * 1000,
+        interval: 60 * 60 * 1000,
+        enableAutoCleanup: true
+      });
+      await scheduler.start();
+      this.cleanupSchedulers.set(connectionKey, scheduler);
+      console.log(`[DataSourceService] Started temp table cleanup for connection: ${connectionKey}`);
     }
 
     return {
@@ -399,7 +413,7 @@ export class DataSourceService {
     try {
       const accessor = this.accessorFactory.createAccessor('postgis');
 
-      // Query geometry_columns for ALL spatial tables (no schema filter)
+      // Query geometry_columns for ALL spatial tables (excluding geoai_temp schema)
       const query = `
         SELECT 
           f_table_schema AS "schema",
@@ -408,6 +422,7 @@ export class DataSourceService {
           srid,
           type AS "geometryType"
         FROM geometry_columns
+        WHERE f_table_schema != 'geoai_temp'
         ORDER BY f_table_schema, f_table_name
       `;
 

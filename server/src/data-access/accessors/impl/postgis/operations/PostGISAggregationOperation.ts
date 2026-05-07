@@ -6,6 +6,8 @@ import type { Pool } from 'pg';
 import type { NativeData } from '../../../../../core';
 import { generateId } from '../../../../../core';
 
+const TEMP_SCHEMA = 'geoai_temp';
+
 export class PostGISAggregationOperation {
   constructor(private pool: Pool, private schema: string) {}
 
@@ -25,25 +27,16 @@ export class PostGISAggregationOperation {
   }
 
   private async executeWithFeature(tableName: string, aggFunc: string, field: string): Promise<NativeData> {
-    const resultTable = `agg_${tableName}_${Date.now()}`;
+    const resultTable = `geoai_temp_agg_${Date.now()}`;
     const order = aggFunc === 'MAX' ? 'DESC' : 'ASC';
 
     await this.pool.query(`
-      CREATE TABLE ${this.schema}.${resultTable} AS
+      CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
       SELECT *
       FROM ${this.schema}.${tableName}
       ORDER BY ${field} ${order}
       LIMIT 1
     `);
-
-    // Register geometry column
-    const hasGeom = await this.hasGeometryColumn(tableName);
-    if (hasGeom) {
-      await this.pool.query(
-        `SELECT AddGeometryColumn($1, $2, 'geom', 4326, 'GEOMETRY', 2)`,
-        [this.schema, resultTable]
-      );
-    }
 
     // Get the aggregated value
     const valueResult = await this.pool.query(
@@ -53,13 +46,13 @@ export class PostGISAggregationOperation {
     return {
       id: generateId(),
       type: 'postgis',
-      reference: `${this.schema}.${resultTable}`,
+      reference: `${TEMP_SCHEMA}.${resultTable}`,
       metadata: {
         crs: 'EPSG:4326',
         srid: 4326,
         featureCount: 1,
         database: this.pool.options.database,
-        schema: this.schema,
+        schema: TEMP_SCHEMA,
         operation: 'aggregate',
         aggregatedField: field,
         aggregatedFunction: aggFunc,
@@ -91,13 +84,5 @@ export class PostGISAggregationOperation {
       },
       createdAt: new Date()
     };
-  }
-
-  private async hasGeometryColumn(tableName: string): Promise<boolean> {
-    const result = await this.pool.query(
-      `SELECT EXISTS (SELECT FROM geometry_columns WHERE f_table_schema = $1 AND f_table_name = $2)`,
-      [this.schema, tableName]
-    );
-    return result.rows[0].exists;
   }
 }
