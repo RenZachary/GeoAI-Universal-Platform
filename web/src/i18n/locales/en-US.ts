@@ -332,5 +332,16 @@ export default {
       osmStandard: 'OpenStreetMap',
       stamenTerrain: 'Stamen Terrain'
     }
+  },
+  report: {
+    preview: 'Report Preview',
+    loadingReport: 'Loading report...',
+    retry: 'Retry',
+    close: 'Close',
+    download: 'Download .md File',
+    noReportUrl: 'No report URL provided',
+    failedToLoad: 'Failed to load report',
+    noContentToDownload: 'No content to download',
+    downloaded: 'Report downloaded'
   }
 }

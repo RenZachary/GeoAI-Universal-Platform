@@ -86,7 +86,6 @@ import { marked } from 'marked'
 import { ElMessage } from 'element-plus'
 import { useChatStore } from '@/stores/chat'
 import { useMapStore } from '@/stores/map'
-import { useDataSourceStore } from '@/stores/dataSources'
 import { useToolStore } from '@/stores/tools'
 import ReportPreviewModal from './ReportPreviewModal.vue'
 

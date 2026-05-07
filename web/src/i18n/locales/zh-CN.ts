@@ -332,5 +332,16 @@ export default {
       osmStandard: '开放街道地图',
       stamenTerrain: 'Stamen 地形'
     }
+  },
+  report: {
+    preview: '报告预览',
+    loadingReport: '加载报告中...',
+    retry: '重试',
+    close: '关闭',
+    download: '下载 .md 文件',
+    noReportUrl: '未提供报告 URL',
+    failedToLoad: '加载报告失败',
+    noContentToDownload: '没有可下载的内容',
+    downloaded: '报告已下载'
   }
 }

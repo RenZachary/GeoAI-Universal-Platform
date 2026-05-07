@@ -11,14 +11,14 @@
       <!-- Loading State -->
       <div v-if="loading" class="loading-state">
         <el-icon class="is-loading"><Loading /></el-icon>
-        <p>Loading report...</p>
+        <p>{{ t('report.loadingReport') }}</p>
       </div>
 
       <!-- Error State -->
       <div v-else-if="error" class="error-state">
         <el-icon color="#f56c6c"><CircleClose /></el-icon>
         <p>{{ error }}</p>
-        <el-button type="primary" @click="retryLoad">Retry</el-button>
+        <el-button type="primary" @click="retryLoad">{{ t('report.retry') }}</el-button>
       </div>
 
       <!-- Report Content -->
@@ -27,10 +27,10 @@
 
     <template #footer>
       <div class="dialog-footer">
-        <el-button @click="handleClose">Close</el-button>
+        <el-button @click="handleClose">{{ t('report.close') }}</el-button>
         <el-button type="primary" @click="handleDownload">
           <el-icon><Download /></el-icon>
-          Download .md File
+          {{ t('report.download') }}
         </el-button>
       </div>
     </template>
@@ -39,9 +39,12 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Loading, CircleClose, Download } from '@element-plus/icons-vue'
 import { marked } from 'marked'
+
+const { t } = useI18n()
 
 interface Props {
   modelValue: boolean
@@ -52,7 +55,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   modelValue: false,
   reportUrl: '',
-  title: 'Report Preview'
+  title: ''
 })
 
 const emit = defineEmits<{
@@ -70,7 +73,7 @@ const error = ref<string | null>(null)
 const rawContent = ref('')
 
 // Computed
-const reportTitle = computed(() => props.title || 'Report Preview')
+const reportTitle = computed(() => props.title || t('report.preview'))
 
 const renderedContent = computed(() => {
   if (!rawContent.value) return ''
@@ -84,7 +87,7 @@ const renderedContent = computed(() => {
 // Methods
 async function loadReport() {
   if (!props.reportUrl) {
-    error.value = 'No report URL provided'
+    error.value = t('report.noReportUrl')
     return
   }
 
@@ -96,13 +99,13 @@ async function loadReport() {
     const response = await fetch(props.reportUrl)
     
     if (!response.ok) {
-      throw new Error(`Failed to load report: ${response.status} ${response.statusText}`)
+      throw new Error(`${t('report.failedToLoad')}: ${response.status} ${response.statusText}`)
     }
 
     rawContent.value = await response.text()
   } catch (err) {
     console.error('[ReportPreviewModal] Failed to load report:', err)
-    error.value = err instanceof Error ? err.message : 'Failed to load report'
+    error.value = err instanceof Error ? err.message : t('report.failedToLoad')
     ElMessage.error(error.value)
   } finally {
     loading.value = false
@@ -119,7 +122,7 @@ function handleClose() {
 
 function handleDownload() {
   if (!rawContent.value) {
-    ElMessage.warning('No content to download')
+    ElMessage.warning(t('report.noContentToDownload'))
     return
   }
 
@@ -128,11 +131,11 @@ function handleDownload() {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `${props.title || 'report'}.md`
+  link.download = `${props.title || t('report.preview')}.md`
   link.click()
   URL.revokeObjectURL(url)
   
-  ElMessage.success('Report downloaded')
+  ElMessage.success(t('report.downloaded'))
 }
 
 // Watch for dialog open
