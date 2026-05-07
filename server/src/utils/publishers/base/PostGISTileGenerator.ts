@@ -6,7 +6,7 @@
  */
 
 import type { PoolConfig } from 'pg';
-import { Pool } from 'pg';
+import type { Pool } from 'pg';
 import { wrapError } from '../../../core';
 import type { PostGISConnectionConfig, ParsedPostGISReference } from '../../../core';
 import { PostGISPoolManager } from '../../../data-access';

@@ -30,7 +30,8 @@
             class="service-link-item"
           >
             <el-icon>
-              <Document v-if="service.type === VisualizationServiceType.GeoJSON || service.type === VisualizationServiceType.Report" />
+              <Reading v-if="service.type === VisualizationServiceType.Report" />
+              <Document v-else-if="service.type === VisualizationServiceType.GeoJSON" />
               <MapLocation v-else />
             </el-icon>
             <span class="service-name">{{ getServiceName(service) }}</span>
@@ -73,7 +74,7 @@
 import { computed } from 'vue'
 import type { ChatMessage, VisualizationService } from '@/types'
 import { VisualizationServiceType } from '@/types'
-import { User, ChatDotRound, DocumentCopy, RefreshRight, Link, Document, MapLocation } from '@element-plus/icons-vue'
+import { User, ChatDotRound, DocumentCopy, RefreshRight, Link, Document, MapLocation, Reading } from '@element-plus/icons-vue'
 import { marked } from 'marked'
 import { useChatStore } from '@/stores/chat'
 import { useMapStore } from '@/stores/map'
@@ -162,12 +163,12 @@ function handleViewService(service: VisualizationService) {
     
     ElMessage.success(`Layer "${service.metadata?.name || service.id}" added to map`)
   } else if (service.type === VisualizationServiceType.Report) {
-    // For reports, open in new tab - convert relative URL to absolute
+    // For reports, open a preview modal or new tab
     const reportUrl = service.url.startsWith('http') 
       ? service.url 
       : `${window.location.origin}${service.url}`
     window.open(reportUrl, '_blank')
-    ElMessage.success('Opening report...')
+    ElMessage.success('Opening report preview...')
   } else {
     // For file-based services (geojson), trigger download - convert relative URL to absolute
     const downloadUrl = service.url.startsWith('http') 

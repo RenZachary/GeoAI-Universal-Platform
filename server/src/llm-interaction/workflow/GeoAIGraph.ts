@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * GeoAI Graph - LangGraph StateGraph for orchestrating analysis workflow
  */
@@ -14,6 +15,7 @@ import { ToolRegistryInstance } from '../../plugin-orchestration';
 import { ConversationBufferMemoryWithSQLite } from '../managers/ConversationMemoryManager';
 import { ServicePublisher } from './ServicePublisher';
 import { SummaryGenerator } from './SummaryGenerator';
+import { reportDecisionNode } from './nodes/ReportDecisionNode';
 import { SQLiteManagerInstance } from '../../storage/';
 import { resolvePlaceholders } from './PlaceholderResolver';
 
@@ -309,25 +311,25 @@ export function createGeoAIGraph(
       };
     })
     .addNode('outputGenerator', async (state: GeoAIStateType) => {
-      console.log('[Output Generator] Publishing visualization services');
+      console.log('[Output Generator] Preserving visualization services');
       
-      if (!state.executionResults || state.executionResults.size === 0) {
-        console.log('[Output Generator] No execution results to publish');
-        return {
-          currentStep: 'output',
-          visualizationServices: []
-        };
-      }
+      // Services have already been published incrementally in pluginExecutor
+      // This node just preserves them (including any reports from ReportDecisionNode)
+      const existingServices = state.visualizationServices || [];
       
-      // Use ServicePublisher to generate services
-      const visualizationServices = servicePublisher.publishBatch(state.executionResults);
-      
-      console.log(`[Output Generator] Published ${visualizationServices.length} services`);
+      console.log(`[Output Generator] Total services: ${existingServices.length}`);
       
       return {
         currentStep: 'output',
-        visualizationServices,
+        visualizationServices: existingServices,
       };
+    })
+    .addNode('reportDecision', async (state: GeoAIStateType) => {
+      return await reportDecisionNode(state, { 
+        llmConfig, 
+        workspaceBase,
+        onPartialResult // Pass the streaming callback
+      });
     })
     .addNode('summaryGenerator', async (state: GeoAIStateType) => {
       console.log('[Summary Generator] Creating analysis summary');
@@ -369,7 +371,8 @@ export function createGeoAIGraph(
   workflow.addEdge('memoryLoader', 'goalSplitter');
   workflow.addEdge('goalSplitter', 'taskPlanner');
   workflow.addEdge('taskPlanner', 'pluginExecutor');
-  workflow.addEdge('pluginExecutor', 'outputGenerator');
+  workflow.addEdge('pluginExecutor', 'reportDecision');
+  workflow.addEdge('reportDecision', 'outputGenerator');
   workflow.addEdge('outputGenerator', 'summaryGenerator');
   workflow.addEdge('summaryGenerator', END);
 

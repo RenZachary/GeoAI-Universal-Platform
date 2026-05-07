@@ -26,16 +26,6 @@ export const WORKSPACE_DIRS = {
 } as const;
 
 // ============================================================================
-// Default Prompt Templates
-// ============================================================================
-
-export const DEFAULT_PROMPT_TEMPLATES = [
-  'goal-splitting.md',
-  'task-planning.md',
-  'response-summary.md',
-] as const;
-
-// ============================================================================
 // Database Configuration
 // ============================================================================
 

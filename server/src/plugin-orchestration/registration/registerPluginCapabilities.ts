@@ -135,19 +135,6 @@ export function registerAllPluginCapabilities(): void {
       priority: 9
     },
 
-    // Reporting Plugins - Textual (Terminal)
-    'report_generator': {
-      executionCategory: 'textual' as const,
-      inputRequirements: {
-        supportedDataFormats: ['vector', 'raster']
-      },
-      outputCapabilities: {
-        outputType: 'html',
-        isTerminalNode: true
-      },
-      priority: 6
-    },
-
     // Query Plugins - Utility
     'data_source_query': {
       executionCategory: 'statistical' as const,

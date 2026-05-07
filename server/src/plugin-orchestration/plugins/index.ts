@@ -8,7 +8,6 @@ export { OverlayAnalysisPlugin } from './analysis/OverlayAnalysisPlugin';
 export { FilterPlugin } from './analysis/FilterPlugin';
 export { AggregationPlugin } from './analysis/AggregationPlugin';
 export { StatisticsCalculatorPlugin } from './analysis/StatisticsCalculatorPlugin';
-export { ReportGeneratorPlugin } from './reporting/ReportGeneratorPlugin';
 export { HeatmapPlugin } from './visualization/HeatmapPlugin';
 export { DataSourceQueryPlugin } from './query/DataSourceQueryPlugin';
 export { GeneralQAPlugin } from './query/GeneralQAPlugin';
@@ -24,7 +23,6 @@ import { OverlayAnalysisPlugin } from './analysis/OverlayAnalysisPlugin';
 import { FilterPlugin } from './analysis/FilterPlugin';
 import { AggregationPlugin } from './analysis/AggregationPlugin';
 import { StatisticsCalculatorPlugin } from './analysis/StatisticsCalculatorPlugin';
-import { ReportGeneratorPlugin } from './reporting/ReportGeneratorPlugin';
 import { HeatmapPlugin } from './visualization/HeatmapPlugin';
 import { DataSourceQueryPlugin } from './query/DataSourceQueryPlugin';
 import { GeneralQAPlugin } from './query/GeneralQAPlugin';
@@ -40,7 +38,6 @@ export const BUILT_IN_PLUGINS = [
   FilterPlugin,
   AggregationPlugin,
   StatisticsCalculatorPlugin,
-  ReportGeneratorPlugin,
   HeatmapPlugin,
   DataSourceQueryPlugin,
   GeneralQAPlugin,

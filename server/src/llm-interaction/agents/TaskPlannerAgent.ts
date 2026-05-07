@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Task Planner Agent - Creates execution plans for each analysis goal
  */
@@ -389,19 +390,10 @@ export class TaskPlannerAgent {
       };
     }
 
-    // Rule 3: Textual plugins can work standalone or with predecessor
-    // In multi-goal scenarios, textual plugins may need to access previous goals' results
-    // This will be handled at execution time by injecting context from state.results
-    const textualPluginIds = ['report_generator']; // Add other textual plugins here
-    if (terminalNodeCount === 1) {
-      const terminalStep = plan.steps[terminalNodeIndex];
-      if (textualPluginIds.includes(terminalStep.pluginId) && plan.steps.length === 1) {
-        console.warn(`[Task Planner] Textual plugin '${terminalStep.pluginId}' has no predecessor in current plan`);
-        console.warn(`[Task Planner] Will attempt to inject previous results at execution time`);
-        // Don't fail validation - allow execution to proceed
-        // The executor will handle missing data gracefully
-      }
-    }
+    // Rule 3: Textual plugins validation removed
+    // Report generation is now handled by ReportDecisionNode at workflow level,
+    // not as a plugin step in the execution plan.
+    // Other textual plugins can be added here if needed in the future.
 
     console.log(`[Task Planner] Terminal node validation PASSED`);
     return plan;

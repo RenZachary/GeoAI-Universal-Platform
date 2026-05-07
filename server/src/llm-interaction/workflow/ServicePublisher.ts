@@ -75,7 +75,7 @@ export class ServicePublisher {
                 return 'image'; // WMS/Image service for map viewing
 
             case 'report':
-            case 'html':
+            case 'markdown':
                 return 'report'; // Report service
 
             case 'geojson':
@@ -107,8 +107,8 @@ export class ServicePublisher {
                 return `/api/services/wms/${stepId}`;
 
             case 'report':
-                // Report HTML file
-                return `/api/results/reports/${stepId}.html`;
+                // Report file
+                return `/api/results/reports/${stepId}.md`;
 
             case 'geojson':
             default:

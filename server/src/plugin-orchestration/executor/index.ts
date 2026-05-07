@@ -6,7 +6,6 @@
 export { BufferAnalysisExecutor, type BufferAnalysisParams } from './analysis/BufferAnalysisExecutor';
 export { OverlayAnalysisExecutor, type OverlayAnalysisParams } from './analysis/OverlayAnalysisExecutor';
 export { StatisticsCalculatorExecutor, type StatisticsCalculatorParams } from './analysis/StatisticsCalculatorExecutor';
-export { HtmlReportGeneratorExecutor, type ReportGeneratorParams } from './reporting/HtmlReportGeneratorExecutor';
 export { HeatmapExecutor, type HeatmapParams } from './visualization/HeatmapExecutor';
 
 // Phase 2: New visualization renderers

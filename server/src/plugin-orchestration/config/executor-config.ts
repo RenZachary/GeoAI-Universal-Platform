@@ -12,7 +12,6 @@ import { OverlayAnalysisExecutor } from '../executor/analysis/OverlayAnalysisExe
 import { StatisticsCalculatorExecutor } from '../executor/analysis/StatisticsCalculatorExecutor';
 import { FilterExecutor } from '../executor/analysis/FilterExecutor';
 import { AggregationExecutor } from '../executor/analysis/AggregationExecutor';
-import { HtmlReportGeneratorExecutor } from '../executor/reporting/HtmlReportGeneratorExecutor';
 import { HeatmapExecutor } from '../executor/visualization/HeatmapExecutor';
 import { DataSourceQueryExecutor } from '../executor/query/DataSourceQueryExecutor';
 import { GeneralQAExecutor } from '../executor/query/GeneralQAExecutor';
@@ -94,14 +93,6 @@ export const BUILTIN_EXECUTORS: ExecutorClassRef[] = [
     pluginId: 'choropleth_renderer',
     executorClass: ChoroplethExecutor,
     requiresDb: true,
-    requiresWorkspace: true
-  },
-
-  // Reporting Executors
-  {
-    pluginId: 'report_generator',
-    executorClass: HtmlReportGeneratorExecutor,
-    requiresDb: false,
     requiresWorkspace: true
   },
 
