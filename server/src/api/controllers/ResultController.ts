@@ -298,6 +298,10 @@ export class ResultController {
         case '.json':
           contentType = 'application/json';
           break;
+        case '.md':
+        case '.markdown':
+          contentType = 'text/markdown; charset=utf-8';
+          break;
         case '.pbf':
           contentType = 'application/x-protobuf';
           break;

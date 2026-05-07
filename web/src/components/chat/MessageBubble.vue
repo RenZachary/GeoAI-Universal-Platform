@@ -68,23 +68,35 @@
       </div>
     </div>
   </div>
+
+  <!-- Report Preview Modal -->
+  <ReportPreviewModal
+    v-model="showReportModal"
+    :report-url="currentReportUrl"
+    :title="currentReportTitle"
+  />
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { ChatMessage, VisualizationService } from '@/types'
 import { VisualizationServiceType } from '@/types'
 import { User, ChatDotRound, DocumentCopy, RefreshRight, Link, Document, MapLocation, Reading } from '@element-plus/icons-vue'
 import { marked } from 'marked'
+import { ElMessage } from 'element-plus'
 import { useChatStore } from '@/stores/chat'
 import { useMapStore } from '@/stores/map'
 import { useDataSourceStore } from '@/stores/dataSources'
 import { useToolStore } from '@/stores/tools'
-import { ElMessage } from 'element-plus'
+import ReportPreviewModal from './ReportPreviewModal.vue'
 
 const chatStore = useChatStore()
 const mapStore = useMapStore()
-const dataSourceStore = useDataSourceStore()
+
+// Report preview modal state
+const showReportModal = ref(false)
+const currentReportUrl = ref('')
+const currentReportTitle = ref('')
 const toolStore = useToolStore()
 
 const props = defineProps<{
@@ -163,12 +175,12 @@ function handleViewService(service: VisualizationService) {
     
     ElMessage.success(`Layer "${service.metadata?.name || service.id}" added to map`)
   } else if (service.type === VisualizationServiceType.Report) {
-    // For reports, open a preview modal or new tab
-    const reportUrl = service.url.startsWith('http') 
+    // For reports, open preview modal
+    currentReportUrl.value = service.url.startsWith('http') 
       ? service.url 
       : `${window.location.origin}${service.url}`
-    window.open(reportUrl, '_blank')
-    ElMessage.success('Opening report preview...')
+    currentReportTitle.value = service.metadata?.title || 'Report Preview'
+    showReportModal.value = true
   } else {
     // For file-based services (geojson), trigger download - convert relative URL to absolute
     const downloadUrl = service.url.startsWith('http') 
