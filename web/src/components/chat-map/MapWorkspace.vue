@@ -362,7 +362,7 @@ function closeFeaturePopup() {
       right: -8px;
       
       :deep(.el-badge__content) {
-        background: #f56c6c;
+        background: #5cc2ff;
         border: 2px solid white;
         font-size: 11px;
         height: 18px;

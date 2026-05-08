@@ -229,7 +229,7 @@ export const useMapStore = defineStore('map', () => {
       }
 
       const styleJson = await response.json()
-      console.log('[Map Store] Style JSON loaded:', JSON.stringify(styleJson, null, 2))
+      // console.log('[Map Store] Style JSON loaded:', JSON.stringify(styleJson, null, 2))
 
       // Add vector source
       const tilesUrl = layer.url.startsWith('http')

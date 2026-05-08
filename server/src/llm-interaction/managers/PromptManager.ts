@@ -89,37 +89,37 @@ export class PromptManager {
   private convertToLangChainSyntax(template: string): string {
     // Step 1: First, escape all literal braces that are NOT template variables
     // In LangChain/Python f-strings, literal { must be written as {{ and }} as }}
-    
+
     // Strategy:
     // 1. Temporarily replace {{variable}} patterns with placeholders
     // 2. Escape all remaining { and } as {{ and }}
     // 3. Restore the variable patterns as {variable}
-    
+
     const VARIABLE_PLACEHOLDER_PREFIX = '__VAR_';
     const VARIABLE_PLACEHOLDER_SUFFIX = '__';
-    
+
     // Find all {{variable}} patterns and replace with placeholders
     let varIndex = 0;
     const variableMap = new Map<string, string>();
-    
+
     const withPlaceholders = template.replace(/\{\{(\w+)\}\}/g, (match, varName) => {
       const placeholder = `${VARIABLE_PLACEHOLDER_PREFIX}${varIndex}${VARIABLE_PLACEHOLDER_SUFFIX}`;
       variableMap.set(placeholder, varName);
       varIndex++;
       return placeholder;
     });
-    
+
     // Now escape all literal braces
     const escapedBraces = withPlaceholders
       .replace(/\{/g, '{{')
       .replace(/\}/g, '}}');
-    
+
     // Restore variables as {variableName}
     const final = escapedBraces.replace(
       new RegExp(`${VARIABLE_PLACEHOLDER_PREFIX}(\\d+)${VARIABLE_PLACEHOLDER_SUFFIX}`, 'g'),
       (_, index) => `{${variableMap.get(`${VARIABLE_PLACEHOLDER_PREFIX}${index}${VARIABLE_PLACEHOLDER_SUFFIX}`)!}}`
     );
-    
+
     // Debug logging
     if (template.includes('{{')) {
       console.log('[PromptManager] Template conversion:', {
@@ -129,7 +129,7 @@ export class PromptManager {
         convertedLength: final.length
       });
     }
-    
+
     return final;
   }
 
@@ -138,7 +138,7 @@ export class PromptManager {
    */
   private removeHtmlComment(content: string): string {
     const lines = content.split('\n');
-    
+
     // Check if first line is an HTML comment
     if (lines[0].trim().startsWith('<!--') && lines[0].trim().endsWith('-->')) {
       // Remove the first line (HTML comment)
@@ -146,7 +146,7 @@ export class PromptManager {
       // Return remaining content, trim leading empty lines
       return lines.join('\n').replace(/^\s*\n/, '');
     }
-    
+
     return content;
   }
 
