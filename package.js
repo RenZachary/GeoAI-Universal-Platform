@@ -321,7 +321,7 @@ async function copyResources() {
     console.log('   ✓ Server node_modules copied');
     
     // Then rebuild native modules using system npm but with bundled node
-    console.log('   Rebuilding better-sqlite3 for bundled Node.js...');
+    console.log('   Rebuilding better-sqlite3 and canvas for bundled Node.js...');
     try {
       // Use npm rebuild which will use the current node version
       execSync('npm rebuild better-sqlite3 canvas', {
@@ -336,6 +336,18 @@ async function copyResources() {
     }
   } else {
     throw new Error('Server node_modules not found. Run npm install first.');
+  }
+
+  // Copy GDAL binaries if they exist in vendor directory
+  const gdalVendorPath = path.join(__dirname, 'vendor', 'GDAL');
+  const gdalPackagePath = path.join(PACKAGE_DIR, 'GDAL');
+  
+  if (await fs.pathExists(gdalVendorPath)) {
+    await fs.copy(gdalVendorPath, gdalPackagePath);
+    console.log('   ✓ GDAL binaries copied to package');
+  } else {
+    console.warn('   ⚠️  GDAL directory not found in vendor/GDAL');
+    console.warn('   WMS GeoTIFF services may not work without GDAL');
   }
 
   console.log('   ✓ All resources copied\n');
@@ -377,6 +389,11 @@ echo.
 
 :: Set environment variables
 set NODE_ENV=production
+:: Set GDAL_DIR to bundled GDAL directory (if exists)
+if exist "GDAL" (
+    set GDAL_DIR=%~dp0GDAL
+    echo GDAL directory detected: %GDAL_DIR%
+)
 :: CLIENT_PATH will be resolved relative to server directory automatically
 
 :: Start server using bundled Node.js
