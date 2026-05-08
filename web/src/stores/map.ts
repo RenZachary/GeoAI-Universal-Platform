@@ -215,6 +215,24 @@ export const useMapStore = defineStore('map', () => {
       console.log('[Map Store] Layer ID:', layer.id)
       console.log('[Map Store] Style URL:', styleUrl)
       
+      // Check if source already exists and remove it first
+      if (map.getSource(layer.id)) {
+        console.log('[Map Store] Source already exists, removing old layers and source...')
+        // Remove all layers that use this source
+        const allLayers = map.getStyle().layers
+        allLayers.forEach((mapLayer: any) => {
+          if (mapLayer.source === layer.id && mapLayer.id !== layer.id) {
+            if (map.getLayer(mapLayer.id)) {
+              map.removeLayer(mapLayer.id)
+              console.log('[Map Store] Removed old layer:', mapLayer.id)
+            }
+          }
+        })
+        // Remove the source
+        map.removeSource(layer.id)
+        console.log('[Map Store] Removed old source:', layer.id)
+      }
+      
       // Convert relative URL to absolute
       const fullStyleUrl = styleUrl.startsWith('http')
         ? styleUrl
@@ -322,6 +340,24 @@ export const useMapStore = defineStore('map', () => {
    * Apply default MVT styling (backward compatibility)
    */
   function applyDefaultMVTStyle(map: any, layer: Omit<MapLayer, 'createdAt'>) {
+    // Check if source already exists and remove it first
+    if (map.getSource(layer.id)) {
+      console.log('[Map Store] Default style - Source already exists, removing...')
+      // Remove all layers that use this source
+      const allLayers = map.getStyle().layers
+      allLayers.forEach((mapLayer: any) => {
+        if (mapLayer.source === layer.id) {
+          if (map.getLayer(mapLayer.id)) {
+            map.removeLayer(mapLayer.id)
+            console.log('[Map Store] Removed old layer:', mapLayer.id)
+          }
+        }
+      })
+      // Remove the source
+      map.removeSource(layer.id)
+      console.log('[Map Store] Removed old source:', layer.id)
+    }
+    
     // Convert relative URL to absolute URL for Mapbox GL JS
     const tilesUrl = layer.url.startsWith('http')
       ? layer.url

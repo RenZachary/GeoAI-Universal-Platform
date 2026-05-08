@@ -2,7 +2,7 @@
  * WMS Publisher Types - Common type definitions for WMS publishing
  */
 
-import type { DataSourceType } from '../../../core/index';
+import type { DataSourceType } from '../../../../core/index';
 
 // ============================================================================
 // WMS Layer Configuration

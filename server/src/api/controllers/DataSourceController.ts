@@ -150,7 +150,7 @@ export class DataSourceController {
   async registerDataSource(req: Request, res: Response): Promise<void> {
     try {
       // TODO: Add validation schema for manual registration
-      const { name, type, reference, metadata } = req.body;
+      // const { name, type, reference, metadata } = req.body;
       
       // Delegate to service (implementation pending)
       res.status(501).json({

@@ -68,7 +68,7 @@ export abstract class BaseRendererExecutor {
 
     try {
       // Step 1: Load data source and validate
-      const { dataSource, nativeData, accessor } = await this.loadDataSource(params.dataSourceId);
+      const { dataSource, nativeData } = await this.loadDataSource(params.dataSourceId);
       
       console.log(`[${this.constructor.name}] Data source loaded: ${dataSource.type}`);
       console.log(`[${this.constructor.name}] NativeData ID: ${nativeData.id}`);

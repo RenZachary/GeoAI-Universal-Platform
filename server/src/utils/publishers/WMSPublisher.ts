@@ -20,8 +20,8 @@ import {
   type WMSGetMapParams,
   type WMSServiceMetadata,
   type WMSPublishResult
-} from './base/WMSPublisherTypes';
-import { GeoTIFFWMSStategy } from './base/GeoTIFFWMSStategy';
+} from './base/WMSStategies/WMSPublisherTypes';
+import { GeoTIFFWMSStategy } from './base/WMSStategies/GeoTIFFWMSStategy';
 
 // Re-export types for backward compatibility
 export type { WMSLayerOptions, WMSGetMapParams, WMSServiceMetadata, WMSPublishResult };

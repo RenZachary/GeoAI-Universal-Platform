@@ -77,7 +77,6 @@ export async function scanAndRegisterDataFiles(
       const metadata = await accessor.getMetadata(fullPath);
       
       // Register in database with the original path
-      const dataSourceId = uuidv4();
       dataSourceRepo.create(
         path.basename(file, path.extname(file)),
         type,

@@ -3,7 +3,7 @@
  * Runs periodic cleanup jobs to prevent database bloat in the geoai_temp schema
  */
 
-import { Pool } from 'pg';
+import type { Pool } from 'pg';
 import { PostGISPoolManager } from '../../data-access';
 import type { PostGISConnectionConfig } from '../../core';
 import type Database from 'better-sqlite3';

@@ -7,13 +7,13 @@
 import fs from 'fs';
 import path from 'path';
 import { LRUCache } from 'lru-cache';
-import type { DataSourceType } from '../../../core/index';
+import type { DataSourceType } from '../../../../core/index';
 import type {
   WMSLayerOptions,
   WMSGetMapParams,
   WMSServiceMetadata
 } from './WMSPublisherTypes';
-import type { WMSGenerationStrategy } from './BaseWMSPublisher';
+import type { WMSGenerationStrategy } from '../BaseWMSPublisher';
 import {
   extractGeoTIFFMetadata,
   renderTile,
@@ -147,11 +147,9 @@ export class GeoTIFFWMSStategy implements WMSGenerationStrategy {
       
       // Check cache first
       if (this.tileCache.has(cacheKey)) {
-        return this.tileCache.get(cacheKey)!;
+        return this.tileCache.get(cacheKey) || null;
       }
-      
-      const [minX, minY, maxX, maxY] = params.bbox;
-      
+            
       // Validate that requested bbox overlaps with source data extent
       const overlaps = bboxesOverlap(params.bbox, cached.bbox);
       
@@ -161,7 +159,7 @@ export class GeoTIFFWMSStategy implements WMSGenerationStrategy {
       }
       
       // Clip bbox to source extent (both in EPSG:3857 now)
-      const clippedBbox = clipBbox(params.bbox, cached.bbox);
+      // const clippedBbox = clipBbox(params.bbox, cached.bbox);
       
       // Render tile using GDAL - use ORIGINAL params.bbox for correct scaling
       const pngBuffer = await renderTile({

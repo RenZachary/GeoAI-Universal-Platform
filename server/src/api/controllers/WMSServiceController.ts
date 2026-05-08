@@ -21,7 +21,7 @@ export class WMSServiceController {
   async handleWMSRequest(req: Request, res: Response): Promise<void> {
     try {
       const { serviceId } = req.params;
-      const { service, request } = req.query;
+      const { request } = req.query;
 
       const sid = Array.isArray(serviceId) ? serviceId[0] : serviceId;
 

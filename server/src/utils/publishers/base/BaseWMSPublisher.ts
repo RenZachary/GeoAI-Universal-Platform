@@ -12,7 +12,7 @@ import type {
   WMSGetMapParams,
   WMSServiceMetadata,
   WMSPublishResult
-} from './WMSPublisherTypes';
+} from './WMSStategies/WMSPublisherTypes';
 
 /**
  * Strategy interface for WMS map generation
