@@ -1,5 +1,11 @@
 # GeoAI-UP - Out-of-the-Box GIS Application Agent
 
+✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️
+
+For any issues, please submit an [Issue](https://gitee.com/rzcgis/geo-ai-universal-platform/issues). We will respond uniformly there. No responses will be provided elsewhere. Thank you for your understanding.
+
+✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️
+
 <div align="center">
 
 
@@ -23,9 +29,9 @@
 
 ### Core Advantages
 
-🎯 **Ready-to-Use GIS Agent** - No complex configuration, start analyzing immediately  
+🎯 **Out-of-the-Box** - No complex configuration, start spatial analysis immediately  
 🚀 **MVT + WMS Visualization** - Native support for big data rendering with dynamic tile services  
-✨ **Natural Language Interface** - Describe tasks in plain language, no GIS expertise required  
+✨ **Natural Language Interface** - Describe tasks in everyday language, no GIS expertise required  
 🤖 **AI-Powered Workflows** - LangGraph-based intelligent task orchestration  
 🔌 **Extensible Plugins** - Support for custom plugin development  
 📊 **Multi-Format Support** - Shapefile, GeoJSON, PostGIS, GeoTIFF  
