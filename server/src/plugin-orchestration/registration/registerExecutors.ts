@@ -36,7 +36,7 @@ export function registerAllExecutors(): void {
   ExecutorRegistryInstance.registerMany(registrations);
 
   console.log(`[Executor Registration] Successfully registered ${registrations.length} executors`);
-  console.log('[Executor Registration] Registered plugin IDs:', ExecutorRegistryInstance.getRegisteredPluginIds());
+ //console.log('[Executor Registration] Registered plugin IDs:', ExecutorRegistryInstance.getRegisteredPluginIds());
 }
 
 /**

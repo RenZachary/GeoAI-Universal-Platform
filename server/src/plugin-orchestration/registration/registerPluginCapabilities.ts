@@ -174,7 +174,7 @@ export function registerAllPluginCapabilities(): void {
   }
 
   console.log(`[Plugin Capability Registration] Successfully registered ${registeredCount} plugin capabilities`);
-  console.log('[Plugin Capability Registration] Registered plugin IDs:', PluginCapabilityRegistry.getAllPluginIds());
+  //console.log('[Plugin Capability Registration] Registered plugin IDs:', PluginCapabilityRegistry.getAllPluginIds());
   
   // Log summary by category
   const byCategory = PluginCapabilityRegistry.getPluginsByCategory();

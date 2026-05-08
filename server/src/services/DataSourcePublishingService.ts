@@ -34,7 +34,7 @@ export class DataSourcePublishingService {
     this.dataSourceRepo = new DataSourceRepository(db);
     // Use provided publisher or get singleton instance
     this.mvtPublisher = mvtPublisher || MVTOnDemandPublisher.getInstance(workspaceBase, 10000);
-    this.wmsPublisher = new WMSPublisher(workspaceBase, db);
+    this.wmsPublisher = WMSPublisher.getInstance(workspaceBase, db);
     this.workspaceBase = workspaceBase;
   }
 
@@ -68,19 +68,29 @@ export class DataSourcePublishingService {
    */
   async isPublished(dataSourceId: string): Promise<boolean> {
     try {
-      // Check MVT tilesets - dataSourceId is used as tilesetId
-      const mvtTilesets = this.mvtPublisher.listTilesets();
-      const isMVTPublished = mvtTilesets.some((ts: { tilesetId: string; metadata: MVTPublishMetadata }) => 
-        ts.tilesetId === dataSourceId
-      );
-
-      if (isMVTPublished) {
-        return true;
+      const dataSource = this.dataSourceRepo.getById(dataSourceId);
+      if (!dataSource) {
+        return false;
       }
 
-      // Check WMS services (would need to query database or check manager)
-      // For now, we'll assume if it's not MVT published, it might be WMS
-      // TODO: Implement proper WMS service tracking
+      // Check MVT tilesets - dataSourceId is used as tilesetId
+      if (dataSource.type !== 'tif') {
+        const mvtTilesets = this.mvtPublisher.listTilesets();
+        const isMVTPublished = mvtTilesets.some((ts: { tilesetId: string; metadata: MVTPublishMetadata }) => 
+          ts.tilesetId === dataSourceId
+        );
+        return isMVTPublished;
+      }
+
+      // For TIF/WMS, check if there's an existing WMS service for this data source
+      // by looking at the metadata stored in the data source
+      const wmsServiceId = dataSource.metadata?.wmsServiceId;
+      if (wmsServiceId) {
+        // Verify the service still exists
+        const metadata = this.wmsPublisher.getServiceMetadata(wmsServiceId);
+        return metadata !== null;
+      }
+
       return false;
     } catch (error) {
       console.error('[DataSourcePublishingService] Check publication status failed:', error);
@@ -100,31 +110,63 @@ export class DataSourcePublishingService {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     metadata?: Record<string, any>;
   }> {
-    // Check if already published
-    const isPublished = await this.isPublished(dataSourceId);
-    console.log(`[DataSourcePublishingService] Checking publication status for data source: ${dataSourceId}, isPublished: ${isPublished}`);
-    if (!isPublished) {
-      console.log(`[DataSourcePublishingService] Data source ${dataSourceId} not published, publishing now...`);
-      await this.publishDataSource(dataSourceId);
-    }
-
     const dataSource = this.dataSourceRepo.getById(dataSourceId);
     if (!dataSource) {
       throw new Error(`Data source not found: ${dataSourceId}`);
     }
 
-    // Return appropriate URL based on type
-    if (dataSource.type === 'tif') {
-      return {
-        url: `/api/services/wms/${dataSourceId}`,
-        type: 'wms'
-      };
+    // Check if already published
+    const isPublished = await this.isPublished(dataSourceId);
+    console.log(`[DataSourcePublishingService] Checking publication status for data source: ${dataSourceId}, isPublished: ${isPublished}`);
+    
+    let publishedInfo: PublishedServiceInfo;
+    
+    if (!isPublished) {
+      console.log(`[DataSourcePublishingService] Data source ${dataSourceId} not published, publishing now...`);
+      publishedInfo = await this.publishDataSource(dataSourceId);
     } else {
-      return {
-        url: `/api/mvt-dynamic/${dataSourceId}/{z}/{x}/{y}.pbf`,
-        type: 'mvt'
-      };
+      // If already published, construct the service info based on stored metadata
+      if (dataSource.type === 'tif') {
+        // For WMS, get the service ID from metadata
+        const wmsServiceId = dataSource.metadata?.wmsServiceId;
+        if (!wmsServiceId) {
+          // Fallback: republish if service ID not found in metadata
+          console.warn(`[DataSourcePublishingService] WMS service ID not found in metadata, republishing...`);
+          publishedInfo = await this.publishDataSource(dataSourceId);
+        } else {
+          // Include bounding box from data source metadata for auto-fit functionality
+          const bbox = dataSource.metadata?.bbox;
+          publishedInfo = {
+            dataSourceId,
+            serviceType: 'wms',
+            serviceUrl: `/api/services/wms/${wmsServiceId}`,
+            serviceId: wmsServiceId,
+            metadata: {
+              serviceType: 'wms',
+              wmsServiceId,
+              bbox: bbox,
+              name: dataSource.name
+            }
+          };
+        }
+      } else {
+        // For MVT, the tilesetId equals dataSourceId
+        publishedInfo = {
+          dataSourceId,
+          serviceType: 'mvt',
+          serviceUrl: `/api/mvt-dynamic/${dataSourceId}/{z}/{x}/{y}.pbf`,
+          tilesetId: dataSourceId,
+          metadata: {}
+        };
+      }
     }
+
+    // Return the correct URL based on the published service info
+    return {
+      url: publishedInfo.serviceUrl,
+      type: publishedInfo.serviceType,
+      metadata: publishedInfo.metadata
+    };
   }
 
   /**
@@ -274,6 +316,19 @@ export class DataSourcePublishingService {
 
     console.log(`[DataSourcePublishingService] Published WMS service: ${serviceId}`);
 
+    // Save the WMS service ID to the data source metadata for future lookups
+    try {
+      const updatedMetadata = {
+        ...dataSource.metadata,
+        wmsServiceId: serviceId
+      };
+      await this.dataSourceRepo.updateMetadata(dataSource.id, updatedMetadata);
+      console.log(`[DataSourcePublishingService] Saved WMS service ID to data source metadata`);
+    } catch (error) {
+      console.error(`[DataSourcePublishingService] Failed to save WMS service ID:`, error);
+      // Continue anyway - the service is still created
+    }
+
     return {
       dataSourceId: dataSource.id,
       serviceType: 'wms',
@@ -281,7 +336,10 @@ export class DataSourcePublishingService {
       serviceId: serviceId,
       metadata: {
         serviceType: 'wms',
-        filePath: filePath
+        filePath: filePath,
+        wmsServiceId: serviceId,
+        bbox: dataSource.metadata?.bbox,
+        name: dataSource.name
       }
     };
   }

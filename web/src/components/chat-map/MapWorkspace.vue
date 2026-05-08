@@ -72,7 +72,7 @@
     </div>
 
     <!-- Layer Panel Drawer -->
-    <el-drawer v-model="showLayerPanel" :title="t('map.layerManagement')" direction="rtl" size="400px">
+    <el-drawer v-model="showLayerPanel" :modal-penetrable="true" :modal="false" :title="t('map.layerManagement')" direction="rtl" size="400px">
       <div class="layer-panel">
         <!-- Summary Stats -->
         <div class="layer-stats">

@@ -11,7 +11,7 @@ export class WMSServiceController {
   private wmsPublisher: WMSPublisher;
 
   constructor(workspaceBase: string, db?: Database.Database) {
-    this.wmsPublisher = new WMSPublisher(workspaceBase, db);
+    this.wmsPublisher = WMSPublisher.getInstance(workspaceBase, db);
   }
 
   /**
@@ -341,5 +341,126 @@ export class WMSServiceController {
         details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
+  }
+
+  /**
+   * GET /api/services/wms/:serviceId/tile/:z/:x/:y.png - WMS tile endpoint
+   * Converts XYZ tile coordinates to WMS GetMap request
+   * This is a convenience endpoint for MapLibre GL JS raster sources
+   */
+  async handleTileRequest(req: Request, res: Response): Promise<void> {
+    try {
+      const { serviceId, z, x, y } = req.params;
+      
+      const sid = Array.isArray(serviceId) ? serviceId[0] : serviceId;
+      const zNum = parseInt(Array.isArray(z) ? String(z[0]) : String(z));
+      const xNum = parseInt(Array.isArray(x) ? String(x[0]) : String(x));
+      const yNum = parseInt(Array.isArray(y) ? String(y[0]) : String(y));
+
+      if (!sid || isNaN(zNum) || isNaN(xNum) || isNaN(yNum)) {
+        res.status(400).json({
+          success: false,
+          error: 'Invalid parameters: serviceId, z, x, y are required'
+        });
+        return;
+      }
+
+      // Convert XYZ tile coordinates to Web Mercator (EPSG:3857) bbox
+      const mercatorBbox = this.xyzToMercatorBbox(xNum, yNum, zNum);
+      
+      // Call GetMap with Mercator coordinates
+      const imageBuffer = await this.wmsPublisher.getMap(sid, {
+        layers: ['raster'],
+        styles: [''],
+        srs: 'EPSG:3857',  // Use Web Mercator for proper tile alignment
+        bbox: mercatorBbox,
+        width: 256,
+        height: 256,
+        format: 'image/png',
+        transparent: true
+      });
+
+      if (!imageBuffer) {
+        res.status(404).json({
+          success: false,
+          error: 'Failed to generate tile'
+        });
+        return;
+      }
+
+      // Set cache headers for tiles
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
+      res.send(imageBuffer);
+
+    } catch (error) {
+      console.error('[WMS Service] Error generating tile:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to generate tile',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  /**
+   * Convert XYZ tile coordinates to Web Mercator (EPSG:3857) bounding box
+   * This is the standard approach for web map tiles
+   * @param x - Tile X coordinate
+   * @param y - Tile Y coordinate  
+   * @param z - Zoom level
+   * @returns [minX, minY, maxX, maxY] in EPSG:3857 (meters)
+   */
+  private xyzToMercatorBbox(x: number, y: number, z: number): [number, number, number, number] {
+    const n = Math.pow(2, z);
+    const tileSize = 20037508.34; // Half of Earth's circumference in meters (Web Mercator)
+    
+    // Calculate Mercator coordinates
+    const minX = (x / n) * 2 * tileSize - tileSize;
+    const maxX = ((x + 1) / n) * 2 * tileSize - tileSize;
+    
+    // Y axis is inverted in tile coordinates (0 at top)
+    const maxY = tileSize - (y / n) * 2 * tileSize;
+    const minY = tileSize - ((y + 1) / n) * 2 * tileSize;
+    
+    return [minX, minY, maxX, maxY];
+  }
+
+  /**
+   * Convert XYZ tile coordinates to WGS84 bounding box
+   * Uses standard Web Mercator (EPSG:3857) to WGS84 (EPSG:4326) conversion
+   * @param x - Tile X coordinate
+   * @param y - Tile Y coordinate  
+   * @param z - Zoom level
+   * @returns [minX, minY, maxX, maxY] in EPSG:4326
+   */
+  private xyzToBbox(x: number, y: number, z: number): [number, number, number, number] {
+    const n = Math.pow(2, z);
+    
+    // Calculate longitude (simple linear mapping)
+    const minX = (x / n) * 360.0 - 180.0;
+    const maxX = ((x + 1) / n) * 360.0 - 180.0;
+    
+    // Calculate latitude using inverse Mercator projection
+    // Standard formula: lat = arctan(sinh(π * (1 - 2*y/n)))
+    const yMin = y / n;
+    const yMax = (y + 1) / n;
+    
+    const minY = this.mercatorYToLat(yMax); // Note: Y axis is inverted in tile coordinates
+    const maxY = this.mercatorYToLat(yMin);
+    
+    return [minX, minY, maxX, maxY];
+  }
+
+  /**
+   * Convert normalized Mercator Y coordinate (0-1) to WGS84 latitude
+   * @param normalizedY - Normalized Y coordinate [0, 1] where 0=top, 1=bottom
+   * @returns Latitude in degrees
+   */
+  private mercatorYToLat(normalizedY: number): number {
+    // Inverse Mercator projection formula
+    const n = Math.PI - 2 * Math.PI * normalizedY;
+    const latRad = Math.atan(Math.sinh(n));
+    return latRad * (180 / Math.PI);
   }
 }

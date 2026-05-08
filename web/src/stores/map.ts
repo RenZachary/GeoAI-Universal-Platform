@@ -235,9 +235,6 @@ export const useMapStore = defineStore('map', () => {
       const tilesUrl = layer.url.startsWith('http')
         ? layer.url
         : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${layer.url}`
-
-      console.log('[Map Store] Tiles URL:', tilesUrl)
-      console.log('[Map Store] Adding source with ID:', layer.id)
       
       map.addSource(layer.id, {
         type: 'vector',
@@ -418,15 +415,52 @@ export const useMapStore = defineStore('map', () => {
       map.removeSource(layer.id)
     }
 
-    // Convert relative URL to absolute URL for Mapbox GL JS
-    const tilesUrl = layer.url.startsWith('http')
+    // Convert WMS service URL to tile URL template for Mapbox GL JS
+    const baseUrl = layer.url.startsWith('http')
       ? layer.url
       : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${layer.url}`
+
+    // For WMS services, use the tile endpoint that converts XYZ to WMS GetMap
+    // The {z}/{x}/{y} placeholders will be replaced by MapLibre with actual tile coordinates
+    const tilesUrl = `${baseUrl}/tile/{z}/{x}/{y}.png`
+    
+    // Check if layer has bounding box in metadata and auto-fit view
+    const bbox = layer.metadata?.bbox
+    if (bbox && Array.isArray(bbox) && bbox.length === 4) {
+      const [minX, minY, maxX, maxY] = bbox
+      const centerX = (minX + maxX) / 2
+      const centerY = (minY + maxY) / 2
+      
+      // Calculate appropriate zoom level based on extent
+      const lonDiff = maxX - minX
+      const latDiff = maxY - minY
+      const maxDiff = Math.max(lonDiff, latDiff)
+      
+      // More aggressive zoom calculation for small datasets
+      let targetZoom = 10  // Default to higher zoom
+      if (maxDiff > 50) targetZoom = 4
+      else if (maxDiff > 20) targetZoom = 5
+      else if (maxDiff > 10) targetZoom = 6
+      else if (maxDiff > 5) targetZoom = 7
+      else if (maxDiff > 2) targetZoom = 8
+      else if (maxDiff > 0.5) targetZoom = 10  // Changed from 9 to 10
+      else if (maxDiff > 0.1) targetZoom = 11
+      else targetZoom = 12
+      
+      // Immediately jump to the data extent (no animation) to ensure correct tile requests
+      map.jumpTo({
+        center: [centerX, centerY],
+        zoom: targetZoom
+      })
+    } else {
+      console.warn(`[Map Store] No bounding box found in layer metadata`)
+    }
 
     map.addSource(layer.id, {
       type: 'raster',
       tiles: [tilesUrl],
-      tileSize: 256
+      tileSize: 256,
+      scheme: 'xyz'
     })
 
     map.addLayer({

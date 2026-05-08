@@ -149,6 +149,7 @@ export class ApiRouter {
     // WMS service endpoints
     this.router.get('/services/wms', (req, res) => this.wmsServiceController.listServices(req, res));
     this.router.all('/services/wms/:serviceId', (req, res) => this.wmsServiceController.handleWMSRequest(req, res));
+    this.router.get('/services/wms/:serviceId/tile/:z/:x/:y.png', (req, res) => this.wmsServiceController.handleTileRequest(req, res));
     this.router.get('/services/wms/:serviceId/metadata', (req, res) => this.wmsServiceController.getServiceMetadata(req, res));
     this.router.delete('/services/wms/:serviceId', (req, res) => this.wmsServiceController.deleteService(req, res));
 

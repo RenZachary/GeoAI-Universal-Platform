@@ -42,7 +42,7 @@ export class CleanupScheduler {
     config?: Partial<CleanupConfig>
   ) {
     this.mvtPublisher = new MVTStrategyPublisher(workspaceBase, SQLiteManagerInstance.getDatabase());
-    this.wmsPublisher = new WMSPublisher(workspaceBase, SQLiteManagerInstance.getDatabase());
+    this.wmsPublisher = WMSPublisher.getInstance(workspaceBase, SQLiteManagerInstance.getDatabase());
     
     // Default configuration
     this.config = {

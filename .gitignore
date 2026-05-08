@@ -10,6 +10,8 @@ out/
 *.tsbuildinfo
 package/
 vendor/node-*
+vendor/3rdParty_x64
+vendor/GDAL
 GeoAI-UP-v*
 dist-bundled/
 

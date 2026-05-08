@@ -122,7 +122,7 @@ function getDisplayType(type?: string): string {
     geojson: t('map.dataSourceTypes.geojson'),
     shapefile: t('map.dataSourceTypes.shapefile'),
     csv: t('map.dataSourceTypes.csv'),
-    geotiff: t('map.dataSourceTypes.geotiff')
+    tif: t('map.dataSourceTypes.geotiff')
   }
   return types[type || ''] || t('map.dataSourceTypes.unknown')
 }
