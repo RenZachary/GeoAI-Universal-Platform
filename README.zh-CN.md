@@ -70,6 +70,8 @@ GeoAI-UP 自动：
 
 ## 🚀 核心功能
 
+> ⚠️ **注意**：本项目仍在积极开发中，部分功能可能不够完善或存在已知问题。欢迎通过 [Issue](https://gitee.com/rzcgis/geo-ai-universal-platform/issues) 反馈问题和建议。
+
 ### 智能 AI 助手
 - **目标拆分**：将复杂请求分解为可管理的子任务
 - **任务规划**：使用 LangGraph 状态机生成可执行工作流

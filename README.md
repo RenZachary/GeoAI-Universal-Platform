@@ -71,6 +71,8 @@ GeoAI-UP:
 
 ## 🚀 Features
 
+> ⚠️ **Note**: This project is under active development. Some features may be incomplete or have known issues. Feel free to report problems and suggestions via [Issues](https://gitee.com/rzcgis/geo-ai-universal-platform/issues).
+
 ### Intelligent AI Assistant
 - **Goal Splitting**: Breaks complex requests into manageable sub-tasks
 - **Task Planning**: Generates executable workflows using LangGraph state machines
