@@ -11,6 +11,7 @@ import type { DataAccessor } from '../interfaces';
 import * as shapefile from 'shapefile';
 import { DBFFile } from 'dbffile';
 import { GeoJSONBasedAccessor, type GeoJSONFeatureCollection } from './impl/geojson/GeoJSONBasedAccessor';
+import { tryMultipleEncodings } from '../../utils/ShapefileEncodingUtils';
 
 export class ShapefileAccessor extends GeoJSONBasedAccessor implements DataAccessor {
   readonly type = 'shapefile' as const;
@@ -52,19 +53,15 @@ export class ShapefileAccessor extends GeoJSONBasedAccessor implements DataAcces
   // ========================================================================
 
   protected async loadGeoJSON(reference: string): Promise<GeoJSONFeatureCollection> {
-    const source = await shapefile.open(reference.replace('.shp', ''));
+    // Use shared encoding utility for Chinese character support
+    const features = await tryMultipleEncodings(
+      async (encoding) => {
+        return await (shapefile as any).open(reference.replace('.shp', ''), undefined, { encoding });
+      },
+      reference,
+      (message) => console.log(`[ShapefileAccessor] ${message}`)
+    );
     
-    // Read all features from the shapefile
-    const features = [];
-    let result;
-    
-    while (!(result = await source.read()).done) {
-      if (result.value) {
-        features.push(result.value);
-      }
-    }
-    
-    // Return as FeatureCollection
     return {
       type: 'FeatureCollection',
       features: features

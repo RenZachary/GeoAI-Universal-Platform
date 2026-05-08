@@ -13,6 +13,7 @@ import type { DataSourceType, NativeData } from '../../core/index';
 import { DataAccessorFactory } from '../../data-access';
 import type Database from 'better-sqlite3';
 import { BaseMVTPublisher, type MVTPublishResult } from './base/BaseMVTPublisher';
+import { tryMultipleEncodings } from '../ShapefileEncodingUtils';
 import type { Pool } from 'pg';
 import { PostGISTileGenerator, type PostGISTileQuery } from './base/PostGISTileGenerator';
 import { PostGISConnectionParser } from '../../data-access';
@@ -263,18 +264,18 @@ class ShapefileMVTTStrategy implements MVTTileGenerationStrategy {
     await accessor.read(sourceReference);
     
     // The reference should point to a .shp file, we need to convert it to GeoJSON
-    // Since loadGeoJSON is protected, we'll use shapefile library directly
+    // Since loadGeoJSON is protected, we'll use shapefile library directly with shared encoding utility
     const shapefilePath = sourceReference.replace('.shp', '');
     const shapefileModule = await import('shapefile');
-    const source = await shapefileModule.open(shapefilePath);
     
-    const features = [];
-    let result;
-    while (!(result = await source.read()).done) {
-      if (result.value) {
-        features.push(result.value);
-      }
-    }
+    // Use shared encoding utility for Chinese character support
+    const features = await tryMultipleEncodings(
+      async (encoding) => {
+        return await (shapefileModule as any).open(shapefilePath, undefined, { encoding });
+      },
+      shapefilePath,
+      (message) => console.log(`[Shapefile MVT Strategy] ${message}`)
+    );
     
     const geojson = {
       type: 'FeatureCollection',
