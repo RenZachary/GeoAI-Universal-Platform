@@ -37,7 +37,7 @@ export interface GeoAIState {
 export interface AnalysisGoal {
   id: string;
   description: string;
-  type: 'visualization' | 'analysis' | 'query' | 'report';
+  type: 'visualization' | 'analysis' | 'query';
   requiredExecutors: string[]; // List of executor IDs needed for this goal
   priority: number;
   parameters?: Record<string, any>; // Optional extracted parameters (e.g., colorRamp, valueField)

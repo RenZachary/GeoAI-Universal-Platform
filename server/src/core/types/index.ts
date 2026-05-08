@@ -26,7 +26,6 @@ export const GOAL_TYPE_VALUES = [
   'spatial_analysis',
   'data_processing',
   'visualization',
-  'report',
   'general'
 ] as const;
 
@@ -78,7 +77,6 @@ export type DataSourceType =
   | 'tif'
   | 'mvt'
   | 'wms'
-  | 'report';
 
 /**
  * Field information - unified format for all vector data sources
@@ -160,7 +158,6 @@ export type PluginCategory =
   | 'analysis'      // Spatial analysis (buffer, overlay, etc.)
   | 'visualization' // Visualization generation
   | 'data_import'   // Data import/export
-  | 'report'        // Report generation
   | 'utility';      // Utility functions
 
 export interface ParameterSchema {
@@ -233,7 +230,7 @@ export interface AnalysisGoal {
   description: string;
   
   /** Goal type */
-  type: 'visualization' | 'analysis' | 'report' | 'query';
+  type: 'visualization' | 'analysis' | 'query';
   
   /** Associated data sources */
   dataSources?: string[];
