@@ -83,6 +83,15 @@ export class DataSourceRepository {
     const id = generateId();
     const now = new Date().toISOString();
 
+    // Validate fields format (strict check in development phase)
+    if (metadata.fields && !Array.isArray(metadata.fields)) {
+      throw new Error('metadata.fields must be an array of FieldInfo objects');
+    }
+    
+    if (metadata.fields && metadata.fields.length > 0 && typeof metadata.fields[0] === 'string') {
+      throw new Error('metadata.fields must use FieldInfo format: {name: string, type: string}');
+    }
+
     this.db.prepare(`
       INSERT INTO data_sources (id, name, type, reference, metadata, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -101,7 +110,7 @@ export class DataSourceRepository {
       name,
       type,
       reference,
-      metadata,
+      metadata: metadata as DataMetadata,
       createdAt: new Date(now),
       updatedAt: new Date(now),
     };

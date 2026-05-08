@@ -55,7 +55,7 @@ export interface UniformStyleConfig {
   strokeWidth?: number;        // for lines/polygons
   pointSize?: number;          // for points
   opacity?: number;
-  geometryType?: GeometryType; // auto-detected from metadata
+  geometryType?: string;       // auto-detected from metadata (Point, LineString, Polygon, etc.)
   minZoom?: number;
   maxZoom?: number;
 }
@@ -68,7 +68,7 @@ export interface CategoricalStyleConfig {
   colorScheme?: string;        // set1, set2, etc.
   customColors?: Record<string, string>; // optional custom mapping
   opacity?: number;
-  geometryType?: GeometryType;
+  geometryType?: string;
   minZoom?: number;
   maxZoom?: number;
 }
@@ -81,7 +81,7 @@ export interface ChoroplethStyleConfigNew {
   colorRamp: string;           // Changed from 'colors' to 'colorRamp'
   numClasses: number;
   opacity?: number;
-  geometryType?: GeometryType;
+  geometryType?: string;
   minZoom?: number;
   maxZoom?: number;
 }
@@ -288,7 +288,7 @@ export class StyleFactory {
 
     // Determine Mapbox layer type based on geometry
     const mapboxLayerType = geometryType 
-      ? GeometryAdapter.getMapboxLayerType(geometryType)
+      ? GeometryAdapter.getMapboxLayerType(geometryType as any)
       : 'fill'; // default to fill
 
     let layers: any[];
@@ -416,7 +416,7 @@ export class StyleFactory {
 
     // Determine Mapbox layer type
     const mapboxLayerType = geometryType 
-      ? GeometryAdapter.getMapboxLayerType(geometryType)
+      ? GeometryAdapter.getMapboxLayerType(geometryType as any)
       : 'fill';
 
     // Build match expression for categorical coloring

@@ -111,14 +111,20 @@ export interface DataMetadata {
   geometryType?: string
   featureCount?: number
   bbox?: [number, number, number, number]
-  fields?: FieldSchema[]
+  fields?: FieldInfo[]
+  fileSize?: number
   [key: string]: any
 }
 
-export interface FieldSchema {
+/**
+ * Field information - unified format for all vector data sources
+ */
+export interface FieldInfo {
+  /** Field name */
   name: string
+  
+  /** Field type (unified type system) */
   type: string
-  nullable?: boolean
 }
 
 // ============================================================================

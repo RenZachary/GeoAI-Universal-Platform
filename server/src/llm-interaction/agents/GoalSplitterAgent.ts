@@ -31,9 +31,24 @@ export class GoalSplitterAgent {
         'en-US'
       );
 
-      // Get all available executor IDs from Tool Registry
-      const availableExecutors = ToolRegistryInstance.getToolNames();
-      console.log(`[Goal Splitter] Available executors: ${availableExecutors.length}`);
+      // Get all available executor IDs from Tool Registry with descriptions
+      const plugins = ToolRegistryInstance.getAllPlugins();
+      const availableExecutorsInfo = plugins.map(plugin => ({
+        id: plugin.id,
+        name: plugin.name,
+        description: plugin.description,
+        capabilities: plugin.capabilities || []
+      }));
+      
+      console.log(`[Goal Splitter] Available executors: ${plugins.length}`);
+      
+      // Format for LLM: include ID, description, and key capabilities
+      const executorsForLLM = availableExecutorsInfo.map(info => {
+        const caps = info.capabilities.length > 0 
+          ? ` [Capabilities: ${info.capabilities.join(', ')}]`
+          : '';
+        return `${info.id}: ${info.description}${caps}`;
+      }).join('\n');
 
       // Define output schema for structured output
       const goalSchema = z.object({
@@ -57,7 +72,7 @@ export class GoalSplitterAgent {
       // Invoke with user input and available executors
       const goals = await chain.invoke({
         userInput: state.userInput,
-        availableExecutors: availableExecutors.join(', '),
+        availableExecutors: executorsForLLM,
         timestamp: new Date().toISOString()
       }) as AnalysisGoal[];
 

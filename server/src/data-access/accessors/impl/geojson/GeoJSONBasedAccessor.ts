@@ -61,7 +61,7 @@ export abstract class GeoJSONBasedAccessor {
       geometryType: geometryTypes.size === 1 ? Array.from(geometryTypes)[0] : 'Mixed',
       crs: this.extractCRS(geojson),
       bbox: this.calculateBbox(geojson),
-      fields: this.extractFields(geojson) as Array<{name: string; type: string}> | string[],
+      fields: this.extractFields(geojson), // Already returns FieldInfo[]
       sampleValues: this.extractSampleValues(geojson)
     };
   }

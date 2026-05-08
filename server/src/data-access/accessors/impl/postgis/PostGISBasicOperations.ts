@@ -3,7 +3,7 @@
  */
 
 import type { Pool } from 'pg';
-import type { NativeData, DataMetadata } from '../../../../core';
+import type { NativeData, DataMetadata, FieldInfo } from '../../../../core';
 import { generateId } from '../../../../core';
 import type { TableSchema, ColumnInfo, IndexInfo } from '../../../interfaces';
 
@@ -16,7 +16,7 @@ export class PostGISBasicOperations {
   async read(reference: string): Promise<NativeData> {
     try {
       let featureCount = 0;
-      let fields: string[] = [];
+      let fields: FieldInfo[] = [];
       let srid = 4326;
       let actualSchema = this.schema;
       let tableName = reference;
@@ -28,7 +28,7 @@ export class PostGISBasicOperations {
           `SELECT COUNT(*) as count FROM (${reference}) AS subquery`
         );
         featureCount = parseInt(countResult.rows[0].count);
-        fields = ['query_result'];
+        fields = [{ name: 'query_result', type: 'string' }];
       } else {
         // It's a table name - parse schema and table
         const parts = reference.split('.');
@@ -45,14 +45,17 @@ export class PostGISBasicOperations {
         );
         featureCount = parseInt(countResult.rows[0].count);
 
-        // Get column names
+        // Get column names and types
         const columnsResult = await this.pool.query(
-          `SELECT column_name FROM information_schema.columns 
+          `SELECT column_name, data_type FROM information_schema.columns 
            WHERE table_schema = $1 AND table_name = $2
            ORDER BY ordinal_position`,
           [actualSchema, tableName]
         );
-        fields = columnsResult.rows.map((row: any) => row.column_name as string);
+        fields = columnsResult.rows.map((row: any) => ({
+          name: row.column_name as string,
+          type: this.mapPostGISDataType(row.data_type)
+        }));
 
         // Get SRID from geometry_columns
         const sridResult = await this.pool.query(
@@ -294,5 +297,39 @@ export class PostGISBasicOperations {
     );
 
     return result.rows[0].exists;
+  }
+
+  /**
+   * Map PostGIS data types to unified field types
+   */
+  private mapPostGISDataType(postgisType: string): string {
+    const typeMap: Record<string, string> = {
+      'integer': 'number',
+      'bigint': 'number',
+      'smallint': 'number',
+      'numeric': 'number',
+      'decimal': 'number',
+      'real': 'number',
+      'double precision': 'number',
+      'float': 'number',
+      'text': 'string',
+      'character varying': 'string',
+      'varchar': 'string',
+      'char': 'string',
+      'character': 'string',
+      'boolean': 'boolean',
+      'bool': 'boolean',
+      'date': 'date',
+      'timestamp': 'date',
+      'timestamptz': 'date',
+      'time': 'date',
+      'json': 'object',
+      'jsonb': 'object',
+      'bytea': 'binary',
+      'uuid': 'string',
+      'USER-DEFINED': 'geometry' // PostGIS geometry types
+    };
+
+    return typeMap[postgisType.toLowerCase()] || 'string';
   }
 }

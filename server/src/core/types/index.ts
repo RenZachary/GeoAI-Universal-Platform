@@ -80,6 +80,17 @@ export type DataSourceType =
   | 'wms'
   | 'report';
 
+/**
+ * Field information - unified format for all vector data sources
+ */
+export interface FieldInfo {
+  /** Field name */
+  name: string;
+  
+  /** Field type (unified type system) */
+  type: string;
+}
+
 export interface DataMetadata {
   /** Coordinate reference system (e.g., EPSG:4326) */
   crs?: string;
@@ -93,11 +104,14 @@ export interface DataMetadata {
   /** Feature count (for vector data) */
   featureCount?: number;
   
-  /** Field/column names with type information */
-  fields?: Array<{name: string; type: string}> | string[];
+  /** Field information array (unified format) */
+  fields?: FieldInfo[];
   
   /** File size in bytes (for file-based data) */
   fileSize?: number;
+  
+  /** Geometry type (Point, LineString, Polygon, etc.) */
+  geometryType?: string;
   
   /** Additional custom metadata */
   [key: string]: any;

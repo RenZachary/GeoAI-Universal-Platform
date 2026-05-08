@@ -10,7 +10,7 @@ export const UniformColorRendererPlugin: Plugin = {
   id: 'uniform_color_renderer',
   name: 'Uniform Color Renderer',
   version: '1.0.0',
-  description: 'Renders all geographic features with a single uniform color. Supports point, line, and polygon geometries.',
+  description: 'Renders all geographic features with a single uniform color. Supports all geometry types.',
   category: 'visualization',
   
   inputSchema: [

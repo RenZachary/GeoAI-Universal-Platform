@@ -5,10 +5,11 @@
 
 import fs from 'fs';
 import path from 'path';
-import type { NativeData, DataMetadata } from '../../core';
+import type { NativeData, DataMetadata, FieldInfo } from '../../core';
 import { generateId } from '../../core';
 import type { DataAccessor } from '../interfaces';
 import * as shapefile from 'shapefile';
+import { DBFFile } from 'dbffile';
 import { GeoJSONBasedAccessor, type GeoJSONFeatureCollection } from './impl/geojson/GeoJSONBasedAccessor';
 
 export class ShapefileAccessor extends GeoJSONBasedAccessor implements DataAccessor {
@@ -124,40 +125,99 @@ export class ShapefileAccessor extends GeoJSONBasedAccessor implements DataAcces
     if (fs.existsSync(dbfPath)) totalSize += fs.statSync(dbfPath).size;
     if (fs.existsSync(prjPath)) totalSize += fs.statSync(prjPath).size;
     
-    // Read shapefile to extract feature count and fields
+    // Extract fields from DBF header (precise type information)
+    let fields: FieldInfo[] = [];
+    if (fs.existsSync(dbfPath)) {
+      try {
+        const dbf = await DBFFile.open(dbfPath);
+        fields = dbf.fields.map(field => ({
+          name: field.name.trim(),
+          type: this.mapDBFTypeToUnified(field.type, field.decimalPlaces || 0)
+        }));
+      } catch (error) {
+        console.warn(`[ShapefileAccessor] Failed to read DBF header for ${reference}:`, error instanceof Error ? error.message : 'Unknown error');
+        // DBF read failure - return empty fields array
+      }
+    }
+    
+    // Read shapefile to extract feature count and geometry type
     let featureCount = 0;
-    const fieldSet = new Set<string>();
+    let geometryType: string | undefined;
     
     try {
       const source = await shapefile.open(reference.replace('.shp', ''));
+      let result;
       
-      // Read all features to count and extract fields
-      let feature;
-      
-      while (!(feature = await source.read()).done) {
+      while (!(result = await source.read()).done) {
         featureCount++;
         
-        // Collect field names from properties
-        if (feature.value && feature.value.properties) {
-          Object.keys(feature.value.properties).forEach(key => {
-            fieldSet.add(key);
-          });
+        // Detect geometry type from first feature
+        if (!geometryType && result.value?.geometry?.type) {
+          geometryType = result.value.geometry.type;
         }
       }
-      
     } catch (error) {
-      console.warn(`Failed to read shapefile for metadata: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      // Continue with basic metadata if reading fails
+      console.warn(`[ShapefileAccessor] Failed to read shapefile features:`, error instanceof Error ? error.message : 'Unknown error');
     }
     
-    const metadata: DataMetadata = {
-      fileSize: totalSize,
-      crs: fs.existsSync(prjPath) ? 'EPSG:4326' : undefined,
-      featureCount,
-      fields: Array.from(fieldSet)
-    };
+    // Extract CRS from PRJ file
+    const crs = fs.existsSync(prjPath) 
+      ? this.extractCRSFromPRJ(prjPath)
+      : undefined;
     
-    return metadata;
+    return {
+      fileSize: totalSize,
+      crs,
+      featureCount,
+      geometryType,
+      fields  // Unified format: FieldInfo[]
+    };
+  }
+  
+  /**
+   * Map DBF field types to unified type system
+   */
+  private mapDBFTypeToUnified(dbfType: string, decimals: number): string {
+    switch (dbfType) {
+      case 'C': // Character
+      case 'M': // Memo
+        return 'string';
+      case 'N': // Numeric
+        // Has decimal places -> float, otherwise integer (both map to 'number')
+        return 'number';
+      case 'D': // Date
+        return 'date';
+      case 'L': // Logical
+        return 'boolean';
+      default:
+        console.warn(`[ShapefileAccessor] Unknown DBF type: ${dbfType}, defaulting to string`);
+        return 'string';
+    }
+  }
+  
+  /**
+   * Extract CRS from PRJ file by parsing WKT
+   */
+  private extractCRSFromPRJ(prjPath: string): string | undefined {
+    try {
+      const wkt = fs.readFileSync(prjPath, 'utf-8').trim();
+      
+      // Try to extract EPSG code from AUTHORITY["EPSG","XXXX"]
+      const epsgMatch = wkt.match(/AUTHORITY\["EPSG",["']?(\d+)["']?\]/i);
+      if (epsgMatch) {
+        return `EPSG:${epsgMatch[1]}`;
+      }
+      
+      // Fallback: recognize common projections
+      if (wkt.includes('WGS_1984') || wkt.includes('WGS84')) {
+        return 'EPSG:4326';
+      }
+      
+      return undefined;
+    } catch (error) {
+      console.warn(`[ShapefileAccessor] Failed to parse PRJ file:`, error instanceof Error ? error.message : 'Unknown error');
+      return undefined;
+    }
   }
   
   /**

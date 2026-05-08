@@ -159,13 +159,24 @@ export class DataSourceService {
 
     console.log(`[DataSourceService] Discovered ${tables.length} spatial tables across all schemas`);
 
-    // Step 4: Register each table as a data source
+    // Step 4: Register each table as a data source and calculate bbox asynchronously
     const connectionName = config.name || `PostGIS_${config.host}_${config.database}`;
     const registeredSources: RegisteredDataSource[] = [];
 
     for (const table of tables) {
+      // 4.1 Register data source immediately (without bbox)
       const dataSource = await this.registerTableAsDataSource(table, config, connectionName);
       registeredSources.push(dataSource);
+      
+      // 4.2 Calculate bbox asynchronously (non-blocking)
+      this.calculateAndPersistBboxAsync(
+        table.schema,
+        table.tableName,
+        table.geometryColumn,
+        dataSource.id
+      ).catch(err => {
+        console.error(`[DataSourceService] Bbox calculation failed for ${table.tableName}:`, err instanceof Error ? err.message : 'Unknown error');
+      });
     }
 
     // Step 5: Start cleanup scheduler for this connection
@@ -549,5 +560,130 @@ export class DataSourceService {
       geometryType: table.geometryType,
       rowCount: table.rowCount
     };
+  }
+
+  // ==========================================================================
+  // Private Methods - Bbox Calculation
+  // ==========================================================================
+
+  /**
+   * Calculate and persist bbox asynchronously
+   */
+  private async calculateAndPersistBboxAsync(
+    schema: string,
+    tableName: string,
+    geometryColumn: string,
+    dataSourceId: string
+  ): Promise<void> {
+    console.log(`[DataSourceService] Calculating bbox for ${schema}.${tableName}...`);
+    
+    // Calculate bbox with timeout control
+    const bbox = await this.calculateSpatialExtentWithTimeout(
+      schema,
+      tableName,
+      geometryColumn,
+      30000 // 30 seconds timeout
+    );
+    
+    // Persist to metadata
+    this.dataSourceRepo.updateMetadata(dataSourceId, { bbox });
+    
+    console.log(`[DataSourceService] Bbox persisted for ${schema}.${tableName}:`, bbox);
+  }
+
+  /**
+   * Calculate spatial extent with timeout control
+   */
+  private async calculateSpatialExtentWithTimeout(
+    schema: string,
+    tableName: string,
+    geometryColumn: string,
+    timeoutMs: number = 30000
+  ): Promise<[number, number, number, number]> {
+    // Timeout promise
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(
+        () => reject(new Error(`Bbox calculation timeout (${timeoutMs}ms)`)),
+        timeoutMs
+      );
+    });
+    
+    const calculationPromise = this.calculateSpatialExtent(schema, tableName, geometryColumn);
+    
+    try {
+      return await Promise.race([calculationPromise, timeoutPromise]);
+    } catch (error) {
+      console.warn(`[DataSourceService] Bbox calculation failed for ${schema}.${tableName}:`, error instanceof Error ? error.message : 'Unknown error');
+      // Return world extent as default
+      return [-180, -90, 180, 90];
+    }
+  }
+
+  /**
+   * Calculate spatial extent using ST_Extent
+   */
+  private async calculateSpatialExtent(
+    schema: string,
+    tableName: string,
+    geometryColumn: string
+  ): Promise<[number, number, number, number]> {
+    // First get row count to decide strategy
+    const accessor = this.accessorFactory.createAccessor('postgis');
+    
+    const countQuery = `SELECT COUNT(*) as count FROM "${schema}"."${tableName}"`;
+    const countResult = await (accessor as any).executeRaw(countQuery);
+    const rowCount = parseInt(countResult.rows[0].count, 10);
+    
+    let extent: string;
+    
+    if (rowCount > 10_000_000) {
+      // Large table: use 1% sampling
+      console.log(`[DataSourceService] Using sampling for large table ${schema}.${tableName} (${rowCount} rows)`);
+      const sampleQuery = `
+        SELECT ST_Extent(geom) as extent FROM (
+          SELECT "${geometryColumn}" as geom
+          FROM "${schema}"."${tableName}"
+          TABLESAMPLE SYSTEM(1)
+        ) AS sample
+      `;
+      const result = await (accessor as any).executeRaw(sampleQuery);
+      extent = result.rows[0]?.extent;
+    } else {
+      // Regular table: exact calculation
+      const query = `
+        SELECT ST_Extent("${geometryColumn}") as extent
+        FROM "${schema}"."${tableName}"
+        WHERE "${geometryColumn}" IS NOT NULL
+      `;
+      const result = await (accessor as any).executeRaw(query);
+      extent = result.rows[0]?.extent;
+    }
+    
+    if (!extent) {
+      console.warn(`[DataSourceService] No spatial extent for ${schema}.${tableName}`);
+      return [-180, -90, 180, 90];
+    }
+    
+    // Parse "BOX(xmin ymin,xmax ymax)" format
+    return this.parseBoxExtent(extent);
+  }
+
+  /**
+   * Parse BOX extent format
+   */
+  private parseBoxExtent(extent: string): [number, number, number, number] {
+    // Format: BOX(xmin ymin,xmax ymax)
+    const match = extent.match(/BOX\(([\d.eE+-]+)\s+([\d.eE+-]+),([\d.eE+-]+)\s+([\d.eE+-]+)\)/);
+    
+    if (!match) {
+      throw new Error(`Invalid extent format: ${extent}`);
+    }
+    
+    return [
+      parseFloat(match[1]), // minX
+      parseFloat(match[2]), // minY
+      parseFloat(match[3]), // maxX
+      parseFloat(match[4])  // maxY
+    ];
   }
 }
