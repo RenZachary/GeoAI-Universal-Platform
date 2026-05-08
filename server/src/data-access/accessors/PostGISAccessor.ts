@@ -72,7 +72,8 @@ export class PostGISAccessor implements DatabaseAccessor {
    */
   async read(reference: string): Promise<NativeData> {
     await this.initOperations();
-    return this.basicOps!.read(reference);
+    if (!this.basicOps) return {} as NativeData;
+    return this.basicOps?.read(reference);
   }
   
   /**
@@ -80,7 +81,8 @@ export class PostGISAccessor implements DatabaseAccessor {
    */
   async write(data: unknown, metadata?: Partial<DataMetadata>): Promise<string> {
     await this.initOperations();
-    return this.basicOps!.write(data, metadata);
+    if (!this.basicOps) return '';
+    return this.basicOps.write(data, metadata);
   }
   
   /**
@@ -88,7 +90,7 @@ export class PostGISAccessor implements DatabaseAccessor {
    */
   async delete(reference: string): Promise<void> {
     await this.initOperations();
-    return this.basicOps!.delete(reference);
+    return this.basicOps?.delete(reference);
   }
   
   /**
@@ -104,7 +106,8 @@ export class PostGISAccessor implements DatabaseAccessor {
    */
   async validate(reference: string): Promise<boolean> {
     await this.initOperations();
-    return this.basicOps!.validate(reference);
+    if (!this.basicOps) return false;
+    return this.basicOps.validate(reference);
   }
   
   /**

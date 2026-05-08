@@ -111,82 +111,6 @@ export class StyleFactory {
   }
 
   /**
-   * Generate choropleth (thematic) map style - DEPRECATED
-   * Use generateChoroplethStyle(config: ChoroplethStyleConfigNew) instead
-   * @deprecated This method will be removed in future versions
-   */
-  static generateChoroplethStyleOld(config: ChoroplethStyleConfig): MapboxStyle {
-    const {
-      tilesetId,
-      layerName,
-      valueField,
-      breaks,
-      colors,
-      minZoom = 0,
-      maxZoom = 22,
-      opacity = 0.8
-    } = config;
-
-    // Validate inputs
-    if (breaks.length !== colors.length && breaks.length !== colors.length + 1) {
-      throw new Error('Breaks and colors length mismatch. Colors should be either equal to breaks or breaks - 1');
-    }
-
-    // Build interpolate expression for fill-color
-    const interpolateExpr = this.buildInterpolateExpression(valueField, breaks, colors);
-
-    const style: MapboxStyle = {
-      version: 8,
-      sources: {
-        [tilesetId]: {
-          type: 'vector',
-          tiles: [`/api/services/mvt/${tilesetId}/{z}/{x}/{y}.pbf`],
-          minzoom: minZoom,
-          maxzoom: maxZoom
-        }
-      },
-      layers: [
-        {
-          id: `${layerName}-fill`,
-          type: 'fill',
-          source: tilesetId,
-          // Use 'default' as source-layer to match geojson-vt configuration
-          'source-layer': 'default',
-          minzoom: minZoom,
-          maxzoom: maxZoom,
-          paint: {
-            'fill-color': interpolateExpr,
-            'fill-opacity': opacity
-          }
-        },
-        {
-          id: `${layerName}-outline`,
-          type: 'line',
-          source: tilesetId,
-          // Use 'default' as source-layer to match geojson-vt configuration
-          'source-layer': 'default',
-          minzoom: minZoom,
-          maxzoom: maxZoom,
-          paint: {
-            'line-color': '#ffffff',
-            'line-width': 1,
-            'line-opacity': 0.5
-          }
-        }
-      ],
-      metadata: {
-        type: 'choropleth',
-        valueField,
-        breaks,
-        colors,
-        generatedAt: new Date().toISOString()
-      }
-    };
-
-    return style;
-  }
-
-  /**
    * Generate heatmap style
    */
   static generateHeatmapStyle(config: HeatmapStyleConfig): MapboxStyle {
@@ -324,19 +248,6 @@ export class StyleFactory {
     
     // Return API-accessible URL path
     return `/api/results/styles/${filename}`;
-  }
-
-  /**
-   * Generate and save choropleth style in one step - DEPRECATED
-   * @deprecated Use generateChoroplethStyle(config: ChoroplethStyleConfigNew) directly instead
-   */
-  static createAndSaveChoroplethStyleOld(
-    config: ChoroplethStyleConfig,
-    filename?: string
-  ): string {
-    const style = this.generateChoroplethStyleOld(config);
-    const defaultFilename = `choropleth_${config.tilesetId}.json`;
-    return this.saveStyle(style, filename || defaultFilename);
   }
 
   /**
