@@ -46,7 +46,7 @@
     <main class="chat-main">
       <el-splitter style="height: 100%">
         <!-- Left Panel: Chat -->
-        <el-splitter-panel min="300" size="40%">
+        <el-splitter-panel min="300">
           <div class="chat-panel">
             <!-- Workflow Status Indicator -->
             <WorkflowStatusIndicator :status="chatStore.workflowStatus" :active-tools="chatStore.activeTools" />
@@ -115,7 +115,7 @@
         </el-splitter-panel>
 
         <!-- Right Panel: Map -->
-        <el-splitter-panel min="30%">
+        <el-splitter-panel min="300">
           <div class="map-panel">
             <MapWorkspace />
           </div>
