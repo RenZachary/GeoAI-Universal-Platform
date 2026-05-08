@@ -226,11 +226,11 @@ export interface AnalysisGoal {
   /** Goal identifier */
   id: string;
   
-  /** Goal description */
+  /** Goal description in natural language */
   description: string;
   
-  /** Goal type */
-  type: 'visualization' | 'analysis' | 'query';
+  /** Priority level (1-10) */
+  priority?: number;
   
   /** Associated data sources */
   dataSources?: string[];

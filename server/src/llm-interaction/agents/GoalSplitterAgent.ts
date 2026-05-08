@@ -54,8 +54,6 @@ export class GoalSplitterAgent {
       const goalSchema = z.object({
         id: z.string().describe('Unique identifier for the goal'),
         description: z.string().describe('Detailed description of what to accomplish in natural language'),
-        type: z.enum(['visualization', 'analysis', 'query', 'report']).describe('The category of the goal'),
-        requiredExecutors: z.array(z.string()).describe('List of executor IDs needed to accomplish this goal'),
         priority: z.number().min(1).max(10).describe('Priority level (1-10)')
       });
 
@@ -89,10 +87,8 @@ export class GoalSplitterAgent {
       
       // Fallback: Create a single generic goal
       const fallbackGoal: AnalysisGoal = {
-        type: 'visualization',
         id: `goal_${Date.now()}`,
         description: state.userInput,
-        requiredExecutors: [],  // Empty - let Task Planner figure it out
         priority: 5
       };
 

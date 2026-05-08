@@ -82,23 +82,15 @@ export class TaskPlannerAgent {
       // Plan each goal in parallel
       const planPromises = state.goals.map(async (goal) => {
         try {
-          // STAGE 1: Determine compatible plugins
+          // STAGE 1: Determine compatible plugins using capability-based filtering
           console.log(`[Task Planner] Stage 1: Processing goal ${goal.id}`);
-          console.log(`[Task Planner] Required executors from Goal Splitter:`, goal.requiredExecutors);
+          console.log(`[Task Planner] Goal description:`, goal.description);
 
           let compatiblePluginIds: string[] = [];
 
-          // Option A: Use required executors from Goal Splitter if provided
-          if (goal.requiredExecutors && goal.requiredExecutors.length > 0) {
-            compatiblePluginIds = goal.requiredExecutors;
-            console.log(`[Task Planner] Using executors from Goal Splitter:`, compatiblePluginIds);
-          } 
-          // Option B: Fallback to capability-based filtering
-          else {
-            console.log(`[Task Planner] No executors from Goal Splitter, using capability-based filtering`);
-            compatiblePluginIds = this.filterPluginsByGoalType(goal);
-            console.log(`[Task Planner] Capability filtering found ${compatiblePluginIds.length} candidates:`, compatiblePluginIds);
-          }
+          // Use capability-based filtering to find candidate plugins
+          compatiblePluginIds = this.filterPluginsByGoalDescription(goal);
+          console.log(`[Task Planner] Capability filtering found ${compatiblePluginIds.length} candidates:`, compatiblePluginIds);
 
           // If still no compatible plugins found, create fallback plan
           if (compatiblePluginIds.length === 0) {
@@ -146,7 +138,6 @@ export class TaskPlannerAgent {
           // STAGE 2: LLM-based selection from filtered candidates
           const plan = await chain.invoke({
             goalId: goal.id,
-            goalType: goal.type || 'query', // Default to query if type is missing
             goalDescription: goal.description,
             availableTools: JSON.stringify(compatibleTools, null, 2),
             dataSourcesMetadata,
@@ -169,9 +160,16 @@ export class TaskPlannerAgent {
             console.log(`[Task Planner] Deduplicated steps:`, deduplicatedPlan.steps.map(s => s.pluginId));
           }
 
+          // STAGE 2.6: Ensure stepId global uniqueness by adding goalId prefix if missing
+          const uniqueStepIdPlan = this.ensureUniqueStepIds(deduplicatedPlan);
+          if (uniqueStepIdPlan !== deduplicatedPlan) {
+            console.log(`[Task Planner] Fixed stepId uniqueness for goal ${goal.id}`);
+            console.log(`[Task Planner] Updated stepIds:`, uniqueStepIdPlan.steps.map(s => s.stepId));
+          }
+
           // STAGE 3: Validate terminal node constraints
           console.log(`[Task Planner] Stage 3: Validating terminal node constraints for goal ${goal.id}`);
-          const validatedPlan = this.validateTerminalNodeConstraints(deduplicatedPlan, compatiblePluginIds);
+          const validatedPlan = this.validateTerminalNodeConstraints(uniqueStepIdPlan, compatiblePluginIds);
 
           if (!validatedPlan) {
             console.warn(`[Task Planner] Plan failed terminal node validation, creating fallback`);
@@ -335,22 +333,120 @@ export class TaskPlannerAgent {
   }
 
   /**
-   * Filter plugins based on goal type and description using PluginCapabilityRegistry
-   * This is the fallback when Goal Splitter doesn't provide requiredExecutors
+   * Ensure stepId global uniqueness by adding goalId prefix if missing
+   * This is a defensive measure to prevent stepId collisions across different goals
    */
-  private filterPluginsByGoalType(goal: any): string[] {
-    console.log(`[Task Planner] Filtering plugins for goal type: ${goal.type}`);
-    
-    // Map goal types to execution categories
-    const categoryMap: Record<string, Array<'computational' | 'statistical' | 'visualization' | 'textual'>> = {
-      'visualization': ['visualization'],
-      'analysis': ['computational', 'statistical'],
-      'data_processing': ['statistical', 'computational'],
-      'query': ['statistical'],
-      'report': ['textual']
+  private ensureUniqueStepIds(plan: ExecutionPlan): ExecutionPlan {
+    if (!plan || !plan.steps || plan.steps.length === 0) {
+      return plan;
+    }
+
+    const goalId = plan.goalId;
+    let needsFixing = false;
+
+    // Check if any stepId is missing the goalId prefix
+    const fixedSteps = plan.steps.map(step => {
+      // If stepId already starts with goalId, keep it as is
+      if (step.stepId.startsWith(`${goalId}_`)) {
+        return step;
+      }
+
+      // Otherwise, add the prefix
+      needsFixing = true;
+      const newStepId = `${goalId}_${step.stepId}`;
+      
+      console.log(`[Task Planner] Fixing stepId: "${step.stepId}" -> "${newStepId}"`);
+
+      // Also update dependsOn references if they exist
+      const fixedDependsOn = step.dependsOn?.map(depId => {
+        // If dependency already has a goal prefix, keep it
+        if (depId.includes('_') && !depId.startsWith(goalId)) {
+          return depId; // Assume it's from another goal, keep as is
+        }
+        // Otherwise, add current goal's prefix
+        return depId.startsWith(goalId) ? depId : `${goalId}_${depId}`;
+      });
+
+      return {
+        ...step,
+        stepId: newStepId,
+        dependsOn: fixedDependsOn
+      };
+    });
+
+    if (!needsFixing) {
+      return plan; // No changes needed
+    }
+
+    return {
+      ...plan,
+      steps: fixedSteps
     };
+  }
+
+  /**
+   * Filter plugins based on goal description using keyword analysis and PluginCapabilityRegistry
+   * This method intelligently infers required plugin categories from natural language description
+   */
+  private filterPluginsByGoalDescription(goal: any): string[] {
+    console.log(`[Task Planner] Filtering plugins for goal: ${goal.id}`);
+    console.log(`[Task Planner] Goal description:`, goal.description);
     
-    const expectedCategories = categoryMap[goal.type] || ['visualization'];
+    const description = goal.description.toLowerCase();
+    const expectedCategories: Array<'computational' | 'statistical' | 'visualization' | 'textual'> = [];
+    
+    // Keyword-based category inference
+    // Computational operations
+    if (description.includes('buffer') || 
+        description.includes('calculate') || 
+        description.includes('compute') ||
+        description.includes('intersect') ||
+        description.includes('overlay') ||
+        description.includes('clip') ||
+        description.includes('merge')) {
+      expectedCategories.push('computational');
+    }
+    
+    // Statistical operations
+    if (description.includes('count') || 
+        description.includes('sum') || 
+        description.includes('average') ||
+        description.includes('statistics') ||
+        description.includes('aggregate') ||
+        description.includes('group by')) {
+      expectedCategories.push('statistical');
+    }
+    
+    // Visualization operations
+    if (description.includes('display') || 
+        description.includes('show') || 
+        description.includes('map') ||
+        description.includes('render') ||
+        description.includes('visualize') ||
+        description.includes('plot') ||
+        description.includes('chart') ||
+        description.includes('color') ||
+        description.includes('red') ||
+        description.includes('blue') ||
+        description.includes('green')) {
+      expectedCategories.push('visualization');
+    }
+    
+    // Textual operations
+    if (description.includes('report') || 
+        description.includes('summary') || 
+        description.includes('describe') ||
+        description.includes('explain')) {
+      expectedCategories.push('textual');
+    }
+    
+    // Default to all categories if no keywords matched
+    if (expectedCategories.length === 0) {
+      console.log(`[Task Planner] No specific keywords found, using all categories`);
+      expectedCategories.push('computational', 'statistical', 'visualization', 'textual');
+    }
+    
+    console.log(`[Task Planner] Inferred categories:`, expectedCategories);
     
     // Try each category and collect matching plugins
     const allMatchingPlugins: string[] = [];
@@ -358,7 +454,7 @@ export class TaskPlannerAgent {
     for (const category of expectedCategories) {
       const matches = PluginCapabilityRegistry.filterByCapability({
         expectedCategory: category,
-        isTerminalAllowed: goal.type === 'visualization' // Only allow terminal nodes for visualization goals
+        isTerminalAllowed: true // Allow terminal nodes for all goals
       });
       allMatchingPlugins.push(...matches);
     }
