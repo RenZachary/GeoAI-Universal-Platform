@@ -16,6 +16,52 @@ export const SUPPORTED_ENCODINGS = ['GBK', 'GB2312', 'UTF-8', 'windows-1252'] as
 export type SupportedEncoding = typeof SUPPORTED_ENCODINGS[number];
 
 /**
+ * Check if a string contains mojibake (encoding corruption)
+ * Specifically detects GBK/GB2312 bytes misinterpreted as UTF-8
+ */
+function detectMojibake(value: string): boolean {
+  // When GBK-encoded Chinese text is misinterpreted as UTF-8,
+  // it creates unusual character combinations that are rare in normal Chinese text.
+  
+  // Strategy: Check for non-CJK characters mixed with CJK
+  // Real Chinese text should only contain:
+  // - CJK Unified Ideographs (U+4E00-U+9FFF)
+  // - CJK punctuation and symbols (U+3000-U+303F, U+FF00-U+FFEF)
+  // - Basic Latin (U+0020-U+007E) for numbers, letters, etc.
+  
+  let nonCjkCount = 0;
+  let cjkCount = 0;
+  
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    
+    // Skip ASCII characters (common in Chinese text)
+    if (code >= 0x0020 && code <= 0x007E) continue;
+    
+    // Count CJK characters
+    if ((code >= 0x4E00 && code <= 0x9FFF) ||  // CJK Unified Ideographs
+        (code >= 0x3400 && code <= 0x4DBF) ||  // CJK Extension A
+        (code >= 0x20000 && code <= 0x2A6DF) || // CJK Extension B
+        (code >= 0x3000 && code <= 0x303F) ||  // CJK punctuation
+        (code >= 0xFF00 && code <= 0xFFEF)) {   // Full-width forms
+      cjkCount++;
+    } else {
+      // Non-CJK, non-ASCII character - suspicious
+      nonCjkCount++;
+    }
+  }
+  
+  const totalChars = cjkCount + nonCjkCount;
+  
+  // If more than 10% of non-ASCII chars are non-CJK, likely mojibake
+  if (totalChars > 0 && nonCjkCount / totalChars > 0.1) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
  * Validate if string properties are properly encoded
  * Checks for common signs of encoding errors
  * 
@@ -42,14 +88,11 @@ export function validateStringEncoding(features: FeatureWithProperties[]): boole
         
         // Check for signs of encoding errors:
         // 1. Replacement character (U+FFFD)
-        // 2. Mojibake patterns (common UTF-8 bytes interpreted as Latin-1)
+        // 2. Mojibake patterns (GBK/GB2312 misinterpreted as UTF-8)
         // 3. Unusual control characters in text fields
         
         const hasReplacementChar = value.includes('\ufffd');
-        
-        // Detect mojibake: sequences like "Ã¤", "Ã¥", "Ã¶" which indicate UTF-8 decoded as Latin-1
-        const hasMojibake = /[\xc0-\xff][\x80-\xbf]/.test(value) && 
-                           !/[\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f]/.test(value); // Not valid CJK
+        const isMojibake = detectMojibake(value);
         
         // Check for excessive non-printable characters (except common whitespace)
         // Count control characters by checking char codes directly
@@ -63,7 +106,7 @@ export function validateStringEncoding(features: FeatureWithProperties[]): boole
         }
         const hasExcessiveControlChars = nonPrintableCount > value.length * 0.1; // More than 10%
         
-        if (hasReplacementChar || hasMojibake || hasExcessiveControlChars) {
+        if (hasReplacementChar || isMojibake || hasExcessiveControlChars) {
           suspiciousStrings++;
         }
       }
