@@ -82,22 +82,27 @@ export class TaskPlannerAgent {
       // Plan each goal in parallel
       const planPromises = state.goals.map(async (goal) => {
         try {
-          // STAGE 1: Use required executors from goal (no filtering needed)
+          // STAGE 1: Determine compatible plugins
           console.log(`[Task Planner] Stage 1: Processing goal ${goal.id}`);
-          console.log(`[Task Planner] Required executors:`, goal.requiredExecutors);
+          console.log(`[Task Planner] Required executors from Goal Splitter:`, goal.requiredExecutors);
 
-          // Use the required executors directly - no category filtering
-          const compatiblePluginIds = goal.requiredExecutors || [];
+          let compatiblePluginIds: string[] = [];
 
-          if (compatiblePluginIds.length === 0) {
-            console.warn(`[Task Planner] No executors specified for goal ${goal.id}`);
+          // Option A: Use required executors from Goal Splitter if provided
+          if (goal.requiredExecutors && goal.requiredExecutors.length > 0) {
+            compatiblePluginIds = goal.requiredExecutors;
+            console.log(`[Task Planner] Using executors from Goal Splitter:`, compatiblePluginIds);
+          } 
+          // Option B: Fallback to capability-based filtering
+          else {
+            console.log(`[Task Planner] No executors from Goal Splitter, using capability-based filtering`);
+            compatiblePluginIds = this.filterPluginsByGoalType(goal);
+            console.log(`[Task Planner] Capability filtering found ${compatiblePluginIds.length} candidates:`, compatiblePluginIds);
           }
 
-          console.log(`[Task Planner] Stage 1: Found ${compatiblePluginIds.length} required executors:`, compatiblePluginIds);
-
-          // If no compatible plugins found, create fallback plan
+          // If still no compatible plugins found, create fallback plan
           if (compatiblePluginIds.length === 0) {
-            console.warn(`[Task Planner] No compatible plugins found for goal ${goal.id}`);
+            console.warn(`[Task Planner] No compatible plugins found for goal ${goal.id}, creating empty plan`);
             const fallbackPlan: ExecutionPlan = {
               goalId: goal.id,
               steps: [],
@@ -105,6 +110,8 @@ export class TaskPlannerAgent {
             };
             return [goal.id, fallbackPlan] as const;
           }
+
+          console.log(`[Task Planner] Stage 1: Final candidate count: ${compatiblePluginIds.length}`);
 
           // Filter tools to only include compatible ones
           const compatibleTools = allTools.filter(tool =>
@@ -325,6 +332,42 @@ export class TaskPlannerAgent {
     }).join('\n\n');
 
     return `Available Data Sources (${dataSources.length}):\n\n${formatted}`;
+  }
+
+  /**
+   * Filter plugins based on goal type and description using PluginCapabilityRegistry
+   * This is the fallback when Goal Splitter doesn't provide requiredExecutors
+   */
+  private filterPluginsByGoalType(goal: any): string[] {
+    console.log(`[Task Planner] Filtering plugins for goal type: ${goal.type}`);
+    
+    // Map goal types to execution categories
+    const categoryMap: Record<string, Array<'computational' | 'statistical' | 'visualization' | 'textual'>> = {
+      'visualization': ['visualization'],
+      'analysis': ['computational', 'statistical'],
+      'data_processing': ['statistical', 'computational'],
+      'query': ['statistical'],
+      'report': ['textual']
+    };
+    
+    const expectedCategories = categoryMap[goal.type] || ['visualization'];
+    
+    // Try each category and collect matching plugins
+    const allMatchingPlugins: string[] = [];
+    
+    for (const category of expectedCategories) {
+      const matches = PluginCapabilityRegistry.filterByCapability({
+        expectedCategory: category,
+        isTerminalAllowed: goal.type === 'visualization' // Only allow terminal nodes for visualization goals
+      });
+      allMatchingPlugins.push(...matches);
+    }
+    
+    // Remove duplicates
+    const uniquePlugins = [...new Set(allMatchingPlugins)];
+    
+    console.log(`[Task Planner] Filtered to ${uniquePlugins.length} plugins:`, uniquePlugins);
+    return uniquePlugins;
   }
 
   /**
