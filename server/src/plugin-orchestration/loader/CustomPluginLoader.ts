@@ -246,7 +246,7 @@ export class CustomPluginLoader {
     }
     
     // Validate category is valid
-    const validCategories: PluginCategory[] = ['analysis', 'visualization', 'data_import', 'report', 'utility'];
+    const validCategories: PluginCategory[] = ['analysis', 'visualization', 'data_import', 'utility'];
     if (!validCategories.includes(manifest.category as PluginCategory)) {
       throw new Error(`Invalid category: ${manifest.category}. Must be one of: ${validCategories.join(', ')}`);
     }
