@@ -18,6 +18,7 @@ import { SummaryGenerator } from './SummaryGenerator';
 import { reportDecisionNode } from './nodes/ReportDecisionNode';
 import { SQLiteManagerInstance } from '../../storage/';
 import { resolvePlaceholders } from './PlaceholderResolver';
+import { VirtualDataSourceManagerInstance } from '../../data-access/managers/VirtualDataSourceManager';
 
 // State interface for the GeoAI workflow
 export interface GeoAIState {
@@ -258,6 +259,21 @@ export function createGeoAIGraph(
               };
               
               executionResults.set(step.stepId, analysisResult);
+              
+              // Register virtual data source for cross-step reference
+              if (parsedResult.success && parsedResult.resultId) {
+                VirtualDataSourceManagerInstance.register({
+                  id: parsedResult.resultId,
+                  conversationId: state.conversationId,
+                  stepId: step.stepId,
+                  data: {
+                    id: parsedResult.resultId,
+                    type: parsedResult.type || 'geojson',
+                    reference: parsedResult.reference || '',
+                    metadata: parsedResult.metadata || {}
+                  } as any
+                });
+              }
               
             } catch (error) {
               console.error(`[Plugin Executor] Step ${step.stepId} failed:`, error);

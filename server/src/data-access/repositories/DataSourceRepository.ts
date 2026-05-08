@@ -6,6 +6,7 @@
 import type Database from 'better-sqlite3';
 import type { DataSourceType, DataMetadata } from '../../core';
 import { generateId } from '../../core';
+import { VirtualDataSourceManagerInstance } from '../managers/VirtualDataSourceManager';
 
 export interface DataSourceRecord {
   id: string;
@@ -53,8 +54,27 @@ export class DataSourceRepository {
 
   /**
    * Get data source by ID
+   * First checks virtual data sources (temporary results), then falls back to database
    */
   getById(id: string): DataSourceRecord | null {
+    // Step 1: Check virtual data sources first
+    const virtualDs = VirtualDataSourceManagerInstance.getById(id);
+    
+    if (virtualDs) {
+      console.log(`[DataSourceRepository] Found virtual data source: ${id}`);
+      // Convert VirtualDataSource to DataSourceRecord format
+      return {
+        id: virtualDs.id,
+        name: virtualDs.name,
+        type: virtualDs.type as any,
+        reference: virtualDs.reference,
+        metadata: virtualDs.nativeData.metadata || {},
+        createdAt: virtualDs.createdAt,
+        updatedAt: virtualDs.createdAt
+      };
+    }
+
+    // Step 2: Fall back to database
     const row = this.db.prepare(`
       SELECT id, name, type, reference, metadata, created_at, updated_at
       FROM data_sources

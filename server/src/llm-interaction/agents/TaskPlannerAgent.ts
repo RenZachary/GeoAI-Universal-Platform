@@ -392,59 +392,10 @@ export class TaskPlannerAgent {
     console.log(`[Task Planner] Filtering plugins for goal: ${goal.id}`);
     console.log(`[Task Planner] Goal description:`, goal.description);
     
-    const description = goal.description.toLowerCase();
+    // const description = goal.description.toLowerCase();
     const expectedCategories: Array<'computational' | 'statistical' | 'visualization' | 'textual'> = [];
     
-    // Keyword-based category inference
-    // Computational operations
-    if (description.includes('buffer') || 
-        description.includes('calculate') || 
-        description.includes('compute') ||
-        description.includes('intersect') ||
-        description.includes('overlay') ||
-        description.includes('clip') ||
-        description.includes('merge')) {
-      expectedCategories.push('computational');
-    }
-    
-    // Statistical operations
-    if (description.includes('count') || 
-        description.includes('sum') || 
-        description.includes('average') ||
-        description.includes('statistics') ||
-        description.includes('aggregate') ||
-        description.includes('group by')) {
-      expectedCategories.push('statistical');
-    }
-    
-    // Visualization operations
-    if (description.includes('display') || 
-        description.includes('show') || 
-        description.includes('map') ||
-        description.includes('render') ||
-        description.includes('visualize') ||
-        description.includes('plot') ||
-        description.includes('chart') ||
-        description.includes('color') ||
-        description.includes('red') ||
-        description.includes('blue') ||
-        description.includes('green')) {
-      expectedCategories.push('visualization');
-    }
-    
-    // Textual operations
-    if (description.includes('report') || 
-        description.includes('summary') || 
-        description.includes('describe') ||
-        description.includes('explain')) {
-      expectedCategories.push('textual');
-    }
-    
-    // Default to all categories if no keywords matched
-    if (expectedCategories.length === 0) {
-      console.log(`[Task Planner] No specific keywords found, using all categories`);
-      expectedCategories.push('computational', 'statistical', 'visualization', 'textual');
-    }
+    expectedCategories.push('computational', 'statistical', 'visualization', 'textual');
     
     console.log(`[Task Planner] Inferred categories:`, expectedCategories);
     

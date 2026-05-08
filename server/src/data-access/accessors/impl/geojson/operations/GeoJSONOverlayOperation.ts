@@ -25,11 +25,29 @@ export class GeoJSONOverlayOperation {
             let result: any = null;
 
             switch (options.operation) {
-              case 'intersect':
-                if ((turf as any).booleanIntersects(feature1, feature2)) {
-                  result = (turf as any).intersect(feature1, feature2);
+              case 'intersect': {
+                // Check geometry types and use appropriate Turf.js function
+                const geom1Type = feature1.geometry.type;
+                const geom2Type = feature2.geometry.type;
+                
+                // For Point-Polygon intersection, use booleanPointInPolygon
+                if ((geom1Type === 'Point' && (geom2Type === 'Polygon' || geom2Type === 'MultiPolygon')) ||
+                    (geom2Type === 'Point' && (geom1Type === 'Polygon' || geom1Type === 'MultiPolygon'))) {
+                  const point = geom1Type === 'Point' ? feature1 : feature2;
+                  const polygon = geom1Type === 'Point' ? feature2 : feature1;
+                  
+                  if ((turf as any).booleanPointInPolygon(point, polygon)) {
+                    // Return the point as the intersection result
+                    result = point;
+                  }
+                } else {
+                  // For Polygon-Polygon or other combinations, use intersect
+                  if ((turf as any).booleanIntersects(feature1, feature2)) {
+                    result = (turf as any).intersect(feature1, feature2);
+                  }
                 }
                 break;
+              }
               case 'union':
                 result = (turf as any).union(feature1, feature2);
                 break;

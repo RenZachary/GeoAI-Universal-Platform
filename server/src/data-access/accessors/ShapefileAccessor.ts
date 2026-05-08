@@ -53,6 +53,23 @@ export class ShapefileAccessor extends GeoJSONBasedAccessor implements DataAcces
   // ========================================================================
 
   protected async loadGeoJSON(reference: string): Promise<GeoJSONFeatureCollection> {
+    // Check if the reference is already a GeoJSON file
+    if (reference.endsWith('.geojson') || reference.endsWith('.json')) {
+      // For GeoJSON files, read and parse directly
+      const content = fs.readFileSync(reference, 'utf-8');
+      const geojson = JSON.parse(content);
+      
+      // Ensure it's a FeatureCollection
+      if (geojson.type === 'Feature') {
+        return {
+          type: 'FeatureCollection',
+          features: [geojson]
+        };
+      }
+      return geojson;
+    }
+    
+    // For Shapefile, use shapefile library with encoding detection
     // Use shared encoding utility for Chinese character support
     const features = await tryMultipleEncodings(
       async (encoding) => {

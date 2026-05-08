@@ -8,6 +8,7 @@ import { compileGeoAIGraph } from '../../llm-interaction';
 import { GeoAIStreamingHandler } from '../../llm-interaction';
 import type { LLMConfig } from '../../llm-interaction';
 import type { ConversationService } from '../../services';
+import { VirtualDataSourceManagerInstance } from '../../data-access/managers/VirtualDataSourceManager';
 
 export class ChatController {
   private llmConfig: LLMConfig;
@@ -161,6 +162,9 @@ export class ChatController {
       if (finalServices && finalServices.length > 0) {
         this.conversationService.saveServicesToLastMessage(convId, finalServices);
       }
+
+      // Clean up virtual data sources for this conversation
+      VirtualDataSourceManagerInstance.cleanup(convId);
 
       res.end();
       console.log(`[Chat API] Conversation completed: ${convId}`);
