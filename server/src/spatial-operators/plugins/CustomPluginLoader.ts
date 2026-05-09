@@ -9,6 +9,7 @@ import {  pathToFileURL } from 'url';
 import type { Plugin, PluginCategory } from '../../core';
 import { SpatialOperatorRegistryInstance } from '../SpatialOperatorRegistry';
 import { ToolAdapter } from '../core/ToolAdapter';
+import { CustomPluginAdapter } from '../core/CustomPluginAdapter';
 
 export interface PluginManifest {
   id: string;
@@ -113,25 +114,33 @@ export class CustomPluginLoader {
     // Validate manifest
     this.validateManifest(manifest);
 
-    // Convert to SpatialOperator and register with registry
-    // For custom plugins without executor, create a mock operator
-    const plugin: Plugin = {
-      id: manifest.id,
-      name: manifest.name,
-      version: manifest.version,
-      description: manifest.description,
-      category: manifest.category as PluginCategory,
-      inputSchema: manifest.inputSchema,
-      outputSchema: manifest.outputSchema,
-      capabilities: manifest.capabilities,
-      isBuiltin: false,
-      installedAt: new Date()
-    };
+    // Load the executor module path
+    const mainFile = manifest.main || 'index.js';
+    const executorPath = path.join(pluginPath, mainFile);
+    
+    if (!fs.existsSync(executorPath)) {
+      throw new Error(`Plugin executor not found: ${executorPath}`);
+    }
 
-    // TODO: Convert Plugin to SpatialOperator and register
-    // For now, we'll skip registration until full migration
-    console.log(`[CustomPluginLoader] Registered plugin metadata: ${manifest.name} v${manifest.version}`);
-    console.warn(`[CustomPluginLoader] Custom plugin execution not yet supported in v2.0 architecture`);
+    // Get database instance from SQLiteManager
+    const { SQLiteManagerInstance } = await import('../../storage');
+    const db = SQLiteManagerInstance.getDatabase();
+
+    // Create CustomPluginAdapter (wraps JS plugin as SpatialOperator)
+    const adapter = new CustomPluginAdapter(
+      manifest,
+      executorPath,
+      this.workspaceBase,
+      db
+    );
+
+    // Register with SpatialOperatorRegistry
+    SpatialOperatorRegistryInstance.register(adapter);
+    console.log(`[CustomPluginLoader] Registered custom operator: ${manifest.name} (${manifest.id})`);
+
+    // Also convert to LangChain Tool for LLM integration
+    const tool = ToolAdapter.convertToTool(adapter);
+    console.log(`[CustomPluginLoader] Created LangChain tool for: ${manifest.name}`);
 
     // Update status
     this.pluginStatuses.set(manifest.id, {
@@ -203,8 +212,8 @@ export class CustomPluginLoader {
       return;
     }
 
-    // TODO: Unregister from SpatialOperatorRegistry
-    // SpatialOperatorRegistryInstance.unregister(pluginId);
+    // Unregister from SpatialOperatorRegistry
+    SpatialOperatorRegistryInstance.unregister(pluginId);
 
     // Update status
     status.status = 'disabled';
@@ -249,8 +258,7 @@ export class CustomPluginLoader {
 
     // Unregister if enabled
     if (status.status === 'enabled') {
-      // TODO: Unregister from SpatialOperatorRegistry
-      // SpatialOperatorRegistryInstance.unregister(pluginId);
+      SpatialOperatorRegistryInstance.unregister(pluginId);
     }
 
     // Remove from filesystem
