@@ -184,8 +184,8 @@ class WorkspaceManager {
     status: 'normal' | 'warning' | 'critical';
     message?: string;
   } {
-    // TODO: Implement disk space checking logic
-    // For now, return normal status
+    // Disk space monitoring - implement if needed for production
+    // Can use 'diskusage' npm package or Node.js fs.statfs
     return {
       usagePercent: 0,
       status: 'normal',

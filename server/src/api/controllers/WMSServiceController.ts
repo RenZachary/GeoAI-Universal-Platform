@@ -226,8 +226,12 @@ export class WMSServiceController {
         return;
       }
 
-      // TODO: Implement GetFeatureInfo
-      // This requires querying the underlying data source at the clicked location
+      // GetFeatureInfo requires spatial query at clicked coordinates
+      // Implementation would need to:
+      // 1. Convert pixel coordinates (i, j) to map coordinates
+      // 2. Query underlying data source for features at that location
+      // 3. Return feature attributes as JSON/XML
+      // This is an advanced WMS feature - implement if needed
 
       res.status(501).json({
         success: false,

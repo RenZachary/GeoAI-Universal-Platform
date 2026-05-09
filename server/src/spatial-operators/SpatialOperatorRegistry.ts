@@ -113,6 +113,13 @@ export class SpatialOperatorRegistry {
   }
   
   /**
+   * Get all operators with full metadata including schemas (for LLM task planning)
+   */
+  listOperatorsWithMetadata(): SpatialOperator[] {
+    return Array.from(this.operators.values());
+  }
+  
+  /**
    * Get total number of registered operators
    */
   getOperatorCount(): number {

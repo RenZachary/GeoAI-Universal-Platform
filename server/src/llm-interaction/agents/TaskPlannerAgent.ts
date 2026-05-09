@@ -51,8 +51,8 @@ export class TaskPlannerAgent {
         'en-US'
       );
 
-      // Get available operators for context
-      const allOperators = SpatialOperatorRegistryInstance.listOperators();
+      // Get available operators for context (with full metadata including schemas)
+      const allOperators = SpatialOperatorRegistryInstance.listOperatorsWithMetadata();
 
       // Get available data sources with metadata
       const dataSources = this.dataSourceRepo.listAll();
@@ -144,13 +144,16 @@ export class TaskPlannerAgent {
             goalDescription: goal.description,
             availableTools: JSON.stringify(compatibleOperators, null, 2),
             dataSourcesMetadata,
-            availablePlugins: JSON.stringify(compatibleOperators.map(op => ({
-              id: op.operatorId,
-              name: op.name,
-              description: op.description,
-              parameters: {}, // TODO: Extract from inputSchema
-              outputSchema: {} // TODO: Extract from outputSchema
-            })), null, 2),
+            availablePlugins: JSON.stringify(compatibleOperators.map(op => {
+              const metadata = op.getMetadata();
+              return {
+                id: metadata.operatorId,
+                name: metadata.name,
+                description: metadata.description,
+                parameters: metadata.inputSchema,
+                outputSchema: metadata.outputSchema
+              };
+            }), null, 2),
             previousResults: previousResultsContext,
             timestamp: new Date().toISOString()
           }) as ExecutionPlan;

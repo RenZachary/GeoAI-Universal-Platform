@@ -5,7 +5,7 @@
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { ChatOpenAI } from '@langchain/openai';
 import { ChatAnthropic } from '@langchain/anthropic';
-// TODO: Install @langchain/ollama to enable Ollama support
+// Note: @langchain/ollama is optional - install with: npm install @langchain/ollama
 // import { ChatOllama } from '@langchain/ollama';
 import { AIMessage } from '@langchain/core/messages';
 
@@ -50,8 +50,8 @@ export class LLMAdapterFactory {
         });
 
       case 'ollama':
-        // TODO: Install @langchain/ollama package to enable Ollama support
-        // npm install @langchain/ollama
+        // Ollama support requires @langchain/ollama package
+        // Install with: npm install @langchain/ollama
         throw new Error('Ollama provider requires @langchain/ollama package. Install it first.');
         // return new ChatOllama({
         //   baseUrl: config.baseUrl || 'http://localhost:11434',

@@ -161,8 +161,8 @@ export class ParallelTaskAnalyzer {
     const pluginId = step.pluginId || '';
     const baseTime = baseTimes[pluginId] || 1000; // Default 1 second
     
-    // Adjust based on complexity (if available in metadata)
-    // TODO: Add complexity estimation based on parameter analysis
+    // Complexity estimation could be added based on parameter analysis
+    // For now, use simple lookup table
     return baseTime;
   }
 

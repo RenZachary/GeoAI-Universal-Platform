@@ -29,10 +29,12 @@ export class DataSourceDetector {
         return 'postgis'; // GeoPackage uses SQLite/PostGIS
       
       case '.kml':
-        return 'geojson'; // TODO: KML conversion needed
+        // KML requires conversion to GeoJSON (use @tmcw/togeojson if needed)
+        throw new Error('KML format not directly supported. Please convert to GeoJSON first.');
       
       case '.csv':
-        return 'geojson'; // TODO: CSV with coords conversion
+        // CSV with coordinates requires parsing and GeoJSON conversion
+        throw new Error('CSV format not directly supported. Please convert to GeoJSON first.');
       
       default:
         // Try to detect from content for unknown extensions
