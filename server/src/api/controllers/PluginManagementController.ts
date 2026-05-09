@@ -8,6 +8,8 @@ import type { CustomPluginLoader } from '../../spatial-operators/plugins/CustomP
 import path from 'path';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
+import { WorkspaceManagerInstance } from '../../storage/filesystem/WorkspaceManager';
+import { WORKSPACE_DIRS } from '../../core';
 
 export class PluginManagementController {
   private pluginLoader: CustomPluginLoader;
@@ -124,12 +126,12 @@ export class PluginManagementController {
       }
 
       const uploadedFile = req.file;
-      const tempDir = path.join(process.cwd(), 'workspace', 'temp');
       
-      // Ensure temp directory exists
-      if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir, { recursive: true });
-      }
+      // Use WorkspaceManager for unified temp directory management
+      const tempDir = WorkspaceManagerInstance.getDirectoryPath('TEMP');
+      
+      // Temp directory is already ensured by WorkspaceManager.initialize()
+      // No need to check/create it here
 
       // Generate unique temp filename
       const tempFilename = `plugin_${uuidv4()}${path.extname(uploadedFile.originalname)}`;
