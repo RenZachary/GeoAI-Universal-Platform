@@ -7,7 +7,7 @@ import type { LLMConfig } from '../adapters/LLMAdapterFactory';
 import { LLMAdapterFactory } from '../adapters/LLMAdapterFactory';
 import type { PromptManager } from '../managers/PromptManager';
 import type { GeoAIStateType, AnalysisGoal } from '../workflow/GeoAIGraph';
-import { ToolRegistryInstance } from '../../plugin-orchestration';
+import { SpatialOperatorRegistryInstance } from '../../spatial-operators';
 
 export class GoalSplitterAgent {
   private llmConfig: LLMConfig;
@@ -31,23 +31,14 @@ export class GoalSplitterAgent {
         'en-US'
       );
 
-      // Get all available executor IDs from Tool Registry with descriptions
-      const plugins = ToolRegistryInstance.getAllPlugins();
-      const availableExecutorsInfo = plugins.map(plugin => ({
-        id: plugin.id,
-        name: plugin.name,
-        description: plugin.description,
-        capabilities: plugin.capabilities || []
-      }));
+      // Get all available operators from SpatialOperator Registry
+      const operators = SpatialOperatorRegistryInstance.listOperators();
       
-      console.log(`[Goal Splitter] Available executors: ${plugins.length}`);
+      console.log(`[Goal Splitter] Available operators: ${operators.length}`);
       
-      // Format for LLM: include ID, description, and key capabilities
-      const executorsForLLM = availableExecutorsInfo.map(info => {
-        const caps = info.capabilities.length > 0 
-          ? ` [Capabilities: ${info.capabilities.join(', ')}]`
-          : '';
-        return `${info.id}: ${info.description}${caps}`;
+      // Format for LLM: include ID, name, description, and category
+      const operatorsForLLM = operators.map(op => {
+        return `${op.operatorId} (${op.category}): ${op.description}`;
       }).join('\n');
 
       // Define output schema for structured output
@@ -67,10 +58,10 @@ export class GoalSplitterAgent {
       // Create chain
       const chain = promptTemplate.pipe(modelWithStructuredOutput);
 
-      // Invoke with user input and available executors
+      // Invoke with user input and available operators
       const goals = await chain.invoke({
         userInput: state.userInput,
-        availableExecutors: executorsForLLM,
+        availableExecutors: operatorsForLLM,
         timestamp: new Date().toISOString()
       }) as AnalysisGoal[];
 

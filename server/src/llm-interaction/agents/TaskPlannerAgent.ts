@@ -8,10 +8,9 @@ import type { LLMConfig } from '../adapters/LLMAdapterFactory';
 import { LLMAdapterFactory } from '../adapters/LLMAdapterFactory';
 import type { PromptManager } from '../managers/PromptManager';
 import type { GeoAIStateType, ExecutionPlan, ExecutionStep } from '../workflow/GeoAIGraph';
-import { ToolRegistryInstance } from '../../plugin-orchestration';
+import { SpatialOperatorRegistryInstance } from '../../spatial-operators';
 import { DataSourceRepository } from '../../data-access/repositories';
 import { SQLiteManagerInstance } from '../../storage/';
-import { PluginCapabilityRegistry } from '../../plugin-orchestration';
 
 export class TaskPlannerAgent {
   private llmConfig: LLMConfig;
@@ -48,8 +47,8 @@ export class TaskPlannerAgent {
         'en-US'
       );
 
-      // Get available tools for context
-      const allTools = ToolRegistryInstance.listToolsWithMetadata();
+      // Get available operators for context
+      const allOperators = SpatialOperatorRegistryInstance.listOperators();
 
       // Get available data sources with metadata
       const dataSources = this.dataSourceRepo.listAll();
@@ -58,15 +57,15 @@ export class TaskPlannerAgent {
       // Define output schema for structured output
       const stepSchema = z.object({
         stepId: z.string().describe('Unique identifier for this step'),
-        pluginId: z.string().describe('ID of the plugin/tool to execute'),
-        parameters: z.record(z.any()).describe('Parameters to pass to the plugin'),
+        operatorId: z.string().describe('ID of the spatial operator to execute'),
+        parameters: z.record(z.any()).describe('Parameters to pass to the operator'),
         dependsOn: z.array(z.string()).nullable().default([]).describe('Step IDs that must complete first')
       });
 
       const planSchema = z.object({
         goalId: z.string().describe('ID of the goal this plan addresses'),
         steps: z.array(stepSchema).describe('Ordered list of execution steps'),
-        requiredPlugins: z.array(z.string()).describe('List of plugin IDs required for this plan')
+        requiredOperators: z.array(z.string()).describe('List of operator IDs required for this plan')
       });
 
       // Create LLM with structured output
@@ -105,12 +104,12 @@ export class TaskPlannerAgent {
 
           console.log(`[Task Planner] Stage 1: Final candidate count: ${compatiblePluginIds.length}`);
 
-          // Filter tools to only include compatible ones
-          const compatibleTools = allTools.filter(tool =>
-            compatiblePluginIds.includes(tool.id)
+          // Filter operators to only include compatible ones
+          const compatibleOperators = allOperators.filter(op =>
+            compatiblePluginIds.includes(op.operatorId)
           );
 
-          console.log(`[Task Planner] Stage 2: LLM selection from ${compatibleTools.length} candidates`);
+          console.log(`[Task Planner] Stage 2: LLM selection from ${compatibleOperators.length} candidates`);
 
           // Prepare previous results context for multi-goal scenarios
           let previousResultsContext = '';
@@ -139,14 +138,14 @@ export class TaskPlannerAgent {
           const plan = await chain.invoke({
             goalId: goal.id,
             goalDescription: goal.description,
-            availableTools: JSON.stringify(compatibleTools, null, 2),
+            availableTools: JSON.stringify(compatibleOperators, null, 2),
             dataSourcesMetadata,
-            availablePlugins: JSON.stringify(compatibleTools.map(t => ({
-              id: t.id,
-              name: t.name,
-              description: t.description,
-              parameters: t.parameters,
-              outputSchema: t.outputSchema  // Include output schema for placeholder reference
+            availablePlugins: JSON.stringify(compatibleOperators.map(op => ({
+              id: op.operatorId,
+              name: op.name,
+              description: op.description,
+              parameters: {}, // TODO: Extract from inputSchema
+              outputSchema: {} // TODO: Extract from outputSchema
             })), null, 2),
             previousResults: previousResultsContext,
             timestamp: new Date().toISOString()
@@ -385,36 +384,48 @@ export class TaskPlannerAgent {
   }
 
   /**
-   * Filter plugins based on goal description using keyword analysis and PluginCapabilityRegistry
-   * This method intelligently infers required plugin categories from natural language description
+   * Filter operators based on goal description using keyword analysis
+   * This method intelligently infers required operator categories from natural language description
    */
   private filterPluginsByGoalDescription(goal: any): string[] {
-    console.log(`[Task Planner] Filtering plugins for goal: ${goal.id}`);
+    console.log(`[Task Planner] Filtering operators for goal: ${goal.id}`);
     console.log(`[Task Planner] Goal description:`, goal.description);
     
-    // const description = goal.description.toLowerCase();
-    const expectedCategories: Array<'computational' | 'statistical' | 'visualization' | 'textual'> = [];
+    const description = goal.description.toLowerCase();
+    const allOperators = SpatialOperatorRegistryInstance.listOperators();
+    const matchingOperators: string[] = [];
     
-    expectedCategories.push('computational', 'statistical', 'visualization', 'textual');
-    
-    console.log(`[Task Planner] Inferred categories:`, expectedCategories);
-    
-    // Try each category and collect matching plugins
-    const allMatchingPlugins: string[] = [];
-    
-    for (const category of expectedCategories) {
-      const matches = PluginCapabilityRegistry.filterByCapability({
-        expectedCategory: category,
-        isTerminalAllowed: true // Allow terminal nodes for all goals
-      });
-      allMatchingPlugins.push(...matches);
+    // Simple keyword-based filtering (v2.0 - will be enhanced with LLM in v2.1)
+    if (description.includes('buffer') || description.includes('缓冲区')) {
+      matchingOperators.push('buffer_analysis');
+    }
+    if (description.includes('overlay') || description.includes('叠加') || description.includes('intersect')) {
+      matchingOperators.push('overlay_analysis');
+    }
+    if (description.includes('filter') || description.includes('过滤')) {
+      matchingOperators.push('filter');
+    }
+    if (description.includes('heatmap') || description.includes('热力图')) {
+      matchingOperators.push('heatmap_generator');
+    }
+    if (description.includes('choropleth') || description.includes('分级色彩')) {
+      matchingOperators.push('choropleth_renderer');
+    }
+    if (description.includes('statistics') || description.includes('统计')) {
+      matchingOperators.push('statistics_calculator', 'aggregation');
+    }
+    if (description.includes('query') || description.includes('查询') || description.includes('list')) {
+      matchingOperators.push('data_source_query');
     }
     
-    // Remove duplicates
-    const uniquePlugins = [...new Set(allMatchingPlugins)];
+    // If no specific match, include all operators as fallback
+    if (matchingOperators.length === 0) {
+      console.log(`[Task Planner] No specific keywords matched, using all operators`);
+      return allOperators.map(op => op.operatorId);
+    }
     
-    console.log(`[Task Planner] Filtered to ${uniquePlugins.length} plugins:`, uniquePlugins);
-    return uniquePlugins;
+    console.log(`[Task Planner] Filtered to ${matchingOperators.length} operators:`, matchingOperators);
+    return matchingOperators;
   }
 
   /**
@@ -490,23 +501,18 @@ export class TaskPlannerAgent {
   }
 
   /**
-   * Get list of plugin IDs that are terminal nodes
-   * Terminal nodes: visualization and textual plugins
+   * Get list of operator IDs that are terminal nodes
+   * Terminal nodes: visualization operators
    */
   private getTerminalPluginIds(pluginIds: string[]): string[] {
-    // These are known terminal node categories
-    const terminalCategories = ['visualization', 'textual'];
-
-    const terminalIds: string[] = [];
-
-    for (const pluginId of pluginIds) {
-      const capability = PluginCapabilityRegistry.getCapability(pluginId);
-      if (capability && terminalCategories.includes(capability.executionCategory)) {
-        terminalIds.push(pluginId);
-      }
-    }
-
-    return terminalIds;
+    // Visualization operators are terminal nodes
+    const allOperators = SpatialOperatorRegistryInstance.listOperators();
+    const visualizationIds = allOperators
+      .filter(op => op.category === 'visualization')
+      .map(op => op.operatorId);
+    
+    // Return intersection of pluginIds and visualization operators
+    return pluginIds.filter(id => visualizationIds.includes(id));
   }
 
   /**
