@@ -200,6 +200,13 @@ export class EnhancedPluginExecutor {
 
     const step = targetPlan.steps[stepIndex];
 
+    // Debug: Log step details
+    console.log(`[Enhanced Executor] Executing step:`, {
+      stepId: step.stepId,
+      operatorId: step.operatorId,
+      parameters: Object.keys(step.parameters || {})
+    });
+
     try {
       // Get the operator from registry (using operatorId)
       const tool = ToolRegistryInstance.getTool(step.operatorId);

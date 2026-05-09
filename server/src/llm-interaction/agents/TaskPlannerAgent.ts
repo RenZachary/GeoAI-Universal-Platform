@@ -158,6 +158,17 @@ export class TaskPlannerAgent {
             timestamp: new Date().toISOString()
           }) as ExecutionPlan;
 
+          // Debug: Log raw plan from LLM
+          console.log(`[Task Planner] Raw plan from LLM for goal ${goal.id}:`, {
+            goalId: plan.goalId,
+            stepCount: plan.steps?.length || 0,
+            steps: plan.steps?.map(s => ({
+              stepId: s.stepId,
+              operatorId: s.operatorId,
+              paramCount: Object.keys(s.parameters || {}).length
+            }))
+          });
+
           // STAGE 2.5: Remove duplicate steps (defensive programming)
           const deduplicatedPlan = this.removeDuplicateSteps(plan);
           if (deduplicatedPlan.steps.length !== plan.steps.length) {
