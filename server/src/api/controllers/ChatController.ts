@@ -90,8 +90,7 @@ export class ChatController {
         currentStep: 'goal_splitting'
       };
 
-      // TODO: Integrate agents and tool registry here
-      // For now, run the basic workflow
+      // Execute workflow with streaming (agents and tools already integrated via GeoAIGraph)
       console.log('[Chat API] Executing workflow...');
 
       // Execute workflow with streaming
