@@ -1,44 +1,18 @@
 /**
- * Plugin Orchestration Layer - Main exports
- * Provides unified interface for plugin management, execution, and tools
+ * Plugin Orchestration Layer - DEPRECATED
+ * 
+ * This module is deprecated and will be removed in v2.1.
+ * Use spatial-operators instead.
  */
 
 // ============================================================================
-// Plugins (Definitions)
+// Registry (kept for backward compatibility during migration)
 // ============================================================================
-export {
-  BufferAnalysisPlugin,
-  OverlayAnalysisPlugin,
-  StatisticsCalculatorPlugin,
-  BUILT_IN_PLUGINS
-} from './plugins';
-
-// ============================================================================
-// Executors (Implementation)
-// ============================================================================
-export {
-  BufferAnalysisExecutor,
-  OverlayAnalysisExecutor,
-  StatisticsCalculatorExecutor,
-  type BufferAnalysisParams,
-  type OverlayAnalysisParams,
-  type StatisticsCalculatorParams
-} from './executor';
-
-// ============================================================================
-// Tools
-// ============================================================================
-export { PluginToolWrapper } from './tools/PluginToolWrapper';
-
-// ============================================================================
-// Registry
-// ============================================================================
-export { ToolRegistryInstance } from './registry/ToolRegistry';
 export { ExecutorRegistryInstance } from './registry/ExecutorRegistry';
 export { PluginCapabilityRegistry } from './registry/PluginCapabilityRegistry';
 
 // ============================================================================
-// Registration (Batch registration functions)
+// Registration (Batch registration functions - deprecated)
 // ============================================================================
 export {
   registerAllExecutors,
@@ -49,6 +23,9 @@ export {
 } from './registration';
 
 // ============================================================================
-// Loader
+// Loader (deprecated - custom plugins will use SpatialOperator pattern)
 // ============================================================================
 export { CustomPluginLoader } from './loader/CustomPluginLoader';
+
+// Deprecation warning
+console.warn('[DEPRECATION] plugin-orchestration module is deprecated. Use spatial-operators instead.');
