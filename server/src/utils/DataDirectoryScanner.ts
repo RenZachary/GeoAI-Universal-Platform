@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { DataSourceRepository } from '../data-access/repositories';
-import { DataAccessorFactory } from '../data-access';
+import { DataAccessFacade } from '../data-access';
 import type { DataSourceType } from '../core';
 import { SQLiteManagerInstance } from '../storage';
 
@@ -45,7 +45,7 @@ export async function scanAndRegisterDataFiles(
   
   // Initialize services
   const dataSourceRepo = new DataSourceRepository(SQLiteManagerInstance.getDatabase());
-  const accessorFactory = new DataAccessorFactory(workspaceBase);
+  const dataAccess = DataAccessFacade.getInstance(workspaceBase);
   
   // Check which files are already registered
   const existingSources = dataSourceRepo.listAll();
@@ -70,11 +70,15 @@ export async function scanAndRegisterDataFiles(
       // Detect file type
       const type = detectFileType(file);
       
-      // Get accessor for this type
-      const accessor = accessorFactory.createAccessor(type);
-      
-      // Extract metadata directly from the file (no copying)
-      const metadata = await accessor.getMetadata(fullPath);
+      // TODO: Use DataAccessFacade or Backend to extract metadata
+      // For now, create minimal metadata
+      const stats = fs.statSync(fullPath);
+      const metadata = {
+        name: path.basename(file),
+        format: type,
+        featureCount: 0,
+        fileSize: stats.size
+      };
       
       // Register in database with the original path
       dataSourceRepo.create(

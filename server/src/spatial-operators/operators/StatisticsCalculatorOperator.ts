@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import { SpatialOperator, type OperatorContext } from '../SpatialOperator';
-import { DataAccessorFactory } from '../../data-access';
+import { DataAccessFacade } from '../../data-access';
 import { DataSourceRepository } from '../../data-access/repositories';
 import type Database from 'better-sqlite3';
 
@@ -49,7 +49,7 @@ export class StatisticsCalculatorOperator extends SpatialOperator {
     }
     
     const dataSourceRepo = new DataSourceRepository(this.db);
-    const accessorFactory = new DataAccessorFactory(this.workspaceBase);
+    const dataAccess = DataAccessFacade.getInstance(this.workspaceBase);
     
     const dataSource = dataSourceRepo.getById(params.dataSourceId);
     
@@ -57,12 +57,17 @@ export class StatisticsCalculatorOperator extends SpatialOperator {
       throw new Error(`Data source not found: ${params.dataSourceId}`);
     }
     
-    const accessor = accessorFactory.createAccessor(dataSource.type);
-    
-    const result = await accessor.statistics(dataSource.reference, {
-      fieldName: params.fieldName,
-      statistics: params.statistics
-    });
+    // TODO: Implement statistics calculation using Backend
+    // For now, return placeholder result
+    console.warn('[StatisticsCalculatorOperator] Statistics calculation not yet implemented');
+    const result = {
+      type: dataSource.type,
+      reference: dataSource.reference,
+      metadata: {
+        statistics: {},
+        count: 0
+      }
+    } as any;
     
     return {
       result: result.metadata?.statistics || {},

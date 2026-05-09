@@ -7,7 +7,7 @@
 
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
-import type { SpatialOperator } from '../core/SpatialOperator';
+import type { SpatialOperator } from '../SpatialOperator';
 
 export class ToolAdapter {
   /**

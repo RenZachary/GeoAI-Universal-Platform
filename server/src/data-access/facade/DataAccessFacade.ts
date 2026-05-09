@@ -65,6 +65,29 @@ export class DataAccessFacade {
   }
   
   /**
+   * Dynamically configure or reconfigure PostGIS backend
+   * Useful for testing connections or switching databases
+   */
+  configurePostGIS(config: PostGISConnectionConfig): void {
+    this.postGISBackend = new PostGISBackend(config);
+    
+    // Rebuild backends list
+    this.backends = [
+      this.vectorBackend,
+      this.rasterBackend,
+      this.postGISBackend
+    ];
+  }
+  
+  /**
+   * Get PostGIS backend instance for direct operations
+   * Returns null if PostGIS is not configured
+   */
+  getPostGISBackend(): PostGISBackend | null {
+    return this.postGISBackend;
+  }
+  
+  /**
    * Get appropriate backend for the given data source
    */
   private getBackend(dataSourceType: string, reference: string): DataBackend {

@@ -56,7 +56,7 @@ export class ApiRouter {
     // Initialize shared MVTOnDemandPublisher singleton
     const mvtOnDemandPublisher = getMVTOnDemandPublisher(workspaceBase, 10000);
     
-    this.dataSourceController = new DataSourceController(dataSourceService, db, workspaceBase, mvtOnDemandPublisher); // ✅ Injected service with shared publisher
+    this.dataSourceController = new DataSourceController(dataSourceService, db, workspaceBase); // ✅ Injected service
     this.fileUploadController = new FileUploadController(fileUploadService); // ✅ Injected service
     this.promptTemplateController = new PromptTemplateController(promptTemplateService); // ✅ Injected service
     this.mvtServiceController = new MVTServiceController(workspaceBase, db);

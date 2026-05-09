@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import { SpatialOperator, type OperatorContext } from '../SpatialOperator';
-import { DataAccessorFactory } from '../../data-access';
+import { DataAccessFacade } from '../../data-access';
 import { DataSourceRepository } from '../../data-access/repositories';
 import { ResultPersistenceService } from '../../services/ResultPersistenceService';
 import type Database from 'better-sqlite3';
@@ -50,7 +50,7 @@ export class CategoricalOperator extends SpatialOperator {
     }
     
     const dataSourceRepo = new DataSourceRepository(this.db);
-    const accessorFactory = new DataAccessorFactory(this.workspaceBase);
+    const dataAccess = DataAccessFacade.getInstance(this.workspaceBase);
     const resultPersistence = new ResultPersistenceService(this.db);
     
     const dataSource = dataSourceRepo.getById(params.dataSourceId);
@@ -59,13 +59,15 @@ export class CategoricalOperator extends SpatialOperator {
       throw new Error(`Data source not found: ${params.dataSourceId}`);
     }
     
-    const accessor = accessorFactory.createAccessor(dataSource.type);
-    
-    const result = await accessor.categorical(dataSource.reference, {
-      categoryField: params.categoryField,
-      colorPalette: params.colorPalette,
-      opacity: params.opacity
-    });
+    const result = await dataAccess.categorical(
+      dataSource.type,
+      dataSource.reference,
+      params.categoryField,
+      {
+        colorPalette: params.colorPalette,
+        opacity: params.opacity
+      }
+    );
     
     const persisted = await resultPersistence.persistResult(
       result,

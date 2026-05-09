@@ -2,12 +2,12 @@
  * PostGISBackend - Handles PostGIS database operations using pg library
  */
 
-import type { NativeData } from '../../../core';
+import type { NativeData, PostGISConnectionConfig } from '../../../core';
 import { generateId } from '../../../core';
 import type { DataBackend } from '../DataBackend';
 import type { Pool } from 'pg';
 import { PostGISPoolManager } from '../../utils/PostGISPoolManager';
-import type { PostGISConnectionConfig, FilterCondition, BufferOptions } from '../../../core';
+import type { FilterCondition, BufferOptions } from '../../interfaces';
 import { PostGISBufferOperation } from './operations/PostGISBufferOperation';
 import { PostGISOverlayOperation } from './operations/PostGISOverlayOperation';
 import { PostGISFilterOperation } from './operations/PostGISFilterOperation';

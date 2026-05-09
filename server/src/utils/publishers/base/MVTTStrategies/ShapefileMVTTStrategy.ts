@@ -4,7 +4,6 @@ import fs from 'fs';
 import type { DataSourceType, NativeData } from '../../../../core/index';
 import type { MVTTileOptions } from '../MVTPublisherTypes';
 import path from 'path';
-import { DataAccessorFactory } from '../../../../data-access';
 import { tryMultipleEncodings } from '../../../ShapefileEncodingUtils';
 import { GeoJSONMVTTStrategy } from './GeoJSONMVTTStrategy';
 /**
@@ -21,15 +20,7 @@ export class ShapefileMVTTStrategy implements MVTTileGenerationStrategy {
     ): Promise<string> {
         console.log('[Shapefile MVT Strategy] Converting Shapefile to GeoJSON...');
 
-        // Use DataAccessor to read Shapefile and convert to GeoJSON
-        const factory = new DataAccessorFactory();
-        const accessor = factory.createAccessor('shapefile');
-
-        // Read the shapefile using the public read() method
-        await accessor.read(sourceReference);
-
-        // The reference should point to a .shp file, we need to convert it to GeoJSON
-        // Since loadGeoJSON is protected, we'll use shapefile library directly with shared encoding utility
+        // Use shapefile library directly with shared encoding utility
         const shapefilePath = sourceReference.replace('.shp', '');
         const shapefileModule = await import('shapefile');
 

@@ -51,7 +51,7 @@ export class DataSourceQueryOperator extends SpatialOperator {
     let dataSources: any[] = [];
     
     if (params.operation === 'list') {
-      dataSources = dataSourceRepo.getAll();
+      dataSources = dataSourceRepo.listAll();
       
       // Apply filters
       if (params.filterType) {
@@ -60,17 +60,17 @@ export class DataSourceQueryOperator extends SpatialOperator {
       
       if (params.searchTerm) {
         const term = params.searchTerm.toLowerCase();
-        dataSources = dataSources.filter(ds => 
+        dataSources = dataSources.filter((ds: any) => 
           ds.name.toLowerCase().includes(term) || 
           ds.description?.toLowerCase().includes(term)
         );
       }
     } else if (params.operation === 'count') {
-      const all = dataSourceRepo.getAll();
+      const all = dataSourceRepo.listAll();
       dataSources = all;
     } else if (params.operation === 'summary') {
-      const all = dataSourceRepo.getAll();
-      dataSources = all.map(ds => ({
+      const all = dataSourceRepo.listAll();
+      dataSources = all.map((ds: any) => ({
         id: ds.id,
         name: ds.name,
         type: ds.type
@@ -80,7 +80,7 @@ export class DataSourceQueryOperator extends SpatialOperator {
     return {
       result: {
         dataSources,
-        totalCount: dataSourceRepo.getAll().length,
+        totalCount: dataSourceRepo.listAll().length,
         filteredCount: dataSources.length
       }
     };

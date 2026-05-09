@@ -14,7 +14,6 @@ import { VisualizationServicePublisher } from './VisualizationServicePublisher';
 import type { MVTSource, MVTTileOptions } from '../utils/publishers/base/MVTPublisherTypes';
 import type { NativeData } from '../core';
 import type { WMSLayerOptions } from '../utils/publishers/base/WMSStategies/WMSPublisherTypes';
-import { ShapefileAccessor } from '../data-access';
 import fs from 'fs';
 
 export interface PublishedServiceInfo {
@@ -222,20 +221,18 @@ export class DataSourcePublishingService {
 
       console.log(`[DataSourcePublishingService] Converting shapefile to GeoJSON: ${shpPath}`);
       
-      // Use ShapefileAccessor to convert to GeoJSON
-      const accessor = new ShapefileAccessor(this.workspaceBase);
-      type ShapefileAccessorWithProtected = ShapefileAccessor & {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        loadGeoJSON: (path: string) => Promise<any>;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        saveGeoJSON: (data: any, name: string) => Promise<string>;
-      };
-      const geojson = await (accessor as ShapefileAccessorWithProtected).loadGeoJSON(shpPath);
+      // Use ogr2ogr to convert shapefile to GeoJSON
+      const { exec } = await import('child_process');
+      const { promisify } = await import('util');
+      const execAsync = promisify(exec);
       
-      // Save GeoJSON to a temporary location for MVT publishing
-      const geojsonPath = await (accessor as ShapefileAccessorWithProtected).saveGeoJSON(geojson, `mvt_${dataSource.id}`);
-      
-      console.log(`[DataSourcePublishingService] Shapefile converted to GeoJSON: ${geojsonPath}`);
+      const geojsonPath = shpPath.replace('.shp', '.geojson');
+      try {
+        await execAsync(`ogr2ogr -f "GeoJSON" "${geojsonPath}" "${shpPath}"`);
+        console.log(`[DataSourcePublishingService] Shapefile converted to GeoJSON: ${geojsonPath}`);
+      } catch (error) {
+        throw new Error(`Failed to convert shapefile to GeoJSON: ${error instanceof Error ? error.message : String(error)}`);
+      }
       
       source = {
         type: 'geojson-file',

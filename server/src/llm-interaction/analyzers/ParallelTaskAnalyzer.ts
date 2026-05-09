@@ -5,7 +5,7 @@
  * in parallel and which must run sequentially based on data dependencies.
  */
 
-import type { ExecutionPlan, AnalysisGoal } from '../workflow/GeoAIGraph';
+import type { ExecutionPlan, ExecutionStep, AnalysisGoal } from '../workflow/GeoAIGraph';
 
 export interface ParallelGroup {
   groupId: string;
@@ -63,17 +63,22 @@ export class ParallelTaskAnalyzer {
     const nodes = new Map<string, TaskNode>();
     const edges: Array<{ from: string; to: string }> = [];
     
-    for (const [taskId, plan] of executionPlans.entries()) {
-      // Create node for this task
-      const node: TaskNode = {
-        taskId,
-        pluginId: plan.pluginId || plan.operatorId || '',
-        inputs: new Set(this.extractInputs(plan)),
-        outputs: new Set(this.extractOutputs(plan)),
-        estimatedTimeMs: this.estimateTaskTime(plan)
-      };
-      
-      nodes.set(taskId, node);
+    // Iterate through all goals and their steps
+    for (const [goalId, plan] of executionPlans.entries()) {
+      for (const step of plan.steps) {
+        const taskId = step.stepId;
+        
+        // Create node for this task
+        const node: TaskNode = {
+          taskId,
+          pluginId: step.pluginId,
+          inputs: new Set(this.extractInputs(step)),
+          outputs: new Set(this.extractOutputs(step)),
+          estimatedTimeMs: this.estimateTaskTime(step)
+        };
+        
+        nodes.set(taskId, node);
+      }
     }
     
     // Build edges based on data dependencies
@@ -94,14 +99,14 @@ export class ParallelTaskAnalyzer {
   }
 
   /**
-   * Extract input data dependencies from execution plan
+   * Extract input data dependencies from execution step
    */
-  private extractInputs(plan: ExecutionPlan): string[] {
+  private extractInputs(step: ExecutionStep): string[] {
     const inputs: string[] = [];
     
     // Check parameters for data source references
-    if (plan.parameters) {
-      for (const [key, value] of Object.entries(plan.parameters)) {
+    if (step.parameters) {
+      for (const [key, value] of Object.entries(step.parameters)) {
         if (typeof value === 'string' && this.isDataSourceReference(value)) {
           inputs.push(value);
         } else if (Array.isArray(value)) {
@@ -118,12 +123,12 @@ export class ParallelTaskAnalyzer {
   }
 
   /**
-   * Extract output data sources from execution plan
+   * Extract output data sources from execution step
    */
-  private extractOutputs(plan: ExecutionPlan): string[] {
+  private extractOutputs(step: ExecutionStep): string[] {
     // For now, assume each task produces one output with a predictable name
     // In reality, this should come from the operator's output schema
-    return [`result_${plan.taskId}`];
+    return [`result_${step.stepId}`];
   }
 
   /**
@@ -140,7 +145,7 @@ export class ParallelTaskAnalyzer {
   /**
    * Estimate task execution time (simplified heuristic)
    */
-  private estimateTaskTime(plan: ExecutionPlan): number {
+  private estimateTaskTime(step: ExecutionStep): number {
     // Base time estimates by operator type
     const baseTimes: Record<string, number> = {
       'buffer': 1000,
@@ -153,12 +158,12 @@ export class ParallelTaskAnalyzer {
       'query': 500
     };
     
-    const operatorId = plan.operatorId || plan.pluginId || '';
-    const baseTime = baseTimes[operatorId] || 1000; // Default 1 second
+    const pluginId = step.pluginId || '';
+    const baseTime = baseTimes[pluginId] || 1000; // Default 1 second
     
     // Adjust based on complexity (if available in metadata)
-    const complexity = (plan.metadata as any)?.complexity || 1;
-    return baseTime * complexity;
+    // TODO: Add complexity estimation based on parameter analysis
+    return baseTime;
   }
 
   /**
@@ -254,10 +259,18 @@ export class ParallelTaskAnalyzer {
   private calculateGroupTime(taskIds: string[], executionPlans: Map<string, ExecutionPlan>): number {
     let maxTime = 0;
     
+    // Build a lookup from stepId to step
+    const stepMap = new Map<string, ExecutionStep>();
+    for (const plan of executionPlans.values()) {
+      for (const step of plan.steps) {
+        stepMap.set(step.stepId, step);
+      }
+    }
+    
     for (const taskId of taskIds) {
-      const plan = executionPlans.get(taskId);
-      if (plan) {
-        const time = this.estimateTaskTime(plan);
+      const step = stepMap.get(taskId);
+      if (step) {
+        const time = this.estimateTaskTime(step);
         maxTime = Math.max(maxTime, time);
       }
     }
@@ -272,14 +285,16 @@ export class ParallelTaskAnalyzer {
     const groups: ParallelGroup[] = [];
     let index = 0;
     
-    for (const taskId of executionPlans.keys()) {
-      const plan = executionPlans.get(taskId)!;
-      groups.push({
-        groupId: `sequential_${index}`,
-        tasks: [taskId],
-        estimatedTimeMs: this.estimateTaskTime(plan)
-      });
-      index++;
+    // Iterate through all goals and their steps
+    for (const plan of executionPlans.values()) {
+      for (const step of plan.steps) {
+        groups.push({
+          groupId: `sequential_${index}`,
+          tasks: [step.stepId],
+          estimatedTimeMs: this.estimateTaskTime(step)
+        });
+        index++;
+      }
     }
     
     return groups;
@@ -334,9 +349,18 @@ export class ParallelTaskAnalyzer {
     
     for (const group of parallelGroups) {
       report += `[${group.groupId}] (${group.tasks.length} tasks, ~${(group.estimatedTimeMs / 1000).toFixed(2)}s)\n`;
+      
+      // Build a lookup from stepId to step
+      const stepMap = new Map<string, ExecutionStep>();
+      for (const plan of executionPlans.values()) {
+        for (const step of plan.steps) {
+          stepMap.set(step.stepId, step);
+        }
+      }
+      
       for (const taskId of group.tasks) {
-        const plan = executionPlans.get(taskId);
-        report += `  - ${taskId}: ${plan?.operatorId || plan?.pluginId || 'unknown'}\n`;
+        const step = stepMap.get(taskId);
+        report += `  - ${taskId}: ${step?.pluginId || 'unknown'}\n`;
       }
     }
     

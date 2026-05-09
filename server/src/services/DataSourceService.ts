@@ -10,7 +10,7 @@
 
 import type { DataSourceRepository} from '../data-access/repositories';
 import { type DataSourceRecord } from '../data-access/repositories';
-import { DataAccessorFactory } from '../data-access';
+import { DataAccessFacade } from '../data-access';
 import type { PostGISConnectionConfig } from '../core';
 import { PostGISCleanupScheduler } from '../storage';
 import type Database from 'better-sqlite3';
@@ -88,13 +88,13 @@ export class ValidationError extends DataSourceError {
 
 export class DataSourceService {
   private dataSourceRepo: DataSourceRepository;
-  private accessorFactory: DataAccessorFactory;
+  private dataAccess: DataAccessFacade;
   private cleanupSchedulers: Map<string, PostGISCleanupScheduler> = new Map();
   private db?: Database.Database;  // Optional SQLite DB for cleanup scheduler
 
   constructor(dataSourceRepo: DataSourceRepository, workspaceBase?: string, db?: Database.Database) {
     this.dataSourceRepo = dataSourceRepo;
-    this.accessorFactory = new DataAccessorFactory(workspaceBase);
+    this.dataAccess = DataAccessFacade.getInstance(workspaceBase);
     this.db = db;
   }
 
@@ -360,8 +360,8 @@ export class DataSourceService {
     try {
       console.log(`[DataSourceService] Testing PostGIS connection to ${config.host}:${config.port || 5432}/${config.database}`);
 
-      // Configure factory with connection
-      this.accessorFactory.configurePostGIS({
+      // Configure PostGIS backend
+      this.dataAccess.configurePostGIS({
         host: config.host,
         port: config.port || 5432,
         database: config.database,
@@ -370,9 +370,13 @@ export class DataSourceService {
         schema: config.schema || 'public'
       });
 
-      // Create accessor and test
-      const accessor = this.accessorFactory.createAccessor('postgis');
-      const isConnected = await (accessor as any).testConnection();
+      // Get PostGIS backend and test connection
+      const postGISBackend = this.dataAccess.getPostGISBackend();
+      if (!postGISBackend) {
+        throw new ConnectionError('PostGIS backend not configured');
+      }
+      
+      const isConnected = await (postGISBackend as any).testConnection();
 
       if (!isConnected) {
         throw new ConnectionError('Failed to connect to PostGIS database. Please check credentials.');
@@ -426,7 +430,10 @@ export class DataSourceService {
    */
   private async discoverSpatialTablesAllSchemas(): Promise<TableInfo[]> {
     try {
-      const accessor = this.accessorFactory.createAccessor('postgis');
+      const postGISBackend = this.dataAccess.getPostGISBackend();
+      if (!postGISBackend) {
+        throw new Error('PostGIS backend not configured');
+      }
 
       // Query geometry_columns for ALL spatial tables (excluding geoai_temp schema)
       const query = `
@@ -441,7 +448,7 @@ export class DataSourceService {
         ORDER BY f_table_schema, f_table_name
       `;
 
-      const result = await (accessor as any).executeRaw(query);
+      const result = await (postGISBackend as any).executeRaw(query);
       const tables = result.rows || [];
 
       console.log(`[DataSourceService] Found ${tables.length} spatial tables in geometry_columns`);
@@ -457,7 +464,7 @@ export class DataSourceService {
             // Get row count
             const countQuery = `SELECT COUNT(*) as count FROM "${schema}"."${tableName}"`;
             console.log(`[DataSourceService] Executing count query for ${schema}.${tableName}`);
-            const countResult = await (accessor as any).executeRaw(countQuery);
+            const countResult = await (postGISBackend as any).executeRaw(countQuery);
             const rowCount = parseInt(countResult.rows[0].count, 10);
             console.log(`[DataSourceService] Row count for ${schema}.${tableName}: ${rowCount}`);
 
@@ -473,7 +480,7 @@ export class DataSourceService {
               ORDER BY ordinal_position
             `;
             console.log(`[DataSourceService] Fetching schema for ${schema}.${tableName}`);
-            const schemaResult = await (accessor as any).executeRaw(schemaQuery, [schema, tableName]);
+            const schemaResult = await (postGISBackend as any).executeRaw(schemaQuery, [schema, tableName]);
             const fieldSchemas = schemaResult.rows || [];
             
             // Convert to unified format: [{name, type}, ...]
@@ -628,10 +635,13 @@ export class DataSourceService {
     geometryColumn: string
   ): Promise<[number, number, number, number]> {
     // First get row count to decide strategy
-    const accessor = this.accessorFactory.createAccessor('postgis');
+    const postGISBackend = this.dataAccess.getPostGISBackend();
+    if (!postGISBackend) {
+      throw new Error('PostGIS backend not configured');
+    }
     
     const countQuery = `SELECT COUNT(*) as count FROM "${schema}"."${tableName}"`;
-    const countResult = await (accessor as any).executeRaw(countQuery);
+    const countResult = await (postGISBackend as any).executeRaw(countQuery);
     const rowCount = parseInt(countResult.rows[0].count, 10);
     
     let extent: string;
@@ -646,7 +656,7 @@ export class DataSourceService {
           TABLESAMPLE SYSTEM(1)
         ) AS sample
       `;
-      const result = await (accessor as any).executeRaw(sampleQuery);
+      const result = await (postGISBackend as any).executeRaw(sampleQuery);
       extent = result.rows[0]?.extent;
     } else {
       // Regular table: exact calculation
@@ -655,7 +665,7 @@ export class DataSourceService {
         FROM "${schema}"."${tableName}"
         WHERE "${geometryColumn}" IS NOT NULL
       `;
-      const result = await (accessor as any).executeRaw(query);
+      const result = await (postGISBackend as any).executeRaw(query);
       extent = result.rows[0]?.extent;
     }
     

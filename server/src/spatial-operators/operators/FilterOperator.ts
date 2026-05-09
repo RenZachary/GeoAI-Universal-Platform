@@ -4,8 +4,8 @@
 
 import { z } from 'zod';
 import { SpatialOperator, type OperatorContext } from '../SpatialOperator';
-import type { FilterCondition } from '../../../data-access/interfaces';
-import { DataAccessorFactory } from '../../data-access';
+import type { FilterCondition } from '../../data-access';
+import { DataAccessFacade } from '../../data-access';
 import { DataSourceRepository } from '../../data-access/repositories';
 import type Database from 'better-sqlite3';
 
@@ -62,7 +62,7 @@ export class FilterOperator extends SpatialOperator {
     console.log('[FilterOperator] Starting filter operation...');
     
     const dataSourceRepo = new DataSourceRepository(this.db);
-    const accessorFactory = new DataAccessorFactory(this.workspaceBase);
+    const dataAccess = DataAccessFacade.getInstance(this.workspaceBase);
     
     const dataSource = dataSourceRepo.getById(params.dataSourceId);
     
@@ -70,13 +70,13 @@ export class FilterOperator extends SpatialOperator {
       throw new Error(`Data source not found: ${params.dataSourceId}`);
     }
     
-    const accessor = accessorFactory.createAccessor(dataSource.type);
-    
     const conditions = Array.isArray(params.conditions) ? params.conditions : [params.conditions];
     
-    const result = await accessor.filter(
+    // For now, use the first condition - TODO: Support multiple conditions
+    const result = await dataAccess.filter(
+      dataSource.type,
       dataSource.reference,
-      conditions as FilterCondition[]
+      conditions[0] as FilterCondition
     );
     
     return {

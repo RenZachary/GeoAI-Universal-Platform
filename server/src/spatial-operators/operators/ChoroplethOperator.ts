@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import { SpatialOperator, type OperatorContext } from '../SpatialOperator';
-import { DataAccessorFactory } from '../../data-access';
+import { DataAccessFacade } from '../../data-access';
 import { DataSourceRepository } from '../../data-access/repositories';
 import { ResultPersistenceService } from '../../services/ResultPersistenceService';
 import type Database from 'better-sqlite3';
@@ -51,7 +51,7 @@ export class ChoroplethOperator extends SpatialOperator {
     }
     
     const dataSourceRepo = new DataSourceRepository(this.db);
-    const accessorFactory = new DataAccessorFactory(this.workspaceBase);
+    const dataAccess = DataAccessFacade.getInstance(this.workspaceBase);
     const resultPersistence = new ResultPersistenceService(this.db);
     
     const dataSource = dataSourceRepo.getById(params.dataSourceId);
@@ -60,16 +60,18 @@ export class ChoroplethOperator extends SpatialOperator {
       throw new Error(`Data source not found: ${params.dataSourceId}`);
     }
     
-    const accessor = accessorFactory.createAccessor(dataSource.type);
-    
     // Generate choropleth visualization
-    const result = await accessor.choropleth(dataSource.reference, {
-      valueField: params.valueField,
-      classification: params.classification,
-      numClasses: params.numClasses,
-      colorRamp: params.colorRamp,
-      opacity: params.opacity
-    });
+    const result = await dataAccess.choropleth(
+      dataSource.type,
+      dataSource.reference,
+      params.valueField,
+      {
+        classification: params.classification,
+        numClasses: params.numClasses,
+        colorRamp: params.colorRamp,
+        opacity: params.opacity
+      }
+    );
     
     // Persist result
     const persisted = await resultPersistence.persistResult(

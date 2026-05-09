@@ -7,7 +7,7 @@
 import { z } from 'zod';
 import { SpatialOperator, type OperatorContext, type OperatorResult } from '../SpatialOperator';
 import type { NativeData } from '../../core';
-import { DataAccessorFactory, parseConnectionConfig } from '../../data-access';
+import { DataAccessFacade } from '../../data-access';
 import { DataSourceRepository } from '../../data-access/repositories';
 import { ResultPersistenceService } from '../../services/ResultPersistenceService';
 import type Database from 'better-sqlite3';
@@ -57,7 +57,7 @@ export class BufferOperator extends SpatialOperator {
     
     // Initialize services
     const dataSourceRepo = new DataSourceRepository(this.db);
-    const accessorFactory = new DataAccessorFactory(this.workspaceBase);
+    const dataAccess = DataAccessFacade.getInstance(this.workspaceBase);
     const resultPersistence = new ResultPersistenceService(this.db);
     
     // Step 1: Query database for data source metadata
@@ -74,14 +74,9 @@ export class BufferOperator extends SpatialOperator {
       reference: dataSource.reference
     });
     
-    // Extract PostGIS connection config
-    const postgisConfig = parseConnectionConfig(dataSource) || undefined;
-    
-    // Step 2: Create appropriate accessor
-    const accessor = accessorFactory.createAccessor(dataSource.type, postgisConfig);
-    
-    // Step 3: Execute buffer operation
-    const result = await accessor.buffer(
+    // Step 2: Execute buffer operation using DataAccessFacade
+    const result = await dataAccess.buffer(
+      dataSource.type,
       dataSource.reference,
       params.distance,
       {

@@ -45,9 +45,9 @@ export class DataSourceController {
   private dataSourceService: DataSourceService;
   private publishingService: DataSourcePublishingService;
 
-  constructor(dataSourceService: DataSourceService, db: Database.Database, workspaceBase: string, mvtPublisher?: MVTOnDemandPublisher) {
+  constructor(dataSourceService: DataSourceService, db: Database.Database, workspaceBase: string) {
     this.dataSourceService = dataSourceService;
-    this.publishingService = new DataSourcePublishingService(db, workspaceBase, mvtPublisher);
+    this.publishingService = new DataSourcePublishingService(db, workspaceBase);
   }
 
   /**

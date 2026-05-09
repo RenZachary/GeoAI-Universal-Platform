@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import { SpatialOperator, type OperatorContext } from '../SpatialOperator';
-import { DataAccessorFactory } from '../../data-access';
+import { DataAccessFacade } from '../../data-access';
 import { DataSourceRepository } from '../../data-access/repositories';
 import { ResultPersistenceService } from '../../services/ResultPersistenceService';
 import type Database from 'better-sqlite3';
@@ -49,7 +49,7 @@ export class UniformColorOperator extends SpatialOperator {
     }
     
     const dataSourceRepo = new DataSourceRepository(this.db);
-    const accessorFactory = new DataAccessorFactory(this.workspaceBase);
+    const dataAccess = DataAccessFacade.getInstance(this.workspaceBase);
     const resultPersistence = new ResultPersistenceService(this.db);
     
     const dataSource = dataSourceRepo.getById(params.dataSourceId);
@@ -58,13 +58,15 @@ export class UniformColorOperator extends SpatialOperator {
       throw new Error(`Data source not found: ${params.dataSourceId}`);
     }
     
-    const accessor = accessorFactory.createAccessor(dataSource.type);
-    
-    const result = await accessor.uniformColor(dataSource.reference, {
-      color: params.color,
-      opacity: params.opacity,
-      strokeWidth: params.strokeWidth
-    });
+    const result = await dataAccess.uniformColor(
+      dataSource.type,
+      dataSource.reference,
+      {
+        color: params.color,
+        opacity: params.opacity,
+        strokeWidth: params.strokeWidth
+      }
+    );
     
     const persisted = await resultPersistence.persistResult(
       result,

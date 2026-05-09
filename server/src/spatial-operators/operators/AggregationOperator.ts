@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import { SpatialOperator, type OperatorContext } from '../SpatialOperator';
-import { DataAccessorFactory } from '../../data-access';
+import { DataAccessFacade } from '../../data-access';
 import { DataSourceRepository } from '../../data-access/repositories';
 import type Database from 'better-sqlite3';
 
@@ -48,7 +48,7 @@ export class AggregationOperator extends SpatialOperator {
     }
     
     const dataSourceRepo = new DataSourceRepository(this.db);
-    const accessorFactory = new DataAccessorFactory(this.workspaceBase);
+    const dataAccess = DataAccessFacade.getInstance(this.workspaceBase);
     
     const dataSource = dataSourceRepo.getById(params.dataSourceId);
     
@@ -56,13 +56,13 @@ export class AggregationOperator extends SpatialOperator {
       throw new Error(`Data source not found: ${params.dataSourceId}`);
     }
     
-    const accessor = accessorFactory.createAccessor(dataSource.type);
-    
-    const result = await accessor.aggregate(dataSource.reference, {
-      operation: params.operation,
-      field: params.field,
-      topN: params.topN
-    });
+    const result = await dataAccess.aggregate(
+      dataSource.type,
+      dataSource.reference,
+      params.operation,
+      params.field,
+      params.topN ? true : undefined  // Convert number to boolean for now
+    );
     
     return {
       result: result.metadata?.value || result.metadata?.features || [],

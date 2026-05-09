@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import { SpatialOperator, type OperatorContext } from '../SpatialOperator';
-import { DataAccessorFactory } from '../../data-access';
+import { DataAccessFacade } from '../../data-access';
 import { DataSourceRepository } from '../../data-access/repositories';
 import type Database from 'better-sqlite3';
 
@@ -48,7 +48,7 @@ export class OverlayOperator extends SpatialOperator {
     console.log('[OverlayOperator] Starting overlay analysis...');
     
     const dataSourceRepo = new DataSourceRepository(this.db);
-    const accessorFactory = new DataAccessorFactory(this.workspaceBase);
+    const dataAccess = DataAccessFacade.getInstance(this.workspaceBase);
     
     // Query both data sources
     const dataSource1 = dataSourceRepo.getById(params.inputDataSourceId);
@@ -58,14 +58,12 @@ export class OverlayOperator extends SpatialOperator {
       throw new Error('One or both data sources not found');
     }
     
-    // Use first data source's accessor for now
-    const accessor = accessorFactory.createAccessor(dataSource1.type);
-    
-    // Execute overlay operation
-    const result = await accessor.overlay(
+    // Execute overlay operation using DataAccessFacade
+    const result = await dataAccess.overlay(
+      dataSource1.type,
       dataSource1.reference,
       dataSource2.reference,
-      { operation: params.operation }
+      params.operation
     );
     
     return {
