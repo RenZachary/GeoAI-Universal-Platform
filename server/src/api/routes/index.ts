@@ -163,7 +163,11 @@ export class ApiRouter {
     if (this.pluginManagementController) {
       this.router.get('/plugins', (req, res) => this.pluginManagementController?.listPlugins(req, res));
       this.router.post('/plugins/scan', (req, res) => this.pluginManagementController?.scanPlugins(req, res));
-      this.router.post('/plugins/upload', (req, res) => this.pluginManagementController?.uploadPlugin(req, res));
+      
+      // Plugin upload with multer middleware
+      const pluginUpload = upload.single('plugin');
+      this.router.post('/plugins/upload', pluginUpload, (req, res) => this.pluginManagementController?.uploadPlugin(req, res));
+      
       this.router.post('/plugins/:id/disable', (req, res) => this.pluginManagementController?.disablePlugin(req, res));
       this.router.post('/plugins/:id/enable', (req, res) => this.pluginManagementController?.enablePlugin(req, res));
       this.router.delete('/plugins/:id', (req, res) => this.pluginManagementController?.deletePlugin(req, res));

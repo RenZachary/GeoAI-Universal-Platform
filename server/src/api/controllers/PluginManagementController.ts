@@ -5,6 +5,9 @@
 
 import type { Request, Response } from 'express';
 import type { CustomPluginLoader } from '../../spatial-operators/plugins/CustomPluginLoader';
+import path from 'path';
+import fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
 
 export class PluginManagementController {
   private pluginLoader: CustomPluginLoader;
@@ -106,21 +109,70 @@ export class PluginManagementController {
 
   /**
    * POST /api/plugins/upload - Upload and install a new plugin
+   * Expects multipart form data with 'plugin' field (zip file)
    */
   async uploadPlugin(req: Request, res: Response): Promise<void> {
     try {
-      // TODO: Implement file upload handling with multer
-      // For now, return placeholder response
-      res.status(501).json({
-        success: false,
-        error: 'Plugin upload not yet implemented',
-        message: 'Please place plugin files directly in workspace/plugins/custom/ directory'
-      });
+      // Check if file was uploaded
+      if (!req.file) {
+        res.status(400).json({
+          success: false,
+          error: 'No file uploaded',
+          message: 'Please provide a plugin archive file (.zip or .tar.gz)'
+        });
+        return;
+      }
+
+      const uploadedFile = req.file;
+      const tempDir = path.join(process.cwd(), 'workspace', 'temp');
+      
+      // Ensure temp directory exists
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+
+      // Generate unique temp filename
+      const tempFilename = `plugin_${uuidv4()}${path.extname(uploadedFile.originalname)}`;
+      const tempPath = path.join(tempDir, tempFilename);
+
+      // Write uploaded file to temp location
+      fs.writeFileSync(tempPath, uploadedFile.buffer);
+
+      console.log(`[PluginManagementController] Plugin uploaded to: ${tempPath}`);
+
+      try {
+        // Attempt to install from archive
+        const pluginId = await this.pluginLoader.installFromArchive(tempPath);
+        
+        // Clean up temp file
+        fs.unlinkSync(tempPath);
+
+        res.json({
+          success: true,
+          message: 'Plugin installed successfully',
+          data: {
+            pluginId,
+            originalName: uploadedFile.originalname
+          }
+        });
+      } catch (installError) {
+        // If archive installation fails, clean up and return helpful error
+        fs.unlinkSync(tempPath);
+        
+        const errorMessage = installError instanceof Error ? installError.message : String(installError);
+        
+        res.status(400).json({
+          success: false,
+          error: 'Failed to install plugin from archive',
+          message: errorMessage,
+          suggestion: 'Please extract the plugin manually to workspace/plugins/custom/ directory'
+        });
+      }
     } catch (error) {
       console.error('[PluginManagementController] Error uploading plugin:', error);
       res.status(500).json({
         success: false,
-        error: 'Failed to upload plugin',
+        error: 'Internal server error during plugin upload',
         details: error instanceof Error ? error.message : 'Unknown error'
       });
     }

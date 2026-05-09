@@ -58,12 +58,15 @@ export class AggregationOperator extends SpatialOperator {
       throw new Error(`Data source not found: ${params.dataSourceId}`);
     }
     
+    // Determine if we should return features (for TOP_N operation)
+    const shouldReturnFeatures = params.operation === 'TOP_N';
+    
     const result = await dataAccess.aggregate(
       dataSource.type,
       dataSource.reference,
       params.operation,
       params.field,
-      params.topN ? true : undefined  // Convert number to boolean for now
+      shouldReturnFeatures
     );
     
     // Persist result to database (registers temp table if PostGIS)

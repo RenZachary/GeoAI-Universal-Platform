@@ -126,8 +126,8 @@ export class ParallelTaskAnalyzer {
    * Extract output data sources from execution step
    */
   private extractOutputs(step: ExecutionStep): string[] {
-    // For now, assume each task produces one output with a predictable name
-    // In reality, this should come from the operator's output schema
+    // Each task produces one output with a predictable name based on stepId
+    // This matches the naming convention used in GeoAIGraph (result_{stepId})
     return [`result_${step.stepId}`];
   }
 
