@@ -26,11 +26,21 @@ export interface ExecutionMetrics {
 }
 
 export class EnhancedPluginExecutor {
-  private db: Database.Database;
+  private db: Database.Database | null = null;
   private metrics: ExecutionMetrics | null = null;
 
   constructor() {
-    this.db = SQLiteManagerInstance.getDatabase();
+    // Database will be initialized lazily on first use
+  }
+  
+  /**
+   * Get database instance (lazy initialization)
+   */
+  private getDatabase(): Database.Database {
+    if (!this.db) {
+      this.db = SQLiteManagerInstance.getDatabase();
+    }
+    return this.db;
   }
 
   /**
@@ -307,7 +317,7 @@ export class EnhancedPluginExecutor {
   private async persistIntermediateResult(taskId: string, result: AnalysisResult): Promise<void> {
     try {
       // Create table if not exists
-      this.db.exec(`
+      this.getDatabase().exec(`
         CREATE TABLE IF NOT EXISTS intermediate_results (
           task_id TEXT PRIMARY KEY,
           goal_id TEXT,
@@ -319,7 +329,7 @@ export class EnhancedPluginExecutor {
       `);
 
       // Insert or replace result
-      this.db.prepare(`
+      this.getDatabase().prepare(`
         INSERT OR REPLACE INTO intermediate_results (task_id, goal_id, status, result_data, error)
         VALUES (?, ?, ?, ?, ?)
       `).run(
@@ -344,7 +354,7 @@ export class EnhancedPluginExecutor {
     const results = new Map<string, AnalysisResult>();
 
     try {
-      const rows = this.db.prepare(`
+      const rows = this.getDatabase().prepare(`
         SELECT task_id, goal_id, status, result_data, error, created_at
         FROM intermediate_results
         ORDER BY created_at
@@ -376,7 +386,7 @@ export class EnhancedPluginExecutor {
    */
   clearPersistedResults(): void {
     try {
-      this.db.exec('DELETE FROM intermediate_results');
+      this.getDatabase().exec('DELETE FROM intermediate_results');
       console.log('[Enhanced Executor] Cleared all persisted results');
     } catch (error) {
       console.warn('[Enhanced Executor] Failed to clear persisted results:', error);
