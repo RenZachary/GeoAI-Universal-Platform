@@ -1,42 +1,48 @@
 # GeoAI-UP v2.0 重构升级文档
 
-## 📚 文档导航
+## 📚 快速导航
 
-本目录包含GeoAI-UP v2.0重构的完整技术文档,按阅读顺序排列:
-
-### 1. [REFACTORING-PLAN-v2.0.md](./REFACTORING-PLAN-v2.0.md) - 总体重构规划 ⭐ 必读
-**内容概要**:
-- 重构目标与收益分析
-- 五大核心架构改造详解
-- 迁移路径与时间表 (12周计划)
-- Breaking Changes清单
-- 预期性能指标提升
-
-**适合读者**: 架构师、技术负责人、全体开发团队
+**新加入? 从这里开始** → [DOCUMENT-STRUCTURE.md](./DOCUMENT-STRUCTURE.md) (5分钟了解文档层次)
 
 ---
 
-### 2. [GIS-TASK-SPLITTING-STRATEGY.md](./GIS-TASK-SPLITTING-STRATEGY.md) - GIS任务拆分策略
-**内容概要**:
-- 四层递进式拆分架构 (语义→业务→流程→算子)
-- 行业因子库设计与实现
-- 数据可用性校验机制
-- 并行/串行混合编排算法
-- 实际案例: 婴幼儿店铺选址完整拆分流程
+## ⭐ 核心文档 (按阅读顺序)
 
-**适合读者**: LLM Agents开发者、提示词工程师、GIS分析师
+### 1. [REFACTORING-PLAN-v2.0.md](./REFACTORING-PLAN-v2.0.md) - 总体重构规划
+**阅读时间**: 15分钟 | **重要性**: ⭐⭐⭐⭐⭐
+
+**核心内容**:
+- LLM自主因子推断 (零配置,无需行业知识库)
+- SpatialOperator统一架构
+- 数据访问层重构
+- 并行执行引擎
+- 12周实施路线图
+
+**适合**: 所有人必读
 
 ---
 
-### 3. [SPATIAL-OPERATOR-ARCHITECTURE.md](./SPATIAL-OPERATOR-ARCHITECTURE.md) - SpatialOperator架构设计
-**内容概要**:
-- 统一算子抽象层设计 (替代Plugin/Executor/Tool三层)
-- 核心接口定义与实现示例
-- 注册表模式与LangChain集成
+### 2. [SPATIAL-OPERATOR-ARCHITECTURE.md](./SPATIAL-OPERATOR-ARCHITECTURE.md) - 算子架构
+**阅读时间**: 20分钟 | **重要性**: ⭐⭐⭐⭐
+
+**核心内容**:
+- SpatialOperator抽象基类
+- 实现示例 (Buffer, KernelDensity, WeightedOverlay)
 - v1.0 → v2.0 迁移指南
-- 最佳实践与代码规范
 
-**适合读者**: 后端开发者、插件开发者、系统维护者
+**适合**: 后端开发者
+
+---
+
+### 3. [GIS-TASK-SPLITTING-STRATEGY.md](./GIS-TASK-SPLITTING-STRATEGY.md) - 任务拆分策略
+**阅读时间**: 15分钟 | **重要性**: ⭐⭐⭐⭐
+
+**核心内容**:
+- DataSourceSemanticAnalyzer设计
+- LLM自主推断流程
+- 并行任务分析器
+
+**适合**: AI/LLM开发者
 
 ---
 
