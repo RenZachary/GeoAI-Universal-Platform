@@ -1,7 +1,11 @@
 /**
  * Tool Controller - Manages spatial operators via API
  * 
- * DEPRECATED: This controller will be replaced by SpatialOperatorController in v2.1
+ * ⚠️  DEPRECATED: This controller is deprecated in v2.0.
+ * Use SpatialOperatorController instead (/api/operators endpoints).
+ * 
+ * This controller will be removed in v2.1.
+ * All new code should use /api/operators/* endpoints.
  */
 
 import type { Request, Response } from 'express';

@@ -5,6 +5,7 @@
 import { Router } from 'express';
 import { ChatController } from '../controllers/ChatController';
 import { ToolController } from '../controllers/ToolController';
+import { SpatialOperatorController } from '../controllers/SpatialOperatorController';
 import { DataSourceController } from '../controllers/DataSourceController';
 import { FileUploadController, upload, handleMultipartEncoding } from '../controllers/FileUploadController';
 import { PromptTemplateController } from '../controllers/PromptTemplateController';
@@ -24,6 +25,7 @@ export class ApiRouter {
   private router: Router;
   private chatController: ChatController;
   private toolController: ToolController;
+  private spatialOperatorController: SpatialOperatorController;
   private dataSourceController: DataSourceController;
   private fileUploadController: FileUploadController;
   private promptTemplateController: PromptTemplateController;
@@ -48,6 +50,7 @@ export class ApiRouter {
     
     // Initialize controllers with injected dependencies
     this.toolController = new ToolController(workspaceBase);
+    this.spatialOperatorController = new SpatialOperatorController(workspaceBase);
     this.chatController = new ChatController(llmConfig, workspaceBase, conversationService);
     
     // Initialize shared MVTOnDemandPublisher singleton
@@ -67,9 +70,14 @@ export class ApiRouter {
       this.pluginManagementController = new PluginManagementController(customPluginLoader);
     }
 
-    // Initialize tools
+    // Initialize tools (DEPRECATED - use operators instead)
     this.toolController.initialize().catch((err: Error) => {
       console.error('[API Router] Failed to initialize tools:', err);
+    });
+
+    // Initialize spatial operators (NEW v2.0)
+    this.spatialOperatorController.initialize().catch((err: Error) => {
+      console.error('[API Router] Failed to initialize spatial operators:', err);
     });
 
     this.setupRoutes();
@@ -87,12 +95,40 @@ export class ApiRouter {
     this.router.delete('/chat/conversations/:id', (req, res) => this.chatController.deleteConversation(req, res));
     this.router.put('/chat/conversations/:id', (req, res) => this.chatController.renameConversation(req, res));
 
-    // Tool endpoints
-    this.router.get('/tools', (req, res) => this.toolController.listTools(req, res));
-    this.router.get('/tools/:id', (req, res) => this.toolController.getTool(req, res));
-    this.router.post('/tools/:id/execute', (req, res) => this.toolController.executeTool(req, res));
-    this.router.post('/tools/register', (req, res) => this.toolController.registerTool(req, res));
-    this.router.delete('/tools/:id', (req, res) => this.toolController.unregisterTool(req, res));
+    // ========================================================================
+    // Spatial Operator endpoints (NEW v2.0 - Recommended)
+    // ========================================================================
+    this.router.get('/operators', (req, res) => this.spatialOperatorController.listOperators(req, res));
+    this.router.get('/operators/categories', (req, res) => this.spatialOperatorController.listCategories(req, res));
+    this.router.get('/operators/search', (req, res) => this.spatialOperatorController.searchOperators(req, res));
+    this.router.get('/operators/health', (req, res) => this.spatialOperatorController.healthCheck(req, res));
+    this.router.get('/operators/:id', (req, res) => this.spatialOperatorController.getOperatorDetail(req, res));
+    this.router.post('/operators/:id/execute', (req, res) => this.spatialOperatorController.executeOperator(req, res));
+
+    // ========================================================================
+    // Tool endpoints (DEPRECATED - Use /api/operators instead)
+    // These endpoints will be removed in v2.1
+    // ========================================================================
+    this.router.get('/tools', (req, res) => {
+      console.warn('[API Router] WARNING: /api/tools is deprecated. Use /api/operators instead.');
+      return this.toolController.listTools(req, res);
+    });
+    this.router.get('/tools/:id', (req, res) => {
+      console.warn('[API Router] WARNING: /api/tools/:id is deprecated. Use /api/operators/:id instead.');
+      return this.toolController.getTool(req, res);
+    });
+    this.router.post('/tools/:id/execute', (req, res) => {
+      console.warn('[API Router] WARNING: /api/tools/:id/execute is deprecated. Use /api/operators/:id/execute instead.');
+      return this.toolController.executeTool(req, res);
+    });
+    this.router.post('/tools/register', (req, res) => {
+      console.warn('[API Router] WARNING: /api/tools/register is deprecated. Operators are auto-registered.');
+      return this.toolController.registerTool(req, res);
+    });
+    this.router.delete('/tools/:id', (req, res) => {
+      console.warn('[API Router] WARNING: /api/tools/:id is deprecated. Use operator registry directly.');
+      return this.toolController.unregisterTool(req, res);
+    });
 
     // Data source endpoints
     this.router.get('/data-sources', (req, res) => this.dataSourceController.listDataSources(req, res));

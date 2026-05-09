@@ -39,5 +39,14 @@ export type {
   ServiceRegistry
 } from './VisualizationServicePublisher';
 
+// Controllers (re-export for convenience)
+export { SpatialOperatorController } from '../api/controllers/SpatialOperatorController';
+export type {
+  OperatorListResponse,
+  OperatorDetailResponse,
+  OperatorExecuteRequest,
+  OperatorExecuteResponse
+} from '../api/controllers/SpatialOperatorController';
+
 // MVTDynamicPublisher Singleton (re-export from utils)
 export { getMVTOnDemandPublisher, resetMVTOnDemandPublisher, MVTOnDemandPublisher } from '../utils/publishers/MVTOnDemandPublisher';
