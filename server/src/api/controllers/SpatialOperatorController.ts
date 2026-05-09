@@ -15,6 +15,7 @@
 import type { Request, Response } from 'express';
 import { SpatialOperatorRegistryInstance, registerAllOperators } from '../../spatial-operators';
 import { SQLiteManagerInstance } from '../../storage';
+import { ToolRegistryInstance } from '../../llm-interaction/tools/ToolRegistry';
 
 export interface OperatorListResponse {
   success: boolean;
@@ -84,6 +85,10 @@ export class SpatialOperatorController {
     
     const count = SpatialOperatorRegistryInstance.getOperatorCount();
     console.log(`[SpatialOperator Controller] Registered ${count} operators`);
+    
+    // Sync operators with ToolRegistry for LLM execution
+    console.log('[SpatialOperator Controller] Syncing with ToolRegistry...');
+    await ToolRegistryInstance.registerAllFromRegistry();
     
     this.initialized = true;
   }
