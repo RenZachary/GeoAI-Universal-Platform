@@ -15,15 +15,15 @@ This document describes the **DataAccessFacade** pattern in GeoAI-UP v2.0, which
 In v1.0, each accessor implemented all operations independently:
 
 ```
-FileAccessor: buffer(), overlay(), filter()  ← GDAL implementation
-PostGISAccessor: buffer(), overlay(), filter()  ← SQL implementation
-WebServiceAccessor: buffer(), overlay(), filter()  ← WPS implementation
+GeoJSONAccessor: buffer(), overlay(), filter()  ← Turf.js implementation ✅
+PostGISAccessor: buffer(), overlay(), filter()  ← SQL implementation ✅
+ShapefileAccessor: Convert → GeoJSON → Turf.js  ← Conversion overhead ⚠️
 ```
 
 **Issues**:
-- ❌ Code duplication (same logic, different backends)
-- ❌ Inconsistent behavior across backends
-- ❌ Hard to add new backends (must implement all operations)
+- ❌ Code duplication across accessors
+- ❌ Shapefile requires format conversion (performance penalty)
+- ❌ No unified routing logic for operator dispatch
 
 ### Solution (v2.0)
 
@@ -81,27 +81,34 @@ export interface ExecutionOptions {
 }
 ```
 
-### 2. GDALBackend Implementation
+### 2. VectorBackend Implementation (Turf.js)
+
+**Why Turf.js?**
+- ✅ Already in use (v1.0 uses `@turf/turf` v7.3.5)
+- ✅ Pure JavaScript, no native dependencies
+- ✅ Excellent for GeoJSON operations
+- ✅ Active community and good documentation
+- ✅ Lightweight compared to GDAL
 
 ```typescript
-// server/src/data-access/backends/GDALBackend.ts
 
-import gdal from 'gdal-async';
+```typescript
+// server/src/data-access/backends/VectorBackend.ts
+
+import * as turf from '@turf/turf';
 import { DataBackend, BackendType } from './DataBackend';
 
-export class GDALBackend implements DataBackend {
-  readonly backendType: BackendType = 'gdal';
+export class VectorBackend implements DataBackend {
+  readonly backendType: BackendType = 'vector';
   
   supports(operatorType: string): boolean {
-    // GDAL supports most vector/raster operations
+    // Turf.js supports most vector operations
     const supported = [
       'buffer',
       'overlay',
       'filter',
       'aggregate',
       'spatial_join',
-      'kernel_density',
-      'reclassify',
       'distance_analysis'
     ];
     return supported.includes(operatorType);
@@ -112,17 +119,17 @@ export class GDALBackend implements DataBackend {
     source: DataSource,
     options?: ExecutionOptions
   ): Promise<NativeData> {
-    console.log(`[GDALBackend] Executing ${operator.operatorType} on ${source.reference}`);
+    console.log(`[VectorBackend] Executing ${operator.operatorType} on ${source.reference}`);
+    
+    // Load GeoJSON data
+    const geojson = await this.loadGeoJSON(source.reference);
     
     switch (operator.operatorType) {
       case 'buffer':
-        return this.executeBuffer(operator as BufferOperator, source);
+        return this.executeBuffer(operator as BufferOperator, geojson);
       
       case 'overlay':
-        return this.executeOverlay(operator as OverlayOperator, source);
-      
-      case 'kernel_density':
-        return this.executeKernelDensity(operator as KernelDensityOperator, source);
+        return this.executeOverlay(operator as OverlayOperator, geojson);
       
       default:
         throw new Error(`Unsupported operator type: ${operator.operatorType}`);
@@ -131,81 +138,187 @@ export class GDALBackend implements DataBackend {
   
   private async executeBuffer(
     operator: BufferOperator,
-    source: DataSource
+    geojson: GeoJSON.FeatureCollection
   ): Promise<NativeData> {
-    // Open dataset
-    const ds = gdal.open(source.reference);
-    const layer = ds.layers.get(0);
+    // Use Turf.js for buffer operation
+    const bufferedFeatures = geojson.features.map(feature => {
+      return turf.buffer(feature, operator.params.distance, {
+        units: operator.params.unit || 'meters'
+      });
+    }).filter(Boolean);
     
-    // Apply buffer
-    const bufferedLayer = layer.executeSQL(
-      `SELECT ST_Buffer(geometry, ${operator.params.distance}) AS geometry, * FROM ${layer.name}`
+    const result: GeoJSON.FeatureCollection = {
+      type: 'FeatureCollection',
+      features: bufferedFeatures
+    };
+    
+    // Apply dissolve if requested
+    if (operator.params.dissolve && bufferedFeatures.length > 0) {
+      const dissolved = turf.dissolve(result);
+      result.features = dissolved.features;
+    }
+    
+    // Save and return NativeData
+    const outputPath = await this.saveResult(result, 'buffer');
+    return this.createNativeData(outputPath, result);
+  }
+  async testConnection(): Promise<boolean> {
+    // Turf.js is always available if installed
+    return true;
+  }
+  
+  private async loadGeoJSON(reference: string): Promise<GeoJSON.FeatureCollection> {
+    const content = await fs.promises.readFile(reference, 'utf-8');
+    return JSON.parse(content);
+  }
+  
+  private async saveResult(geojson: GeoJSON.FeatureCollection, prefix: string): Promise<string> {
+    const outputPath = path.join(
+      process.env.WORKSPACE_BASE!,
+      'temp',
+      `${prefix}_${Date.now()}.geojson`
     );
-    
-    // Save to temporary file
-    const outputPath = this.generateTempPath('buffer');
-    this.saveLayer(bufferedLayer, outputPath);
-    
+    await fs.promises.writeFile(outputPath, JSON.stringify(geojson));
+    return outputPath;
+  }
+  
+  private createNativeData(reference: string, geojson: GeoJSON.FeatureCollection): NativeData {
     return {
       id: generateId(),
-      type: 'vector',
-      reference: outputPath,
+      type: 'geojson',
+      reference,
       metadata: {
-        featureCount: bufferedLayer.features.count(),
-        geometryType: 'Polygon',
-        srid: layer.srs.authority
-      }
+        featureCount: geojson.features.length,
+        geometryType: geojson.features[0]?.geometry.type,
+        srid: 4326
+      },
+      createdAt: new Date()
     };
+  }
+}
+```
+
+### 3. RasterBackend Implementation (GDAL)
+
+**Why GDAL for Raster?**
+- ✅ Industry standard for raster data
+- ✅ Supports GeoTIFF, NetCDF, HDF, etc.
+- ✅ High-performance operations on large datasets
+- ✅ Already used in v1.0 (`geotiff` package)
+
+```typescript
+// server/src/data-access/backends/RasterBackend.ts
+
+import { fromFile } from 'geotiff';
+import { DataBackend, BackendType } from './DataBackend';
+
+export class RasterBackend implements DataBackend {
+  readonly backendType: BackendType = 'raster';
+  
+  supports(operatorType: string): boolean {
+    // GDAL supports raster-specific operations
+    const supported = [
+      'kernel_density',
+      'reclassify',
+      'resample',
+      'clip_raster',
+      'mosaic'
+    ];
+    return supported.includes(operatorType);
+  }
+  
+  async execute(
+    operator: SpatialOperator,
+    source: DataSource,
+    options?: ExecutionOptions
+  ): Promise<NativeData> {
+    console.log(`[RasterBackend] Executing ${operator.operatorType} on ${source.reference}`);
+    
+    switch (operator.operatorType) {
+      case 'kernel_density':
+        return this.executeKernelDensity(operator as KernelDensityOperator, source);
+      
+      case 'reclassify':
+        return this.executeReclassify(operator as ReclassifyOperator, source);
+      
+      default:
+        throw new Error(`Unsupported operator type: ${operator.operatorType}`);
+    }
   }
   
   private async executeKernelDensity(
     operator: KernelDensityOperator,
     source: DataSource
   ): Promise<NativeData> {
-    // Use GDAL grid module for kernel density
-    const outputPath = this.generateTempPath('density.tif');
+    // Read input raster
+    const tiff = await fromFile(source.reference);
+    const image = await tiff.getImage();
     
-    await gdal.grid({
-      input: source.reference,
-      output: outputPath,
-      algorithm: 'invdist',
-      radius: operator.params.searchRadius,
-      cellSize: operator.params.cellSize
-    });
+    // Extract pixel values
+    const rasters = await image.readRasters();
+    const width = image.getWidth();
+    const height = image.getHeight();
+    
+    // Apply kernel density algorithm
+    const densityValues = this.calculateKernelDensity(rasters, operator.params);
+    
+    // Create output GeoTIFF
+    const outputPath = await this.saveRaster(densityValues, width, height, 'density');
     
     return {
       id: generateId(),
-      type: 'raster',
+      type: 'tif',
       reference: outputPath,
       metadata: {
-        width: 1000,
-        height: 1000,
+        width,
+        height,
+        bandCount: 1,
         cellSize: operator.params.cellSize,
         srid: 4326
-      }
+      },
+      createdAt: new Date()
     };
   }
   
-  async testConnection(): Promise<boolean> {
-    // GDAL is always available if installed
-    return true;
+  private calculateKernelDensity(rasters: any, params: any): number[] {
+    // Simplified kernel density calculation
+    // In production, use proper spatial statistics algorithms
+    const data = rasters[0];
+    const result = new Float32Array(data.length);
+    
+    for (let i = 0; i < data.length; i++) {
+      result[i] = data[i] > 0 ? data[i] * params.weight : 0;
+    }
+    
+    return Array.from(result);
   }
   
-  private generateTempPath(prefix: string): string {
-    return path.join(
+  private async saveRaster(values: number[], width: number, height: number, prefix: string): Promise<string> {
+    const outputPath = path.join(
       process.env.WORKSPACE_BASE!,
       'temp',
-      `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.geojson`
+      `${prefix}_${Date.now()}.tif`
     );
+    
+    // Write GeoTIFF using geotiff library
+    // Implementation depends on specific requirements
+    
+    return outputPath;
   }
   
-  private saveLayer(layer: any, outputPath: string): void {
-    // Implementation depends on GDAL bindings
+  async testConnection(): Promise<boolean> {
+    // Check if geotiff library is available
+    try {
+      await fromFile('/dev/null');
+      return false; // Expected to fail for invalid file
+    } catch (error) {
+      return true; // Library loaded successfully
+    }
   }
 }
 ```
 
-### 3. PostGISBackend Implementation
+### 4. PostGISBackend Implementation
 
 ```typescript
 // server/src/data-access/backends/PostGISBackend.ts
@@ -359,13 +472,15 @@ export class PostGISBackend implements DataBackend {
 
 ### 4. DataAccessFacade
 
+**Core Logic**: Route operator to appropriate backend based on data source type and operator requirements.
+
 ```typescript
 // server/src/data-access/facade/DataAccessFacade.ts
 
 import { DataBackend, BackendType } from '../backends/DataBackend';
-import { GDALBackend } from '../backends/GDALBackend';
+import { VectorBackend } from '../backends/VectorBackend';
+import { RasterBackend } from '../backends/RasterBackend';
 import { PostGISBackend } from '../backends/PostGISBackend';
-import { WebServiceBackend } from '../backends/WebServiceBackend';
 
 export class DataAccessFacade {
   private static instance: DataAccessFacade;
@@ -384,28 +499,84 @@ export class DataAccessFacade {
   }
   
   private initializeBackends(): void {
-    // Register GDAL backend (for file-based data)
-    this.backends.set('gdal', new GDALBackend());
+    // Register Vector backend (Turf.js for GeoJSON)
+    this.backends.set('vector', new VectorBackend());
     
-    // Register PostGIS backend (if configured)
-    if (process.env.POSTGIS_CONNECTION_STRING) {
-      this.backends.set(
-        'postgis',
-        new PostGISBackend(process.env.POSTGIS_CONNECTION_STRING)
-      );
-    }
+    // Register Raster backend (GDAL for GeoTIFF)
+    this.backends.set('raster', new RasterBackend());
     
-    // Register Web Service backend
-    this.backends.set('web_service', new WebServiceBackend());
-    
-    console.log(`[DataAccessFacade] Initialized ${this.backends.size} backends`);
+    // Register PostGIS backend (SQL for database)
+    const postgisUrl = process.env.POSTGIS_CONNECTION_STRING || 'postgresql://localhost:5432/geoai';
+    this.backends.set('postgis', new PostGISBackend(postgisUrl));
   }
   
   /**
-   * Execute a spatial operator on a data source
-   * Automatically routes to the appropriate backend
+   * Execute a spatial operator by routing to the appropriate backend
    */
-  async execute(
+  async executeOperator(
+    operator: SpatialOperator,
+    source: DataSource,
+    options?: ExecutionOptions
+  ): Promise<NativeData> {
+    console.log(`[DataAccessFacade] Routing ${operator.operatorType} for ${source.type}`);
+    
+    // Select backend based on data source type
+    const backend = this.selectBackend(source.type, operator.operatorType);
+    
+    if (!backend) {
+      throw new Error(
+        `No backend found for data source type '${source.type}' with operator '${operator.operatorType}'`
+      );
+    }
+    
+    // Check if backend supports the operator
+    if (!backend.supports(operator.operatorType)) {
+      throw new Error(
+        `Backend '${backend.backendType}' does not support operator '${operator.operatorType}'`
+      );
+    }
+    
+    // Execute via selected backend
+    return await backend.execute(operator, source, options);
+  }
+  
+  /**
+   * Select the best backend for given data source type and operator
+   */
+  private selectBackend(dataSourceType: string, operatorType: string): DataBackend | null {
+    // Priority-based selection
+    switch (dataSourceType) {
+      case 'geojson':
+      case 'shapefile':
+        return this.backends.get('vector'); // Turf.js
+      
+      case 'tif':
+      case 'geotiff':
+        return this.backends.get('raster'); // GDAL
+      
+      case 'postgis':
+        return this.backends.get('postgis'); // SQL
+      
+      default:
+        // Fallback: try vector backend first
+        return this.backends.get('vector');
+    }
+  }
+  
+  /**
+   * Test all backend connections
+   */
+  async testAllConnections(): Promise<Map<BackendType, boolean>> {
+    const results = new Map<BackendType, boolean>();
+    
+    for (const [type, backend] of this.backends) {
+      const isConnected = await backend.testConnection();
+      results.set(type, isConnected);
+    }
+    
+    return results;
+  }
+}
     operator: SpatialOperator,
     source: DataSource,
     options?: ExecutionOptions
@@ -843,6 +1014,83 @@ describe('DataAccessFacade Integration', () => {
 | **Testing** | Test N accessors × M operations | Test backends independently |
 | **Performance** | No cross-backend optimization | Backend-specific optimizations |
 | **Maintenance** | Update all accessors | Update only affected backend |
+
+---
+
+## 💡 Why Turf.js for Vector Operations?
+
+### Decision Rationale
+
+In v1.0, we already use `@turf/turf` v7.3.5 for GeoJSON spatial operations. In v2.0, we continue this approach because:
+
+#### ✅ Advantages of Turf.js
+
+1. **Already in Production**: No new dependency, proven stability
+   - Current usage: `GeoJSONBufferOperation`, `GeoJSONOverlayOperation`, `GeoJSONSpatialJoinOperation`
+   - Package size: ~2MB (lightweight)
+
+2. **Pure JavaScript**: No native compilation required
+   - Easy deployment across platforms (Windows/Linux/macOS)
+   - No GDAL C++ bindings complexity
+   - Works in browser if needed
+
+3. **Excellent GeoJSON Support**
+   - Native GeoJSON format (no conversion overhead)
+   - Comprehensive spatial operations (buffer, intersect, union, etc.)
+   - Active community and good documentation
+
+4. **Performance is Adequate**
+   - For small-medium datasets (<10K features): Excellent
+   - For large datasets: Use PostGIS backend instead
+   - Streaming support available via GeoJSON streaming libraries
+
+#### ❌ Why NOT GDAL for Vector?
+
+1. **Heavy Dependency**
+   - Requires C++ compilation
+   - Large binary size (~50MB+)
+   - Platform-specific builds needed
+
+2. **Overkill for Simple Operations**
+   - Buffer/overlay on GeoJSON doesn't need GDAL's power
+   - Turf.js is faster for in-memory operations
+
+3. **Complexity**
+   - GDAL bindings can be tricky to install
+   - Version compatibility issues
+   - Memory management challenges
+
+#### 🎯 When to Use Each Backend
+
+| Scenario | Recommended Backend | Reason |
+|----------|-------------------|--------|
+| GeoJSON < 10K features | **VectorBackend (Turf.js)** | Fast, no conversion |
+| Shapefile | **VectorBackend (Turf.js)** | Convert once → GeoJSON, then Turf |
+| PostGIS table | **PostGISBackend (SQL)** | Database-native, uses indexes |
+| GeoTIFF raster | **RasterBackend (GDAL)** | Industry standard for raster |
+| Large vector (>100K features) | **PostGISBackend** | Better performance with spatial indexes |
+| Complex raster analysis | **RasterBackend (GDAL)** | Advanced algorithms |
+
+### Migration Path from v1.0
+
+**No changes needed!** The existing Turf.js-based operations in v1.0 are already aligned with v2.0 design:
+
+```typescript
+// v1.0: Already using Turf.js ✅
+import * as turf from '@turf/turf';
+const buffered = turf.buffer(feature, distance, { units: 'meters' });
+
+// v2.0: Same approach, better organization ✅
+class VectorBackend {
+  async executeBuffer(operator, geojson) {
+    return turf.buffer(feature, operator.params.distance, {
+      units: operator.params.unit || 'meters'
+    });
+  }
+}
+```
+
+The refactoring focuses on **organization and routing**, not changing the underlying spatial operation library.
 
 ---
 
