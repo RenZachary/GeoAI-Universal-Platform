@@ -16,6 +16,7 @@ import { ConversationBufferMemoryWithSQLite } from '../managers/ConversationMemo
 import { ServicePublisher } from './ServicePublisher';
 import { SummaryGenerator } from './SummaryGenerator';
 import { reportDecisionNode } from './nodes/ReportDecisionNode';
+import { EnhancedExecutorInstance } from './nodes/EnhancedPluginExecutor';
 import { SQLiteManagerInstance } from '../../storage/';
 import { resolvePlaceholders } from './PlaceholderResolver';
 import { VirtualDataSourceManagerInstance } from '../../data-access/managers/VirtualDataSourceManager';
@@ -178,158 +179,60 @@ export function createGeoAIGraph(
       return await taskPlanner.execute(state);
     })
     .addNode('pluginExecutor', async (state: GeoAIStateType) => {
-      console.log('[Plugin Executor] Executing plugins');
+      console.log('[Plugin Executor] Starting enhanced execution with parallel support');
       
-      const executionResults = new Map<string, any>();
+      // Use EnhancedPluginExecutor for parallel execution
+      const result = await EnhancedExecutorInstance.executeWithParallelSupport(state, streamWriter);
+      
+      // Get execution metrics
+      const metrics = EnhancedExecutorInstance.getMetrics();
+      if (metrics) {
+        console.log(EnhancedExecutorInstance.generateSummary());
+      }
+      
+      // Publish visualization services for successful results
       const allServices: VisualizationService[] = [];
       
-      if (state.executionPlans) {
-        for (const [goalId, plan] of state.executionPlans.entries()) {
-          console.log(`[Plugin Executor] Executing plan for goal: ${goalId}`);
-          console.log(`[Plugin Executor] Plan has ${plan.steps.length} steps`);
-          
-          // Execute each step in the plan
-          for (const step of plan.steps) {
-            try {
-              console.log(`[Plugin Executor] Executing step: ${step.stepId} using plugin: ${step.pluginId}`);
-              
-              // Get tool from registry
-              const tool = ToolRegistryInstance.getTool(step.pluginId);
-              
-              if (!tool) {
-                console.error(`[Plugin Executor] Tool not found: ${step.pluginId}`);
-                executionResults.set(step.stepId, {
-                  id: step.stepId,
-                  goalId,
-                  status: 'failed',
-                  error: `Plugin not found: ${step.pluginId}`
-                });
-                continue;
-              }
-              
-              // Resolve placeholders in parameters using previous execution results
-              console.log(`[Plugin Executor] Original parameters:`, step.parameters);
-              const resolvedParameters = resolvePlaceholders(step.parameters, executionResults);
-              console.log(`[Plugin Executor] Resolved parameters:`, resolvedParameters);
-              
-              // Send tool_start event via SSE if streamWriter is available
-              if (streamWriter) {
-                streamWriter.write(`data: ${JSON.stringify({
-                  type: 'tool_start',
-                  tool: step.pluginId,
-                  input: JSON.stringify(resolvedParameters).substring(0, 200),
-                  timestamp: Date.now()
-                })}\n\n`);
-              }
-              
-              // Invoke the tool with resolved parameters
-              console.log(`[Plugin Executor] Invoking tool with parameters:`, resolvedParameters);
-              const toolResult = await tool.invoke(resolvedParameters);
-              
-              console.log(`[Plugin Executor] Tool execution successful`);
-              
-              // Send tool_complete event via SSE if streamWriter is available
-              if (streamWriter) {
-                streamWriter.write(`data: ${JSON.stringify({
-                  type: 'tool_complete',
-                  tool: step.pluginId,
-                  output: typeof toolResult === 'string' ? toolResult.substring(0, 2000) : JSON.stringify(toolResult).substring(0, 2000),
-                  timestamp: Date.now()
-                })}\n\n`);
-              }
-              
-              // Parse tool result (it's a JSON string)
-              let parsedResult: any;
-              try {
-                parsedResult = typeof toolResult === 'string' ? JSON.parse(toolResult) : toolResult;
-              } catch (error) {
-                console.error(`[Plugin Executor] Failed to parse tool result:`, error);
-                parsedResult = { success: false, error: 'Invalid tool result format' };
-              }
-              
-              // Construct proper result object with NativeData
-              const analysisResult: AnalysisResult = {
-                id: step.stepId,
-                goalId,
-                status: parsedResult.success ? 'success' : 'failed',
-                data: parsedResult.success ? {
-                  id: parsedResult.resultId,
-                  type: parsedResult.type || 'geojson',  // Use type from tool result
-                  reference: parsedResult.reference || '',
-                  metadata: parsedResult.metadata || {}
-                } : undefined,
-                error: parsedResult.error,
-                metadata: {
-                  pluginId: step.pluginId,
-                  parameters: step.parameters,
-                  executedAt: new Date().toISOString()
-                }
-              };
-              
-              executionResults.set(step.stepId, analysisResult);
-              
-              // Register virtual data source for cross-step reference
-              if (parsedResult.success && parsedResult.resultId) {
-                VirtualDataSourceManagerInstance.register({
-                  id: parsedResult.resultId,
-                  conversationId: state.conversationId,
-                  stepId: step.stepId,
-                  data: {
-                    id: parsedResult.resultId,
-                    type: parsedResult.type || 'geojson',
-                    reference: parsedResult.reference || '',
-                    metadata: parsedResult.metadata || {}
-                  } as any
-                });
-              }
-              
-            } catch (error) {
-              console.error(`[Plugin Executor] Step ${step.stepId} failed:`, error);
-              executionResults.set(step.stepId, {
-                id: step.stepId,
-                goalId,
-                status: 'failed',
-                error: error instanceof Error ? error.message : 'Unknown error'
-              });
-            }
-          }
-          
-          // After completing ALL steps for this goal, publish services incrementally
-          console.log(`[Plugin Executor] Goal ${goalId} complete, publishing services...`);
-          
-          // Filter results for this goal only
-          const goalResults = new Map<string, any>();
-          for (const [stepId, result] of executionResults.entries()) {
-            if (result.goalId === goalId && result.status === 'success') {
-              goalResults.set(stepId, result);
-            }
-          }
-          
-          // Publish services for this goal
-          if (goalResults.size > 0) {
-            const goalServices = servicePublisher.publishBatch(goalResults);
-            console.log(`[Plugin Executor] Published ${goalServices.length} services for goal ${goalId}`);
+      if (result.executionResults) {
+        // Filter successful results
+        const successfulResults = new Map<string, AnalysisResult>();
+        for (const [stepId, analysisResult] of result.executionResults.entries()) {
+          if (analysisResult.status === 'success' && analysisResult.data) {
+            successfulResults.set(stepId, analysisResult);
             
-            // Add to accumulated services
-            allServices.push(...goalServices);
-            
-            // Stream partial results to frontend if callback provided
-            if (onPartialResult) {
-              for (const service of goalServices) {
-                console.log(`[Plugin Executor] Streaming partial result: ${service.id}`);
-                onPartialResult(service);
-              }
+            // Register virtual data source for cross-step reference
+            VirtualDataSourceManagerInstance.register({
+              id: analysisResult.data.id,
+              conversationId: state.conversationId,
+              stepId: stepId,
+              data: analysisResult.data as any
+            });
+          }
+        }
+        
+        // Publish services in batch
+        if (successfulResults.size > 0) {
+          const publishedServices = servicePublisher.publishBatch(successfulResults);
+          console.log(`[Plugin Executor] Published ${publishedServices.length} visualization services`);
+          allServices.push(...publishedServices);
+          
+          // Stream partial results to frontend if callback provided
+          if (onPartialResult) {
+            for (const service of publishedServices) {
+              console.log(`[Plugin Executor] Streaming partial result: ${service.id}`);
+              onPartialResult(service);
             }
           }
         }
       }
       
-      console.log(`[Plugin Executor] Execution complete. Results: ${executionResults.size}, Services: ${allServices.length}`);
+      console.log(`[Plugin Executor] Execution complete. Results: ${result.executionResults?.size || 0}, Services: ${allServices.length}`);
       
       return {
         currentStep: 'execution',
-        executionResults,
-        visualizationServices: allServices,  // Accumulate services incrementally
+        executionResults: result.executionResults,
+        visualizationServices: allServices,
+        errors: result.errors
       };
     })
     .addNode('outputGenerator', async (state: GeoAIStateType) => {
