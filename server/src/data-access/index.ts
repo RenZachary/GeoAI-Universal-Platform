@@ -13,6 +13,9 @@ export type {
   TableSchema,
   ColumnInfo,
   IndexInfo,
+  FilterCondition,
+  BufferOptions,
+  OverlayOptions,
 } from './interfaces';
 
 // Factory
