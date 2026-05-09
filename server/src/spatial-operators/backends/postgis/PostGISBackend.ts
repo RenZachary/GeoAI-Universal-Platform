@@ -7,7 +7,10 @@ import { generateId } from '../../../../core';
 import type { DataBackend } from '../DataBackend';
 import type { Pool } from 'pg';
 import { PostGISPoolManager } from '../../../../../data-access';
-import type { PostGISConnectionConfig } from '../../../../core';
+import type { PostGISConnectionConfig, FilterCondition, BufferOptions } from '../../../../core';
+import { PostGISBufferOperation } from './operations/PostGISBufferOperation';
+import { PostGISOverlayOperation } from './operations/PostGISOverlayOperation';
+import { PostGISFilterOperation } from './operations/PostGISFilterOperation';
 
 export class PostGISBackend implements DataBackend {
   readonly backendType = 'postgis' as const;
@@ -15,6 +18,9 @@ export class PostGISBackend implements DataBackend {
   private config: PostGISConnectionConfig;
   private pool: Pool | null = null;
   private schema: string;
+  private bufferOp: PostGISBufferOperation | null = null;
+  private overlayOp: PostGISOverlayOperation | null = null;
+  private filterOp: PostGISFilterOperation | null = null;
   
   constructor(config: PostGISConnectionConfig) {
     this.config = config;
@@ -28,34 +34,55 @@ export class PostGISBackend implements DataBackend {
   private async getPool(): Promise<Pool> {
     if (!this.pool) {
       this.pool = await PostGISPoolManager.getInstance().getPool(this.config);
+      // Initialize operations
+      this.bufferOp = new PostGISBufferOperation(this.pool!, this.schema);
+      this.overlayOp = new PostGISOverlayOperation(this.pool!, this.schema);
+      this.filterOp = new PostGISFilterOperation(this.pool!, this.schema);
     }
     return this.pool!;
   }
   
-  async buffer(reference: string, distance: number, options?: any): Promise<NativeData> {
-    const pool = await this.getPool();
-    const tableName = reference;
-    const unit = options?.unit || 'meters';
-    const distanceInDegrees = unit === 'meters' ? distance / 111320 : distance;
-    const resultTable = `buffer_${tableName}_${Date.now()}`;
-    
-    await pool.query(`
-      CREATE TABLE ${this.schema}.${resultTable} AS
-      SELECT ST_Buffer(geom, ${distanceInDegrees}) as geom, *
-      FROM ${this.schema}.${tableName}
-    `);
+  async buffer(reference: string, distance: number, options?: BufferOptions): Promise<NativeData> {
+    await this.getPool();
+    const resultTable = await this.bufferOp!.execute(reference, distance, options);
     
     return {
       id: generateId(),
       type: 'postgis',
       reference: resultTable,
-      metadata: { result: resultTable, description: `Buffer on ${tableName}`, featureCount: 0 },
+      metadata: { result: resultTable, description: `Buffer on ${reference}`, featureCount: 0 },
       createdAt: new Date()
     };
   }
   
-  async overlay(): Promise<NativeData> { throw new Error('PostGIS overlay not implemented'); }
-  async filter(): Promise<NativeData> { throw new Error('PostGIS filter not implemented'); }
+  async overlay(
+    reference1: string,
+    reference2: string,
+    operation: 'intersect' | 'union' | 'difference' | 'symmetric_difference'
+  ): Promise<NativeData> {
+    await this.getPool();
+    const resultTable = await this.overlayOp!.execute(reference1, reference2, operation);
+    
+    return {
+      id: generateId(),
+      type: 'postgis',
+      reference: resultTable,
+      metadata: { result: resultTable, description: `Overlay ${operation}` },
+      createdAt: new Date()
+    };
+  }
+  async filter(reference: string, filterCondition: FilterCondition): Promise<NativeData> {
+    await this.getPool();
+    const resultTable = await this.filterOp!.execute(reference, filterCondition);
+    
+    return {
+      id: generateId(),
+      type: 'postgis',
+      reference: resultTable,
+      metadata: { result: resultTable, description: `Filter applied` },
+      createdAt: new Date()
+    };
+  }
   async aggregate(): Promise<NativeData> { throw new Error('PostGIS aggregate not implemented'); }
   async spatialJoin(): Promise<NativeData> { throw new Error('PostGIS spatial join not implemented'); }
   async choropleth(): Promise<NativeData> { throw new Error('Choropleth is visualization concern'); }
