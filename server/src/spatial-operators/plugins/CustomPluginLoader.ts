@@ -328,13 +328,13 @@ export class CustomPluginLoader {
   }
 
   /**
-   * Upload and install plugin from zip/tar archive (placeholder)
+   * Upload and install plugin from zip/tar archive
+   * Note: Requires external library (adm-zip or tar) for extraction
    */
   async installFromArchive(archivePath: string): Promise<string> {
-    // TODO: Implement archive extraction
-    // - Extract archive to temporary directory
-    // - Find plugin.json
-    // - Validate and install
-    throw new Error('Archive installation not yet implemented');
+    // This feature requires additional dependencies:
+    // - adm-zip for .zip files
+    // - tar for .tar.gz files
+    throw new Error('Archive installation requires external library. Please extract manually and use installPlugin() instead.');
   }
 }
