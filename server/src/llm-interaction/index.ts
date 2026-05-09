@@ -19,6 +19,10 @@ export { GeoAIStreamingHandler } from './handlers/GeoAIStreamingHandler';
 export { GoalSplitterAgent } from './agents/GoalSplitterAgent';
 export { TaskPlannerAgent } from './agents/TaskPlannerAgent';
 
+// Analyzers (NEW v2.0)
+export { DataSourceSemanticAnalyzer, ParallelTaskAnalyzer } from './analyzers';
+export type { DataSourceSemanticInfo, ParallelGroup, DependencyGraph, TaskNode } from './analyzers';
+
 // Workflow
 export { 
   createGeoAIGraph, 

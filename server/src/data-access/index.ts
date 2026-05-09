@@ -30,6 +30,7 @@ export { DataAccessFacade, type VisualizationOptions } from './facade/DataAccess
 
 // Repositories
 export { DataSourceRepository } from './repositories/DataSourceRepository';
+export type { DataSourceRecord } from './repositories/DataSourceRepository';
 
 // Utilities
 export { DataSourceDetector } from './utils/DataSourceDetector';
