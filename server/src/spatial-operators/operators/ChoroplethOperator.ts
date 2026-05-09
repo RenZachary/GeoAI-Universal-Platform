@@ -4,7 +4,6 @@
 
 import { z } from 'zod';
 import { SpatialOperator, type OperatorContext } from '../SpatialOperator';
-import { DataAccessFacade } from '../../data-access';
 import { DataSourceRepository } from '../../data-access/repositories';
 import { ResultPersistenceService } from '../../services/ResultPersistenceService';
 import type Database from 'better-sqlite3';
@@ -51,7 +50,6 @@ export class ChoroplethOperator extends SpatialOperator {
     }
     
     const dataSourceRepo = new DataSourceRepository(this.db);
-    const dataAccess = DataAccessFacade.getInstance(this.workspaceBase);
     const resultPersistence = new ResultPersistenceService(this.db);
     
     const dataSource = dataSourceRepo.getById(params.dataSourceId);
@@ -60,22 +58,31 @@ export class ChoroplethOperator extends SpatialOperator {
       throw new Error(`Data source not found: ${params.dataSourceId}`);
     }
     
-    // Generate choropleth visualization
-    const result = await dataAccess.choropleth(
-      dataSource.type,
-      dataSource.reference,
-      params.valueField,
-      {
-        classification: params.classification,
-        numClasses: params.numClasses,
-        colorRamp: params.colorRamp,
-        opacity: params.opacity
-      }
-    );
+    // Choropleth is a frontend rendering concern
+    // Create style configuration for frontend to apply
+    const styleConfig = {
+      type: 'choropleth',
+      valueField: params.valueField,
+      classification: params.classification,
+      numClasses: params.numClasses,
+      colorRamp: params.colorRamp,
+      opacity: params.opacity,
+      layerName: params.layerName || dataSource.name
+    };
     
-    // Persist result
+    // Persist result with style metadata (no data transformation)
     const persisted = await resultPersistence.persistResult(
-      result,
+      {
+        id: `choropleth_${Date.now()}`,
+        type: dataSource.type,
+        reference: dataSource.reference, // Pass through original reference
+        metadata: {
+          ...dataSource.metadata,
+          result: dataSource.reference, // Standardized output field
+          styleConfig
+        },
+        createdAt: new Date()
+      },
       'choropleth',
       dataSource,
       { valueField: params.valueField }

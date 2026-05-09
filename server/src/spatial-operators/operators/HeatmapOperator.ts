@@ -4,7 +4,6 @@
 
 import { z } from 'zod';
 import { SpatialOperator, type OperatorContext } from '../SpatialOperator';
-import { DataAccessFacade } from '../../data-access';
 import { DataSourceRepository } from '../../data-access/repositories';
 import { ResultPersistenceService } from '../../services/ResultPersistenceService';
 import type Database from 'better-sqlite3';
@@ -50,7 +49,6 @@ export class HeatmapOperator extends SpatialOperator {
     }
     
     const dataSourceRepo = new DataSourceRepository(this.db);
-    const dataAccess = DataAccessFacade.getInstance(this.workspaceBase);
     const resultPersistence = new ResultPersistenceService(this.db);
     
     const dataSource = dataSourceRepo.getById(params.dataSourceId);
@@ -59,20 +57,30 @@ export class HeatmapOperator extends SpatialOperator {
       throw new Error(`Data source not found: ${params.dataSourceId}`);
     }
     
-    const result = await dataAccess.heatmap(
-      dataSource.type,
-      dataSource.reference,
-      {
-        radius: params.radius,
-        cellSize: params.cellSize,
-        weightField: params.weightField,
-        colorRamp: params.colorRamp,
-        outputFormat: params.outputFormat
-      }
-    );
+    // Heatmap is a frontend rendering concern (or requires actual KDE computation)
+    // For now, create style metadata for frontend to apply density visualization
+    const styleConfig = {
+      type: 'heatmap',
+      radius: params.radius,
+      cellSize: params.cellSize,
+      weightField: params.weightField,
+      colorRamp: params.colorRamp,
+      outputFormat: params.outputFormat
+    };
     
+    // Persist result with style metadata (no data transformation)
     const persisted = await resultPersistence.persistResult(
-      result,
+      {
+        id: `heatmap_${Date.now()}`,
+        type: dataSource.type,
+        reference: dataSource.reference, // Pass through original reference
+        metadata: {
+          ...dataSource.metadata,
+          result: dataSource.reference, // Standardized output field
+          styleConfig
+        },
+        createdAt: new Date()
+      },
       'heatmap',
       dataSource,
       { radius: params.radius }

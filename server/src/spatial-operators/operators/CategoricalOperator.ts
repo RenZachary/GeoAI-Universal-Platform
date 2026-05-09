@@ -4,7 +4,6 @@
 
 import { z } from 'zod';
 import { SpatialOperator, type OperatorContext } from '../SpatialOperator';
-import { DataAccessFacade } from '../../data-access';
 import { DataSourceRepository } from '../../data-access/repositories';
 import { ResultPersistenceService } from '../../services/ResultPersistenceService';
 import type Database from 'better-sqlite3';
@@ -50,7 +49,6 @@ export class CategoricalOperator extends SpatialOperator {
     }
     
     const dataSourceRepo = new DataSourceRepository(this.db);
-    const dataAccess = DataAccessFacade.getInstance(this.workspaceBase);
     const resultPersistence = new ResultPersistenceService(this.db);
     
     const dataSource = dataSourceRepo.getById(params.dataSourceId);
@@ -59,18 +57,33 @@ export class CategoricalOperator extends SpatialOperator {
       throw new Error(`Data source not found: ${params.dataSourceId}`);
     }
     
-    const result = await dataAccess.categorical(
-      dataSource.type,
-      dataSource.reference,
-      params.categoryField,
-      {
-        colorPalette: params.colorPalette,
-        opacity: params.opacity
-      }
-    );
+    // Categorical rendering is a frontend concern
+    // Create style configuration for frontend to apply distinct colors per category
+    const styleConfig = {
+      type: 'categorical',
+      categoryField: params.categoryField,
+      colorPalette: params.colorPalette,
+      opacity: params.opacity,
+      layerName: params.layerName || dataSource.name
+    };
     
+    // Categories will be extracted by frontend from actual data
+    const categories: string[] = [];
+    
+    // Persist result with style metadata (no data transformation)
     const persisted = await resultPersistence.persistResult(
-      result,
+      {
+        id: `categorical_${Date.now()}`,
+        type: dataSource.type,
+        reference: dataSource.reference, // Pass through original reference
+        metadata: {
+          ...dataSource.metadata,
+          result: dataSource.reference, // Standardized output field
+          styleConfig,
+          categories
+        },
+        createdAt: new Date()
+      },
       'categorical',
       dataSource,
       { categoryField: params.categoryField }
