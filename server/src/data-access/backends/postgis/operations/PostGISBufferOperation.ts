@@ -3,7 +3,7 @@
  */
 
 import type { Pool } from 'pg';
-import type { BufferOptions } from '../../../../../../data-access';
+import type { BufferOptions } from '../../../interfaces';
 
 export class PostGISBufferOperation {
   private pool: Pool;

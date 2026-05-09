@@ -3,7 +3,7 @@
  */
 
 import * as turf from '@turf/turf';
-import type { FilterCondition } from '../../../../../../data-access';
+import type { FilterCondition } from '../../../interfaces';
 
 interface GeoJSONFeatureCollection {
   type: 'FeatureCollection';

@@ -8,16 +8,8 @@
 export { SpatialOperator, type OperatorContext, type OperatorResult } from './SpatialOperator';
 export { SpatialOperatorRegistry, SpatialOperatorRegistryInstance } from './SpatialOperatorRegistry';
 
-// Data Access Backends (NEW v2.0)
-export { 
-  type DataBackend,
-  VectorBackend,
-  RasterBackend,
-  PostGISBackend 
-} from './backends';
-
 // Data Access Facade (NEW v2.0)
-export { DataAccessFacade, type VisualizationOptions } from './facade/DataAccessFacade';
+export { DataAccessFacade, type VisualizationOptions } from '../data-access/facade/DataAccessFacade';
 
 // Analysis Operators
 export { BufferOperator } from './operators/BufferOperator';

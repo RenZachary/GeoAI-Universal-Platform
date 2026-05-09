@@ -5,8 +5,8 @@
 import fs from 'fs';
 import path from 'path';
 import { fromFile } from 'geotiff';
-import type { NativeData, DataMetadata } from '../../../../core';
-import { generateId } from '../../../../core';
+import type { NativeData, DataMetadata } from '../../../core';
+import { generateId } from '../../../core';
 import type { DataBackend } from '../DataBackend';
 
 export class RasterBackend implements DataBackend {

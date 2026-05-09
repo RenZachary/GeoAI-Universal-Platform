@@ -3,7 +3,7 @@
  */
 
 import * as turf from '@turf/turf';
-import type { BufferOptions } from '../../../../../../data-access';
+import type { BufferOptions } from '../../../interfaces';
 
 interface GeoJSONFeatureCollection {
   type: 'FeatureCollection';

@@ -3,7 +3,7 @@
  */
 
 import type { Pool } from 'pg';
-import type { FilterCondition } from '../../../../../../data-access';
+import type { FilterCondition } from '../../../interfaces';
 
 export class PostGISFilterOperation {
   private pool: Pool;

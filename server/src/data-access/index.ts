@@ -1,8 +1,7 @@
 /**
- * Data Access Layer - Type Definitions and Utilities
+ * Data Access Layer - Complete Implementation
  * 
- * NOTE: Accessor implementations have been migrated to spatial-operators/backends.
- * This module now only provides shared types and utility classes.
+ * Unified data access architecture with Backend pattern.
  */
 
 // Core interfaces (type-only exports)
@@ -19,6 +18,15 @@ export type {
   BufferOptions,
   OverlayOptions,
 } from './interfaces';
+
+// Backend implementations (NEW v2.0)
+export type { DataBackend } from './backends/DataBackend';
+export { VectorBackend } from './backends/vector';
+export { RasterBackend } from './backends/raster';
+export { PostGISBackend } from './backends/postgis';
+
+// DataAccessFacade (NEW v2.0)
+export { DataAccessFacade, type VisualizationOptions } from './facade/DataAccessFacade';
 
 // Repositories
 export { DataSourceRepository } from './repositories/DataSourceRepository';

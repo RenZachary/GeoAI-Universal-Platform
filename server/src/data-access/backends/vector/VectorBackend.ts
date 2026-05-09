@@ -8,9 +8,9 @@
 import fs from 'fs';
 import path from 'path';
 import * as turf from '@turf/turf';
-import type { NativeData, DataMetadata } from '../../../../core';
-import { generateId } from '../../../../core';
-import type { FilterCondition, BufferOptions } from '../../../../../data-access';
+import type { NativeData, DataMetadata } from '../../../core';
+import { generateId } from '../../../core';
+import type { FilterCondition, BufferOptions } from '../../interfaces';
 import type { DataBackend } from '../DataBackend';
 import { BufferOperation } from './operations/BufferOperation';
 import { OverlayOperation } from './operations/OverlayOperation';

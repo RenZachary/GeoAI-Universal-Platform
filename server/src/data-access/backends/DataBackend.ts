@@ -6,7 +6,7 @@
  */
 
 import type { NativeData, DataSourceType } from '../../core';
-import type { FilterCondition, BufferOptions, OverlayOptions } from '../../../data-access';
+import type { FilterCondition, BufferOptions, OverlayOptions } from '../interfaces';
 
 /**
  * Base interface for all data backends

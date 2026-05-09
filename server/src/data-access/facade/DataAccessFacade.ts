@@ -6,7 +6,7 @@
  */
 
 import type { NativeData, DataSourceType } from '../../core';
-import type { FilterCondition, BufferOptions, OverlayOptions } from '../../../data-access';
+import type { FilterCondition, BufferOptions, OverlayOptions } from '../interfaces';
 import type { DataBackend } from '../backends';
 import { VectorBackend } from '../backends/vector';
 import { RasterBackend } from '../backends/raster';
