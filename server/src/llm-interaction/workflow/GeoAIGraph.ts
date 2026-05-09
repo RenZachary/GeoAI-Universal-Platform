@@ -11,7 +11,7 @@ import type Database from 'better-sqlite3';
 import { PromptManager } from '../managers/PromptManager';
 import { GoalSplitterAgent } from '../agents/GoalSplitterAgent';
 import { TaskPlannerAgent } from '../agents/TaskPlannerAgent';
-import { ToolRegistryInstance } from '../../plugin-orchestration';
+import { ToolRegistryInstance } from '../tools/ToolRegistry';
 import { ConversationBufferMemoryWithSQLite } from '../managers/ConversationMemoryManager';
 import { ServicePublisher } from './ServicePublisher';
 import { SummaryGenerator } from './SummaryGenerator';

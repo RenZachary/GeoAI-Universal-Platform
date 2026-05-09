@@ -8,6 +8,13 @@
 export { SpatialOperator, type OperatorContext, type OperatorResult } from './SpatialOperator';
 export { SpatialOperatorRegistry, SpatialOperatorRegistryInstance } from './SpatialOperatorRegistry';
 
+// Core utilities
+export { ToolAdapter } from './core/ToolAdapter';
+
+// Plugins support
+export { CustomPluginLoader } from './plugins/CustomPluginLoader';
+export type { PluginManifest, PluginStatus } from './plugins/CustomPluginLoader';
+
 // Data Access Facade (NEW v2.0)
 export { DataAccessFacade, type VisualizationOptions } from '../data-access/facade/DataAccessFacade';
 

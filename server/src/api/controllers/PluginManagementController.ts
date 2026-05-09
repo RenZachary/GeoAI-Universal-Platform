@@ -4,7 +4,7 @@
  */
 
 import type { Request, Response } from 'express';
-import type { CustomPluginLoader } from '../../plugin-orchestration';
+import type { CustomPluginLoader } from '../../spatial-operators/plugins/CustomPluginLoader';
 
 export class PluginManagementController {
   private pluginLoader: CustomPluginLoader;

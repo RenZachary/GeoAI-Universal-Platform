@@ -17,7 +17,7 @@ import { LLMConfigController } from '../controllers/LLMConfigController';
 import { DataSourceService, FileUploadService, PromptTemplateService, getMVTOnDemandPublisher, ConversationService } from '../../services';
 import { DataSourceRepository } from '../../data-access/repositories';
 import type { LLMConfig } from '../../llm-interaction';
-import {  type CustomPluginLoader } from '../../plugin-orchestration';
+import type { CustomPluginLoader } from '../../spatial-operators/plugins/CustomPluginLoader';
 import { SQLiteManagerInstance } from '../../storage/';
 
 export class ApiRouter {

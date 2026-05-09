@@ -11,7 +11,7 @@ import fs from 'fs';
 import { WorkspaceManagerInstance, CleanupScheduler, PostGISCleanupScheduler } from './storage';
 import { SQLiteManagerInstance } from './storage';
 import { ApiRouter } from './api/routes';
-import { CustomPluginLoader, registerAllExecutors, registerAllPluginCapabilities } from './plugin-orchestration';
+import { CustomPluginLoader } from './spatial-operators/plugins/CustomPluginLoader';
 import { LLMConfigManagerInstance } from './services/LLMConfigService';
 import { scanAndRegisterDataFiles } from './utils/DataDirectoryScanner';
 
@@ -99,15 +99,9 @@ async function startServer() {
     await customPluginLoader.loadAllPlugins();
     console.log(`Plugin system initialized with ${customPluginLoader.getAllPluginStatuses().length} plugins`);
     
-    // Register all executors with ExecutorRegistry
-    console.log('Registering plugin executors...');
-    registerAllExecutors();
-    console.log('Executor registration complete');
-    
-    // Register all plugin capabilities with PluginCapabilityRegistry
-    console.log('Registering plugin capabilities...');
-    registerAllPluginCapabilities();
-    console.log('Plugin capability registration complete');
+    // NOTE: Executor and capability registration removed in v2.0
+    // All operators are now registered via SpatialOperatorRegistry
+    console.log('Spatial operators registered via SpatialOperatorRegistry');
     
     // Initialize API routes after database is ready
     const apiRouter = new ApiRouter(llmConfig, WORKSPACE_BASE, customPluginLoader);

@@ -7,8 +7,8 @@ import fs from 'fs';
 import path from 'path';
 import {  pathToFileURL } from 'url';
 import type { Plugin, PluginCategory } from '../../core';
-import { ToolRegistryInstance } from '../registry/ToolRegistry';
-import { ExecutorRegistryInstance } from '../registry/ExecutorRegistry';
+import { SpatialOperatorRegistryInstance } from '../SpatialOperatorRegistry';
+import { ToolAdapter } from '../core/ToolAdapter';
 
 export interface PluginManifest {
   id: string;
@@ -113,7 +113,8 @@ export class CustomPluginLoader {
     // Validate manifest
     this.validateManifest(manifest);
 
-    // Create Plugin object
+    // Convert to SpatialOperator and register with registry
+    // For custom plugins without executor, create a mock operator
     const plugin: Plugin = {
       id: manifest.id,
       name: manifest.name,
@@ -127,15 +128,10 @@ export class CustomPluginLoader {
       installedAt: new Date()
     };
 
-    // Register with ToolRegistry (for LLM tool discovery)
-    await ToolRegistryInstance.registerPlugin(plugin);
-
-    // Load and register executor if specified
-    if (manifest.main) {
-      await this.loadAndRegisterExecutor(pluginPath, manifest);
-    } else {
-      console.warn(`[CustomPluginLoader] No executor specified for plugin ${manifest.id}. Plugin will return mock data.`);
-    }
+    // TODO: Convert Plugin to SpatialOperator and register
+    // For now, we'll skip registration until full migration
+    console.log(`[CustomPluginLoader] Registered plugin metadata: ${manifest.name} v${manifest.version}`);
+    console.warn(`[CustomPluginLoader] Custom plugin execution not yet supported in v2.0 architecture`);
 
     // Update status
     this.pluginStatuses.set(manifest.id, {
@@ -151,67 +147,7 @@ export class CustomPluginLoader {
     console.log(`[CustomPluginLoader] Loaded plugin: ${manifest.name} v${manifest.version}`);
   }
 
-  /**
-   * Load executor module and register with ExecutorRegistry
-   */
-  private async loadAndRegisterExecutor(pluginPath: string, manifest: PluginManifest): Promise<void> {
-    try {
-      const executorPath = path.join(pluginPath, manifest.main!);
-      
-      // Check if executor file exists
-      if (!fs.existsSync(executorPath)) {
-        throw new Error(`Executor file not found: ${executorPath}`);
-      }
 
-      // Dynamically import the executor module
-      // Convert to file:// URL for ESM compatibility
-      const executorUrl = pathToFileURL(executorPath).href;
-      const executorModule = await import(executorUrl);
-
-      // Get the execute function (support both default export and named export)
-      const executeFunction = executorModule.default || executorModule.execute;
-
-      if (typeof executeFunction !== 'function') {
-        throw new Error(`Executor must export an execute function. Got: ${typeof executeFunction}`);
-      }
-
-      // Register executor factory with ExecutorRegistry
-      ExecutorRegistryInstance.register(
-        manifest.id,
-        (db, workspaceBase) => ({
-          execute: async (params: Record<string, any>) => {
-            try {
-              // Call the custom executor with parameters
-              const result = await executeFunction(params, { db, workspaceBase });
-              
-              // Ensure result has required fields
-              if (!result || typeof result !== 'object') {
-                throw new Error('Executor must return an object');
-              }
-
-              // Add default fields if missing
-              return {
-                id: result.id || `custom_${manifest.id}_${Date.now()}`,
-                type: result.type || 'geojson',
-                reference: result.reference || '',
-                metadata: result.metadata || {},
-                createdAt: result.createdAt || new Date(),
-                ...result
-              };
-            } catch (error) {
-              console.error(`[CustomPluginLoader] Executor execution failed for ${manifest.id}:`, error);
-              throw error;
-            }
-          }
-        })
-      );
-
-      console.log(`[CustomPluginLoader] Registered executor for plugin: ${manifest.id}`);
-    } catch (error) {
-      console.error(`[CustomPluginLoader] Failed to load executor for ${manifest.id}:`, error);
-      throw error;
-    }
-  }
 
   /**
    * Validate plugin manifest structure
@@ -253,7 +189,7 @@ export class CustomPluginLoader {
   }
 
   /**
-   * Disable a plugin (unregister from ToolRegistry)
+   * Disable a plugin
    */
   disablePlugin(pluginId: string): void {
     const status = this.pluginStatuses.get(pluginId);
@@ -267,8 +203,8 @@ export class CustomPluginLoader {
       return;
     }
 
-    // Unregister from ToolRegistry
-    ToolRegistryInstance.unregisterPlugin(pluginId);
+    // TODO: Unregister from SpatialOperatorRegistry
+    // SpatialOperatorRegistryInstance.unregister(pluginId);
 
     // Update status
     status.status = 'disabled';
@@ -278,7 +214,7 @@ export class CustomPluginLoader {
   }
 
   /**
-   * Enable a plugin (re-register with ToolRegistry)
+   * Enable a plugin
    */
   async enablePlugin(pluginId: string): Promise<void> {
     const status = this.pluginStatuses.get(pluginId);
@@ -292,7 +228,7 @@ export class CustomPluginLoader {
       return;
     }
 
-    // Reload plugin (this will also reload the executor)
+    // Reload plugin
     const pluginPath = path.join(this.customPluginsDir, pluginId);
     await this.loadPlugin(pluginPath);
 
@@ -313,7 +249,8 @@ export class CustomPluginLoader {
 
     // Unregister if enabled
     if (status.status === 'enabled') {
-      ToolRegistryInstance.unregisterPlugin(pluginId);
+      // TODO: Unregister from SpatialOperatorRegistry
+      // SpatialOperatorRegistryInstance.unregister(pluginId);
     }
 
     // Remove from filesystem
