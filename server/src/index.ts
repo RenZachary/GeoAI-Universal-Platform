@@ -14,6 +14,7 @@ import { ApiRouter } from './api/routes';
 import { CustomPluginLoader } from './spatial-operators/plugins/CustomPluginLoader';
 import { LLMConfigManagerInstance } from './services/LLMConfigService';
 import { scanAndRegisterDataFiles } from './utils/DataDirectoryScanner';
+import { ResultPersistenceService } from './services/ResultPersistenceService';
 
 // Load environment variables
 const __filename = fileURLToPath(import.meta.url);
@@ -92,6 +93,36 @@ async function startServer() {
     });
     cleanupScheduler.start();
     console.log('Filesystem cleanup scheduler started');
+    
+    // Initialize intermediate result file cleanup
+    console.log('Initializing intermediate result cleanup...');
+    const db = SQLiteManagerInstance.getDatabase();
+    const resultPersistenceService = new ResultPersistenceService(db);
+    
+    // Clean up old intermediate files on startup (TTL: 24 hours)
+    try {
+      const cleanedCount = await resultPersistenceService.cleanupOldIntermediateFiles(24);
+      console.log(`Cleaned up ${cleanedCount} old intermediate result files on startup`);
+    } catch (error) {
+      console.error('Failed to clean up intermediate files:', error);
+    }
+    
+    // Schedule periodic cleanup (every 6 hours)
+    const intermediateCleanupInterval = setInterval(async () => {
+      try {
+        const cleanedCount = await resultPersistenceService.cleanupOldIntermediateFiles(24);
+        if (cleanedCount > 0) {
+          console.log(`Periodic cleanup: removed ${cleanedCount} old intermediate files`);
+        }
+      } catch (error) {
+        console.error('Periodic intermediate file cleanup failed:', error);
+      }
+    }, 6 * 60 * 60 * 1000); // 6 hours
+    
+    // Prevent interval from keeping process alive
+    if (intermediateCleanupInterval.unref) {
+      intermediateCleanupInterval.unref();
+    }
     
     // Initialize plugin system
     console.log('Initializing plugin system...');
