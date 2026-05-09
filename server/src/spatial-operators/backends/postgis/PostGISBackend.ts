@@ -11,6 +11,9 @@ import type { PostGISConnectionConfig, FilterCondition, BufferOptions } from '..
 import { PostGISBufferOperation } from './operations/PostGISBufferOperation';
 import { PostGISOverlayOperation } from './operations/PostGISOverlayOperation';
 import { PostGISFilterOperation } from './operations/PostGISFilterOperation';
+import { PostGISAggregationOperation } from './operations/PostGISAggregationOperation';
+import { PostGISSpatialJoinOperation } from './operations/PostGISSpatialJoinOperation';
+import { PostGISStatisticalOperation } from './operations/PostGISStatisticalOperation';
 
 export class PostGISBackend implements DataBackend {
   readonly backendType = 'postgis' as const;
@@ -21,6 +24,9 @@ export class PostGISBackend implements DataBackend {
   private bufferOp: PostGISBufferOperation | null = null;
   private overlayOp: PostGISOverlayOperation | null = null;
   private filterOp: PostGISFilterOperation | null = null;
+  private aggOp: PostGISAggregationOperation | null = null;
+  private joinOp: PostGISSpatialJoinOperation | null = null;
+  private statOp: PostGISStatisticalOperation | null = null;
   
   constructor(config: PostGISConnectionConfig) {
     this.config = config;
@@ -38,6 +44,9 @@ export class PostGISBackend implements DataBackend {
       this.bufferOp = new PostGISBufferOperation(this.pool!, this.schema);
       this.overlayOp = new PostGISOverlayOperation(this.pool!, this.schema);
       this.filterOp = new PostGISFilterOperation(this.pool!, this.schema);
+      this.aggOp = new PostGISAggregationOperation(this.pool!, this.schema);
+      this.joinOp = new PostGISSpatialJoinOperation(this.pool!, this.schema);
+      this.statOp = new PostGISStatisticalOperation(this.pool!, this.schema);
     }
     return this.pool!;
   }
@@ -83,8 +92,40 @@ export class PostGISBackend implements DataBackend {
       createdAt: new Date()
     };
   }
-  async aggregate(): Promise<NativeData> { throw new Error('PostGIS aggregate not implemented'); }
-  async spatialJoin(): Promise<NativeData> { throw new Error('PostGIS spatial join not implemented'); }
+  async aggregate(
+    reference: string,
+    aggFunc: string,
+    field: string,
+    returnFeature?: boolean
+  ): Promise<NativeData> {
+    await this.getPool();
+    const { resultTable, value } = await this.aggOp!.execute(reference, aggFunc, field, returnFeature);
+    
+    return {
+      id: generateId(),
+      type: 'postgis',
+      reference: resultTable,
+      metadata: { result: resultTable, description: `Aggregation ${aggFunc} on ${field}: ${value}` },
+      createdAt: new Date()
+    };
+  }
+  async spatialJoin(
+    targetReference: string,
+    joinReference: string,
+    operation: string,
+    joinType?: string
+  ): Promise<NativeData> {
+    await this.getPool();
+    const resultTable = await this.joinOp!.execute(targetReference, joinReference, operation, joinType);
+    
+    return {
+      id: generateId(),
+      type: 'postgis',
+      reference: resultTable,
+      metadata: { result: resultTable, description: `Spatial join (${operation})` },
+      createdAt: new Date()
+    };
+  }
   async choropleth(): Promise<NativeData> { throw new Error('Choropleth is visualization concern'); }
   async heatmap(): Promise<NativeData> { throw new Error('Heatmap is visualization concern'); }
   async categorical(): Promise<NativeData> { throw new Error('Categorical is visualization concern'); }
