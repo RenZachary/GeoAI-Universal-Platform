@@ -1096,9 +1096,9 @@ The refactoring focuses on **organization and routing**, not changing the underl
 
 ## 🔗 Related Documents
 
-- [REFACTORING-PLAN-v2.0.md](./REFACTORING-PLAN-v2.0.md) - Overall refactoring plan
-- [SPATIAL-OPERATOR-ARCHITECTURE.md](./SPATIAL-OPERATOR-ARCHITECTURE.md) - Operator design
-- [GIS-TASK-SPLITTING-STRATEGY.md](./GIS-TASK-SPLITTING-STRATEGY.md) - Task planning
+- [02-REFACTORING-PLAN-v2.0.md](./02-REFACTORING-PLAN-v2.0.md) - Overall refactoring plan
+- [03-SPATIAL-OPERATOR-ARCHITECTURE.md](./03-SPATIAL-OPERATOR-ARCHITECTURE.md) - Operator design
+- [04-GIS-TASK-SPLITTING-STRATEGY.md](./04-GIS-TASK-SPLITTING-STRATEGY.md) - Task planning
 
 ---
 

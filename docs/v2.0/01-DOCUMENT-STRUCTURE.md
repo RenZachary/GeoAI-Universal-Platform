@@ -4,7 +4,7 @@
 
 ### ⭐ 核心文档 (必读)
 
-#### 1. [REFACTORING-PLAN-v2.0.md](./REFACTORING-PLAN-v2.0.md) - 总体重构规划
+#### 1. [02-REFACTORING-PLAN-v2.0.md](./02-REFACTORING-PLAN-v2.0.md) - 总体重构规划
 **文件大小**: ~900行 (精简后)  
 **阅读时间**: 15分钟  
 **核心内容**:
@@ -20,7 +20,7 @@
 
 ### 🔧 技术细节文档 (按需阅读)
 
-#### 2. [SPATIAL-OPERATOR-ARCHITECTURE.md](./SPATIAL-OPERATOR-ARCHITECTURE.md) - 算子架构设计
+#### 2. [03-SPATIAL-OPERATOR-ARCHITECTURE.md](./03-SPATIAL-OPERATOR-ARCHITECTURE.md) - 算子架构设计
 **文件大小**: ~800行  
 **阅读时间**: 20分钟  
 **核心内容**:
@@ -33,7 +33,7 @@
 
 ---
 
-#### 3. [GIS-TASK-SPLITTING-STRATEGY.md](./GIS-TASK-SPLITTING-STRATEGY.md) - 任务拆分策略
+#### 3. [04-GIS-TASK-SPLITTING-STRATEGY.md](./04-GIS-TASK-SPLITTING-STRATEGY.md) - 任务拆分策略
 **文件大小**: ~700行  
 **阅读时间**: 15分钟  
 **核心内容**:
@@ -48,7 +48,7 @@
 
 ### 📖 补充文档 (已完成)
 
-#### 4. [DATA-ACCESS-FACADE.md](./DATA-ACCESS-FACADE.md) - 数据访问门面
+#### 4. [05-DATA-ACCESS-FACADE.md](./05-DATA-ACCESS-FACADE.md) - 数据访问门面
 **文件大小**: ~860行  
 **阅读时间**: 20分钟  
 **核心内容**:
@@ -61,7 +61,7 @@
 
 ---
 
-#### 5. [MIGRATION-GUIDE.md](./MIGRATION-GUIDE.md) - 迁移指南
+#### 5. [06-MIGRATION-GUIDE.md](./06-MIGRATION-GUIDE.md) - 迁移指南
 **文件大小**: ~845行  
 **阅读时间**: 30分钟  
 **核心内容**:
@@ -80,21 +80,21 @@
 ```
 你是?
 ├─ 架构师/技术负责人
-│  └─ 阅读: REFACTORING-PLAN-v2.0.md (整体把握)
+│  └─ 阅读: 02-REFACTORING-PLAN-v2.0.md (整体把握)
 │
 ├─ 后端开发者
-│  ├─ 首先: REFACTORING-PLAN-v2.0.md (了解目标)
-│  └─ 然后: SPATIAL-OPERATOR-ARCHITECTURE.md (实现细节)
+│  ├─ 首先: 02-REFACTORING-PLAN-v2.0.md (了解目标)
+│  └─ 然后: 03-SPATIAL-OPERATOR-ARCHITECTURE.md (实现细节)
 │
 ├─ AI/LLM开发者
-│  ├─ 首先: REFACTORING-PLAN-v2.0.md (了解目标)
-│  └─ 然后: GIS-TASK-SPLITTING-STRATEGY.md (Agent设计)
+│  ├─ 首先: 02-REFACTORING-PLAN-v2.0.md (了解目标)
+│  └─ 然后: 04-GIS-TASK-SPLITTING-STRATEGY.md (Agent设计)
 │
 ├─ 产品经理
-│  └─ 阅读: REFACTORING-PLAN-v2.0.md 的"预期收益"章节
+│  └─ 阅读: 02-REFACTORING-PLAN-v2.0.md 的"预期收益"章节
 │
 └─ 新加入团队
-   └─ 阅读: REFACTORING-PLAN-v2.0.md (快速上手)
+   └─ 阅读: 02-REFACTORING-PLAN-v2.0.md (快速上手)
 ```
 
 ---
@@ -134,9 +134,9 @@
 
 ## 💡 使用建议
 
-1. **第一次阅读**: 只看 REFACTORING-PLAN-v2.0.md
+1. **第一次阅读**: 只看 02-REFACTORING-PLAN-v2.0.md
 2. **需要实现时**: 查阅对应的技术细节文档
-3. **遇到问题**: 参考迁移指南 (待编写)
+3. **遇到问题**: 参考 06-MIGRATION-GUIDE.md
 
 ---
 

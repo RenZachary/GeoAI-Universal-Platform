@@ -1309,7 +1309,7 @@ interface ExecutionPlan {
 - [四层递进式GIS任务拆分策略](./GIS-TASK-SPLITTING-STRATEGY.md)
 - [SpatialOperator架构设计](./SPATIAL-OPERATOR-ARCHITECTURE.md)
 - [并行执行引擎设计](./PARALLEL-EXECUTION-ENGINE.md)
-- [迁移指南: v1.0 → v2.0](./MIGRATION-GUIDE.md)
+- [迁移指南: v1.0 → v2.0](./06-MIGRATION-GUIDE.md)
 
 ---
 

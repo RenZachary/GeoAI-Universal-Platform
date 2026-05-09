@@ -2,13 +2,13 @@
 
 ## 📚 快速导航
 
-**新加入? 从这里开始** → [DOCUMENT-STRUCTURE.md](./DOCUMENT-STRUCTURE.md) (5分钟了解文档层次)
+**新加入? 从这里开始** → [01-DOCUMENT-STRUCTURE.md](./01-DOCUMENT-STRUCTURE.md) (5分钟了解文档层次)
 
 ---
 
 ## ⭐ 核心文档 (按阅读顺序)
 
-### 1. [REFACTORING-PLAN-v2.0.md](./REFACTORING-PLAN-v2.0.md) - 总体重构规划
+### 1. [02-REFACTORING-PLAN-v2.0.md](./02-REFACTORING-PLAN-v2.0.md) - 总体重构规划
 **阅读时间**: 15分钟 | **重要性**: ⭐⭐⭐⭐⭐
 
 **核心内容**:
@@ -22,7 +22,7 @@
 
 ---
 
-### 2. [SPATIAL-OPERATOR-ARCHITECTURE.md](./SPATIAL-OPERATOR-ARCHITECTURE.md) - 算子架构
+### 2. [03-SPATIAL-OPERATOR-ARCHITECTURE.md](./03-SPATIAL-OPERATOR-ARCHITECTURE.md) - 算子架构
 **阅读时间**: 20分钟 | **重要性**: ⭐⭐⭐⭐
 
 **核心内容**:
@@ -34,7 +34,7 @@
 
 ---
 
-### 3. [GIS-TASK-SPLITTING-STRATEGY.md](./GIS-TASK-SPLITTING-STRATEGY.md) - 任务拆分策略
+### 3. [04-GIS-TASK-SPLITTING-STRATEGY.md](./04-GIS-TASK-SPLITTING-STRATEGY.md) - 任务拆分策略
 **阅读时间**: 15分钟 | **重要性**: ⭐⭐⭐⭐
 
 **核心内容**:
@@ -46,39 +46,30 @@
 
 ---
 
-### 4. [PARALLEL-EXECUTION-ENGINE.md](./PARALLEL-EXECUTION-ENGINE.md) - 并行执行引擎 *(待编写)*
-**计划内容**:
-- DAG依赖图构建算法
-- 并行组识别与调度
-- 资源管理与并发控制
-- 异常回退与中间结果持久化
-- 性能基准测试
+### 4. [05-DATA-ACCESS-FACADE.md](./05-DATA-ACCESS-FACADE.md) - 数据访问门面
+**阅读时间**: 20分钟 | **重要性**: ⭐⭐⭐⭐
 
-**适合读者**: 工作流引擎开发者、性能优化工程师
+**核心内容**:
+- DataBackend接口设计 (Vector/Raster/PostGIS)
+- DataAccessFacade路由逻辑
+- Turf.js vs GDAL 技术选型说明
+- 后端实现示例
 
----
-
-### 5. [DATA-ACCESS-FACADE.md](./DATA-ACCESS-FACADE.md) - 数据访问门面设计 *(待编写)*
-**计划内容**:
-- Backend抽象层 (GDAL/PostGIS/WebService)
-- Operator到Backend的映射机制
-- 统一错误处理与日志
-- 缓存策略与性能优化
-- 扩展新数据源指南
-
-**适合读者**: 数据访问层开发者、GIS后端工程师
+**适合**: 数据层开发者、GIS后端工程师
 
 ---
 
-### 6. [MIGRATION-GUIDE.md](./MIGRATION-GUIDE.md) - v1.0 → v2.0 迁移指南 *(待编写)*
-**计划内容**:
+### 5. [06-MIGRATION-GUIDE.md](./06-MIGRATION-GUIDE.md) - 迁移指南
+**阅读时间**: 30分钟 | **重要性**: ⭐⭐⭐
+
+**核心内容**:
+- 8周分阶段迁移计划
+- 代码迁移示例 (v1.0 → v2.0对照)
 - 自动化迁移脚本
-- 手动迁移步骤详解
-- 常见陷阱与解决方案
-- 兼容性测试清单
+- 测试与部署清单
 - 回滚策略
 
-**适合读者**: 运维工程师、系统集成商、升级实施团队
+**适合**: 运维工程师、系统集成商、升级实施团队
 
 ---
 
@@ -86,23 +77,23 @@
 
 ### 对于新加入的开发者
 
-1. **首先阅读**: [REFACTORING-PLAN-v2.0.md](./REFACTORING-PLAN-v2.0.md) 了解整体架构
+1. **首先阅读**: [02-REFACTORING-PLAN-v2.0.md](./02-REFACTORING-PLAN-v2.0.md) 了解整体架构
 2. **然后深入**: 根据你的职责选择对应文档
-   - LLM/AI开发 → [GIS-TASK-SPLITTING-STRATEGY.md](./GIS-TASK-SPLITTING-STRATEGY.md)
-   - 后端开发 → [SPATIAL-OPERATOR-ARCHITECTURE.md](./SPATIAL-OPERATOR-ARCHITECTURE.md)
-   - 工作流开发 → [PARALLEL-EXECUTION-ENGINE.md](./PARALLEL-EXECUTION-ENGINE.md)
-3. **实践操作**: 参考迁移指南进行代码重构
+   - LLM/AI开发 → [04-GIS-TASK-SPLITTING-STRATEGY.md](./04-GIS-TASK-SPLITTING-STRATEGY.md)
+   - 后端开发 → [03-SPATIAL-OPERATOR-ARCHITECTURE.md](./03-SPATIAL-OPERATOR-ARCHITECTURE.md)
+   - 数据层开发 → [05-DATA-ACCESS-FACADE.md](./05-DATA-ACCESS-FACADE.md)
+3. **实践操作**: 参考 [06-MIGRATION-GUIDE.md](./06-MIGRATION-GUIDE.md) 进行代码重构
 
 ### 对于架构评审委员会
 
-1. 审阅 [REFACTORING-PLAN-v2.0.md](./REFACTORING-PLAN-v2.0.md) 的目标与收益
+1. 审阅 [02-REFACTORING-PLAN-v2.0.md](./02-REFACTORING-PLAN-v2.0.md) 的目标与收益
 2. 评估 Breaking Changes 对现有用户的影响
 3. 确认12周实施时间表的可行性
 4. 批准技术债务清理优先级
 
 ### 对于产品经理
 
-1. 关注 [REFACTORING-PLAN-v2.0.md](./REFACTORING-PLAN-v2.0.md) 中的用户体验改进
+1. 关注 [02-REFACTORING-PLAN-v2.0.md](./02-REFACTORING-PLAN-v2.0.md) 中的用户体验改进
 2. 了解新功能: 数据预校验、并行执行、中间结果查看
 3. 规划v2.0发布后的用户沟通策略
 
@@ -125,13 +116,13 @@
 
 ```
 docs/v2.0/
-├── README.md                          # 本文档 (导航)
-├── REFACTORING-PLAN-v2.0.md          # 总体重构规划 ⭐
-├── GIS-TASK-SPLITTING-STRATEGY.md    # 任务拆分策略
-├── SPATIAL-OPERATOR-ARCHITECTURE.md  # 算子架构设计
-├── PARALLEL-EXECUTION-ENGINE.md      # 并行执行引擎 (TODO)
-├── DATA-ACCESS-FACADE.md             # 数据访问门面 (TODO)
-└── MIGRATION-GUIDE.md                # 迁移指南 (TODO)
+├── 00-README.md                          # 本文档 (导航)
+├── 01-DOCUMENT-STRUCTURE.md              # 文档层次说明
+├── 02-REFACTORING-PLAN-v2.0.md          # 总体重构规划 ⭐
+├── 03-SPATIAL-OPERATOR-ARCHITECTURE.md  # 算子架构设计
+├── 04-GIS-TASK-SPLITTING-STRATEGY.md    # 任务拆分策略
+├── 05-DATA-ACCESS-FACADE.md             # 数据访问门面
+└── 06-MIGRATION-GUIDE.md                # 迁移指南
 ```
 
 ---

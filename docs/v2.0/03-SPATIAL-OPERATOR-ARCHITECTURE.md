@@ -1118,9 +1118,9 @@ protected async executeCore(params, context): Promise<OperatorResult> {
 
 ## 🔗 相关文档
 
-- [REFACTORING-PLAN-v2.0.md](./REFACTORING-PLAN-v2.0.md) - 总体重构规划
-- [GIS-TASK-SPLITTING-STRATEGY.md](./GIS-TASK-SPLITTING-STRATEGY.md) - 任务拆分策略
-- [DATA-ACCESS-FACADE.md](./DATA-ACCESS-FACADE.md) - 数据访问门面设计
+- [02-REFACTORING-PLAN-v2.0.md](./02-REFACTORING-PLAN-v2.0.md) - 总体重构规划
+- [04-GIS-TASK-SPLITTING-STRATEGY.md](./04-GIS-TASK-SPLITTING-STRATEGY.md) - 任务拆分策略
+- [05-DATA-ACCESS-FACADE.md](./05-DATA-ACCESS-FACADE.md) - 数据访问门面设计
 
 ---
 

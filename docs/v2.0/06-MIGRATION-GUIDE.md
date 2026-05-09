@@ -128,7 +128,7 @@ mkdir -p server/src/spatial-operators/operators
 
 **File**: `server/src/data-access/facade/DataAccessFacade.ts`
 
-Copy implementation from [DATA-ACCESS-FACADE.md](./DATA-ACCESS-FACADE.md).
+Copy implementation from [05-DATA-ACCESS-FACADE.md](./05-DATA-ACCESS-FACADE.md).
 
 ### 2.3 Implement Backends
 
@@ -182,7 +182,7 @@ node scripts/test-data-access.js
 
 **File**: `server/src/spatial-operators/SpatialOperator.ts`
 
-Copy from [SPATIAL-OPERATOR-ARCHITECTURE.md](./SPATIAL-OPERATOR-ARCHITECTURE.md).
+Copy from [03-SPATIAL-OPERATOR-ARCHITECTURE.md](./03-SPATIAL-OPERATOR-ARCHITECTURE.md).
 
 ### 3.2 Migrate Existing Plugins to Operators
 
@@ -239,7 +239,7 @@ export class BufferOperator extends SpatialOperator {
 
 **File**: `server/src/spatial-operators/SpatialOperatorRegistry.ts`
 
-Copy from [SPATIAL-OPERATOR-ARCHITECTURE.md](./SPATIAL-OPERATOR-ARCHITECTURE.md).
+Copy from [03-SPATIAL-OPERATOR-ARCHITECTURE.md](./03-SPATIAL-OPERATOR-ARCHITECTURE.md).
 
 ### 3.4 Register All Operators
 
@@ -335,7 +335,7 @@ export class DataSourceSemanticAnalyzer {
 
 **File**: `server/src/llm-interaction/agents/GoalSplitterAgent.ts`
 
-Replace entire implementation with v2.0 version from [REFACTORING-PLAN-v2.0.md](./REFACTORING-PLAN-v2.0.md).
+Replace entire implementation with v2.0 version from [02-REFACTORING-PLAN-v2.0.md](./02-REFACTORING-PLAN-v2.0.md).
 
 **Key changes**:
 - Remove `GISIndustryKnowledgeBase` dependency
@@ -823,9 +823,9 @@ POSTGIS_CONNECTION_STRING=postgresql://...
 
 ## 🔗 Related Documents
 
-- [REFACTORING-PLAN-v2.0.md](./REFACTORING-PLAN-v2.0.md) - Overall refactoring plan
-- [DATA-ACCESS-FACADE.md](./DATA-ACCESS-FACADE.md) - Data access design
-- [SPATIAL-OPERATOR-ARCHITECTURE.md](./SPATIAL-OPERATOR-ARCHITECTURE.md) - Operator design
+- [02-REFACTORING-PLAN-v2.0.md](./02-REFACTORING-PLAN-v2.0.md) - Overall refactoring plan
+- [05-DATA-ACCESS-FACADE.md](./05-DATA-ACCESS-FACADE.md) - Data access design
+- [03-SPATIAL-OPERATOR-ARCHITECTURE.md](./03-SPATIAL-OPERATOR-ARCHITECTURE.md) - Operator design
 
 ---
 
