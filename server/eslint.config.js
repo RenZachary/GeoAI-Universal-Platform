@@ -51,6 +51,13 @@ export default tseslint.config(
               message: "⚠️ 工具类应通过 data-access/index 导入"
             },
             
+            // 🔥 核心架构约束：backends 只能被 facade 或 backends 内部导入
+            {
+              // 禁止 services、operators、api 等外部模块直接导入 backends
+              group: ['**/services/**/../../data-access/backends/**', '**/spatial-operators/**/../../data-access/backends/**', '**/api/**/../../data-access/backends/**', '**/llm-interaction/**/../../data-access/backends/**'],
+              message: "❌ 禁止直接导入 backends！必须通过 DataAccessFacade 统一访问\n   ✅ 正确做法: import { DataAccessFacade } from '../data-access'"
+            },
+            
             // 📌 内部模块隔离规则（防止循环依赖和架构混乱）
             {
               // accessors 不应该导入 repositories
