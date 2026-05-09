@@ -258,4 +258,32 @@ export class PostGISBackend implements DataBackend {
       indexes: [] // Indexes can be added later if needed
     };
   }
+  
+  // ========== Statistical Operations ==========
+  
+  async getUniqueValues(reference: string, fieldName: string): Promise<string[]> {
+    if (!this.statOp) {
+      throw new Error('PostGIS backend not initialized');
+    }
+    return this.statOp.getUniqueValues(reference, fieldName);
+  }
+  
+  async getFieldStatistics(reference: string, fieldName: string): Promise<any> {
+    if (!this.statOp) {
+      throw new Error('PostGIS backend not initialized');
+    }
+    return this.statOp.getFieldStatistics(reference, fieldName);
+  }
+  
+  async getClassificationBreaks(
+    reference: string,
+    fieldName: string,
+    method: 'quantile' | 'equal_interval' | 'jenks' | 'standard_deviation',
+    numClasses: number = 5
+  ): Promise<number[]> {
+    if (!this.statOp) {
+      throw new Error('PostGIS backend not initialized');
+    }
+    return this.statOp.getClassificationBreaks(reference, fieldName, method, numClasses);
+  }
 }

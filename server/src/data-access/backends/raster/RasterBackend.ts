@@ -99,4 +99,22 @@ export class RasterBackend implements DataBackend {
     // Raster data has bands/pixels, not tabular schema
     throw new Error('Schema extraction not applicable for raster data');
   }
+  
+  // Statistical operations not applicable for raster data
+  async getUniqueValues(_reference: string, _fieldName: string): Promise<string[]> {
+    throw new Error('getUniqueValues not applicable for raster data');
+  }
+  
+  async getFieldStatistics(_reference: string, _fieldName: string): Promise<any> {
+    throw new Error('getFieldStatistics not applicable for raster data');
+  }
+  
+  async getClassificationBreaks(
+    _reference: string,
+    _fieldName: string,
+    _method: 'quantile' | 'equal_interval' | 'jenks' | 'standard_deviation',
+    _numClasses?: number
+  ): Promise<number[]> {
+    throw new Error('getClassificationBreaks not applicable for raster data');
+  }
 }

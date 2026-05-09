@@ -390,4 +390,26 @@ export class VectorBackend implements DataBackend {
     // This method is typically not used for file-based sources
     throw new Error('Schema extraction for vector files should use metadata from registration');
   }
+  
+  // ========== Statistical Operations ==========
+  
+  async getUniqueValues(reference: string, fieldName: string): Promise<string[]> {
+    const geojson = await this.loadGeoJSON(reference);
+    return this.statisticalOp.getUniqueValues(geojson, fieldName);
+  }
+  
+  async getFieldStatistics(reference: string, fieldName: string): Promise<any> {
+    const geojson = await this.loadGeoJSON(reference);
+    return this.statisticalOp.getFieldStatistics(geojson, fieldName);
+  }
+  
+  async getClassificationBreaks(
+    reference: string,
+    fieldName: string,
+    method: 'quantile' | 'equal_interval' | 'jenks' | 'standard_deviation',
+    numClasses: number = 5
+  ): Promise<number[]> {
+    const geojson = await this.loadGeoJSON(reference);
+    return this.statisticalOp.getClassificationBreaks(geojson, fieldName, method, numClasses);
+  }
 }

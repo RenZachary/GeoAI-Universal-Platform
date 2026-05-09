@@ -236,4 +236,44 @@ export class DataAccessFacade {
     const targetTable = tableName || reference;
     return backend.getSchema(targetTable);
   }
+  
+  // ========== Statistical Operations ==========
+  
+  /**
+   * Get unique values for a field (for categorical rendering)
+   */
+  async getUniqueValues(
+    dataSourceType: string,
+    reference: string,
+    fieldName: string
+  ): Promise<string[]> {
+    const backend = this.getBackend(dataSourceType, reference);
+    return backend.getUniqueValues(reference, fieldName);
+  }
+  
+  /**
+   * Get comprehensive field statistics
+   */
+  async getFieldStatistics(
+    dataSourceType: string,
+    reference: string,
+    fieldName: string
+  ): Promise<any> {
+    const backend = this.getBackend(dataSourceType, reference);
+    return backend.getFieldStatistics(reference, fieldName);
+  }
+  
+  /**
+   * Calculate classification breaks for choropleth mapping
+   */
+  async getClassificationBreaks(
+    dataSourceType: string,
+    reference: string,
+    fieldName: string,
+    method: 'quantile' | 'equal_interval' | 'jenks' | 'standard_deviation',
+    numClasses?: number
+  ): Promise<number[]> {
+    const backend = this.getBackend(dataSourceType, reference);
+    return backend.getClassificationBreaks(reference, fieldName, method, numClasses);
+  }
 }

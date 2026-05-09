@@ -142,6 +142,28 @@ export interface DataBackend {
    * Returns column/field metadata including types, constraints, etc.
    */
   getSchema(reference: string): Promise<any>;
+  
+  // ========== Statistical Operations ==========
+  
+  /**
+   * Get unique values for a field (for categorical rendering)
+   */
+  getUniqueValues(reference: string, fieldName: string): Promise<string[]>;
+  
+  /**
+   * Get comprehensive field statistics (min, max, mean, stdDev, median, count, sum)
+   */
+  getFieldStatistics(reference: string, fieldName: string): Promise<any>;
+  
+  /**
+   * Calculate classification breaks for choropleth mapping
+   */
+  getClassificationBreaks(
+    reference: string,
+    fieldName: string,
+    method: 'quantile' | 'equal_interval' | 'jenks' | 'standard_deviation',
+    numClasses?: number
+  ): Promise<number[]>;
 }
 
 /**
@@ -228,5 +250,23 @@ export abstract class BaseBackend implements DataBackend {
   // Default implementation for getSchema - can be overridden by subclasses
   async getSchema(_reference: string): Promise<any> {
     throw new Error(`Schema extraction not supported by ${this.backendType} backend`);
+  }
+  
+  // Default implementations for statistical operations
+  async getUniqueValues(_reference: string, _fieldName: string): Promise<string[]> {
+    throw new Error(`getUniqueValues not supported by ${this.backendType} backend`);
+  }
+  
+  async getFieldStatistics(_reference: string, _fieldName: string): Promise<any> {
+    throw new Error(`getFieldStatistics not supported by ${this.backendType} backend`);
+  }
+  
+  async getClassificationBreaks(
+    _reference: string,
+    _fieldName: string,
+    _method: 'quantile' | 'equal_interval' | 'jenks' | 'standard_deviation',
+    _numClasses?: number
+  ): Promise<number[]> {
+    throw new Error(`getClassificationBreaks not supported by ${this.backendType} backend`);
   }
 }

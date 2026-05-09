@@ -25,6 +25,10 @@ export { VectorBackend } from './backends/vector';
 export { RasterBackend } from './backends/raster';
 export { PostGISBackend } from './backends/postgis';
 
+// Statistical operations
+export { VectorStatisticalOperation, type FieldStatistics as VectorFieldStatistics } from './backends/vector/operations/VectorStatisticalOperation';
+export { PostGISStatisticalOperation, type FieldStatistics as PostGISFieldStatistics } from './backends/postgis/operations/PostGISStatisticalOperation';
+
 // DataAccessFacade (NEW v2.0)
 export { DataAccessFacade, type VisualizationOptions } from './facade/DataAccessFacade';
 

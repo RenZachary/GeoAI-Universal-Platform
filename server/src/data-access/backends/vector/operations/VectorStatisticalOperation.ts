@@ -38,7 +38,7 @@ export class VectorStatisticalOperation {
   }
   
   /**
-   * Get unique string values from a field (for categorical data)
+   * Get unique string values from a field
    */
   getUniqueValues(geojson: GeoJSONFeatureCollection, fieldName: string): string[] {
     const values = new Set<string>();
@@ -74,21 +74,22 @@ export class VectorStatisticalOperation {
     
     // Basic statistics
     const count = values.length;
-    const sum = values.reduce((a, b) => a + b, 0);
-    const mean = sum / count;
+    const sum = values.reduce((acc, val) => acc + val, 0);
     const min = Math.min(...values);
     const max = Math.max(...values);
+    const mean = sum / count;
     
-    // Variance and standard deviation
-    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / count;
-    const stdDev = Math.sqrt(variance);
-    
-    // Median
+    // Median calculation
     const sorted = [...values].sort((a, b) => a - b);
     const mid = Math.floor(sorted.length / 2);
     const median = sorted.length % 2 === 0 
       ? (sorted[mid - 1] + sorted[mid]) / 2 
       : sorted[mid];
+    
+    // Variance and standard deviation
+    const squaredDiffs = values.map(val => Math.pow(val - mean, 2));
+    const variance = squaredDiffs.reduce((acc, val) => acc + val, 0) / count;
+    const stdDev = Math.sqrt(variance);
     
     return {
       min,
@@ -103,7 +104,7 @@ export class VectorStatisticalOperation {
   }
   
   /**
-   * Calculate classification breaks for choropleth mapping
+   * Calculate classification breaks for choropleth maps
    */
   getClassificationBreaks(
     geojson: GeoJSONFeatureCollection,
@@ -112,7 +113,7 @@ export class VectorStatisticalOperation {
     numClasses: number = 5
   ): number[] {
     const stats = this.getFieldStatistics(geojson, fieldName);
-    const values = this.extractValues(geojson, fieldName);
+    const values = this.extractValues(geojson, fieldName).sort((a, b) => a - b);
     const breaks: number[] = [];
     
     switch (method) {
@@ -128,17 +129,15 @@ export class VectorStatisticalOperation {
         
       case 'quantile': {
         // Use percentile-based breaks
-        const sorted = [...values].sort((a, b) => a - b);
         for (let i = 0; i <= numClasses; i++) {
-          const percentile = i / numClasses;
-          const index = Math.floor(percentile * (sorted.length - 1));
-          breaks.push(sorted[index]);
+          const percentileIndex = Math.floor((i / numClasses) * (values.length - 1));
+          breaks.push(values[percentileIndex]);
         }
         break;
       }
         
       case 'standard_deviation': {
-        // Breaks at standard deviation intervals from mean
+        // Breaks at standard deviation intervals
         const mean = stats.mean;
         const stdDev = stats.stdDev;
         breaks.push(mean - (2 * stdDev));
@@ -150,14 +149,12 @@ export class VectorStatisticalOperation {
       }
         
       case 'jenks': {
-        // Simplified Jenks Natural Breaks using quantile as approximation
-        // Full Jenks implementation requires iterative optimization algorithm
+        // Simplified Jenks - use quantile as approximation
+        // Full Jenks implementation requires iterative optimization
         console.warn('[VectorStatisticalOperation] Jenks classification uses quantile approximation');
-        const sorted = [...values].sort((a, b) => a - b);
         for (let i = 0; i <= numClasses; i++) {
-          const percentile = i / numClasses;
-          const index = Math.floor(percentile * (sorted.length - 1));
-          breaks.push(sorted[index]);
+          const percentileIndex = Math.floor((i / numClasses) * (values.length - 1));
+          breaks.push(values[percentileIndex]);
         }
         break;
       }
