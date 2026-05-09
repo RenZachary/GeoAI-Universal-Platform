@@ -11,7 +11,6 @@ import type { NativeData } from '../core';
 import type { DataSourceRecord } from '../data-access/repositories';
 import { DataSourceRepository } from '../data-access/repositories';
 import type Database from 'better-sqlite3';
-import fs from 'fs';
 
 export class ResultPersistenceService {
   private dataSourceRepo: DataSourceRepository;
@@ -22,13 +21,19 @@ export class ResultPersistenceService {
 
   /**
    * Persist analysis result to data source registry
-   * Only persists PostGIS results (temporary tables need to be registered)
+   * 
+   * DESIGN DECISION:
+   * - PostGIS temporary tables: MUST be registered in SQLite for SQL operations
+   * - File-based results (GeoJSON/Shapefile): Skip database registration
+   *   → GeoAIGraph will register them in VirtualDataSourceManager (memory)
+   *   → Memory-only storage provides natural conversation isolation
+   *   → No need to pass conversationId through the entire call chain
    * 
    * @param result - The NativeData result from an operation
    * @param operation - Operation name (e.g., 'buffer', 'overlay')
    * @param sourceDataSource - Original data source that was operated on
    * @param params - Operation parameters for metadata
-   * @returns Updated NativeData with persisted ID
+   * @returns Updated NativeData (ID unchanged for file-based results)
    */
   async persistResult(
     result: NativeData,
@@ -36,18 +41,19 @@ export class ResultPersistenceService {
     sourceDataSource: DataSourceRecord,
     params?: any
   ): Promise<NativeData> {
-    // Case 1: PostGIS results (temporary tables) - register in database
+    // Case 1: PostGIS results (temporary tables) - MUST register in database
+    // These are SQL-based and need database tracking for cleanup
     if (result.type === 'postgis' && result.metadata?.result?.table) {
       return this.persistPostGISResult(result, operation, sourceDataSource, params);
     }
     
-    // Case 2: File-based results (GeoJSON, Shapefile) - also register in database
-    if (result.type === 'geojson' || result.type === 'shapefile') {
-      return this.persistFileResult(result, operation, sourceDataSource, params);
-    }
+    // Case 2: File-based results (GeoJSON, Shapefile) - SKIP database registration
+    // These will be registered by GeoAIGraph in VirtualDataSourceManager (memory-only)
+    // Memory storage provides automatic conversation isolation without passing conversationId
+    console.log(`[ResultPersistenceService] Skipping database registration for file result (${result.type})`);
+    console.log(`[ResultPersistenceService] File will be managed by VirtualDataSourceManager (memory)`);
     
-    // Case 3: Other types - skip persistence
-    console.log(`[ResultPersistenceService] Skipping persistence for unsupported type: ${result.type}`);
+    // Return result unchanged - GeoAIGraph will handle memory registration
     return result;
   }
   
@@ -107,93 +113,5 @@ export class ResultPersistenceService {
 
     return result;
   }
-  
-  /**
-   * Persist file-based results (GeoJSON, Shapefile, etc.)
-   * These files are already on disk, but we need to register them in the database
-   * so they can be tracked and used in subsequent workflow steps
-   */
-  private async persistFileResult(
-    result: NativeData,
-    operation: string,
-    sourceDataSource: DataSourceRecord,
-    params?: any
-  ): Promise<NativeData> {
-    const filePath = result.reference;
-    
-    console.log(`[ResultPersistenceService] Registering file result: ${filePath}`);
-    
-    // Create DataSourceRecord for this file result
-    const dataSourceRecord = this.dataSourceRepo.create(
-      `${operation}_${result.id}`,
-      result.type,
-      filePath,
-      {
-        ...result.metadata,
-        operation,
-        sourceDataSourceId: sourceDataSource.id,
-        description: `${operation} result from ${sourceDataSource.name}`,
-        isIntermediate: true,  // Mark as intermediate result
-        createdAt: new Date().toISOString()  // Add timestamp for TTL cleanup
-      }
-    );
-    
-    console.log(`[ResultPersistenceService] File result registered with ID: ${dataSourceRecord.id}`);
-    
-    // Update result ID to match the database record
-    result.id = dataSourceRecord.id;
-    
-    return result;
-  }
-  
-  /**
-   * Clean up old intermediate file results based on TTL
-   * Should be called periodically (e.g., server startup or scheduled job)
-   * 
-   * @param ttlHours - Time-to-live in hours (default: 24 hours)
-   * @returns Number of cleaned up records
-   */
-  async cleanupOldIntermediateFiles(ttlHours: number = 24): Promise<number> {
-    console.log(`[ResultPersistenceService] Cleaning up intermediate files older than ${ttlHours} hours...`);
-    
-    const cutoffTime = new Date(Date.now() - ttlHours * 60 * 60 * 1000);
-    const cutoffIso = cutoffTime.toISOString();
-    
-    // Query all intermediate file results older than TTL
-    const oldRecords = this.dataSourceRepo.listAll().filter(ds => {
-      if (!ds.metadata?.isIntermediate) return false;
-      if (ds.type === 'postgis') return false; // Skip PostGIS tables (handled separately)
-      
-      const createdAt = ds.metadata.createdAt || ds.createdAt;
-      if (!createdAt) return false;
-      
-      return new Date(createdAt) < cutoffTime;
-    });
-    
-    let cleanedCount = 0;
-    
-    for (const record of oldRecords) {
-      try {
-        // Delete physical file if it exists
-        if (record.reference && !record.reference.startsWith('/api/')) {
-          const filePath = record.reference;
-          if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-            console.log(`[ResultPersistenceService] Deleted old intermediate file: ${filePath}`);
-          }
-        }
-        
-        // Delete database record
-        this.dataSourceRepo.delete(record.id);
-        console.log(`[ResultPersistenceService] Deleted database record: ${record.id}`);
-        
-        cleanedCount++;
-      } catch (error) {
-        console.error(`[ResultPersistenceService] Failed to clean up record ${record.id}:`, error);
-      }
-    }
-    
-    console.log(`[ResultPersistenceService] Cleaned up ${cleanedCount} old intermediate files`);
-    return cleanedCount;
-  }
+
 }
