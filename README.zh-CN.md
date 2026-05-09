@@ -1,11 +1,5 @@
 # GeoAI-UP - 开箱即用的 GIS 应用智能体
 
-✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️
-
-任何问题请提[Issue](https://gitee.com/rzcgis/geo-ai-universal-platform/issues)，统一回复，其他地方概不回复，请谅解。
-
-✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️
-
 <div align="center">
 
 **用自然语言驱动的智能空间分析平台**
@@ -26,6 +20,9 @@
 
 ![首页](https://foruda.gitee.com/images/1778104634845045889/691faa01_790454.png "首页")
 
+
+任何问题请提[Issue](https://gitee.com/rzcgis/geo-ai-universal-platform/issues)，统一回复，其他地方概不回复，请谅解。
+
 ### 核心优势
 
 🎯 **开箱即用** - 无需复杂配置，立即开始空间分析  
@@ -34,6 +31,9 @@
 🤖 **AI 驱动工作流** - 基于 LangGraph 的智能任务编排  
 🔌 **可扩展插件** - 支持自定义插件开发  
 📊 **多格式支持** - Shapefile、GeoJSON、PostGIS、GeoTIFF  
+
+
+> ⚠️ **注意**：本项目仍在积极开发中，部分功能可能不够完善或存在已知问题。欢迎通过 [Issue](https://gitee.com/rzcgis/geo-ai-universal-platform/issues) 反馈问题和建议。
 
 ---
 
@@ -69,8 +69,6 @@ GeoAI-UP 自动：
 ---
 
 ## 🚀 核心功能
-
-> ⚠️ **注意**：本项目仍在积极开发中，部分功能可能不够完善或存在已知问题。欢迎通过 [Issue](https://gitee.com/rzcgis/geo-ai-universal-platform/issues) 反馈问题和建议。
 
 ### 智能 AI 助手
 - **目标拆分**：将复杂请求分解为可管理的子任务

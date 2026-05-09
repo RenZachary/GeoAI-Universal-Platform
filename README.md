@@ -1,11 +1,5 @@
 # GeoAI-UP - Out-of-the-Box GIS Application Agent
 
-✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️
-
-For any issues, please submit an [Issue](https://gitee.com/rzcgis/geo-ai-universal-platform/issues). We will respond uniformly there. No responses will be provided elsewhere. Thank you for your understanding.
-
-✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️✳️
-
 <div align="center">
 
 
@@ -26,6 +20,8 @@ For any issues, please submit an [Issue](https://gitee.com/rzcgis/geo-ai-univers
 **GeoAI-UP** is an **out-of-the-box GIS application agent** that combines Large Language Models (LLMs) with advanced spatial analysis capabilities. Simply describe your geospatial analysis needs in natural language, and the AI agent will intelligently plan, execute, and visualize results.
 
 ![首页](https://foruda.gitee.com/images/1778104634845045889/691faa01_790454.png "首页")
+
+For any issues, please submit an [Issue](https://gitee.com/rzcgis/geo-ai-universal-platform/issues). We will respond uniformly there. No responses will be provided elsewhere. Thank you for your understanding.
 
 ### Core Advantages
 
