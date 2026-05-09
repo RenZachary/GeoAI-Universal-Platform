@@ -57,40 +57,112 @@ export class StatisticsCalculatorOperator extends SpatialOperator {
       throw new Error(`Data source not found: ${params.dataSourceId}`);
     }
     
-    // Calculate statistics using PostGIS backend
-    const postGISBackend = dataAccess.getPostGISBackend();
-    if (!postGISBackend) {
-      throw new Error('PostGIS backend not configured');
+    // Calculate statistics for each requested type using DataAccessFacade
+    const result: Record<string, number> = {};
+    let count = 0;
+    
+    for (const stat of params.statistics) {
+      try {
+        // Map statistics to aggregate functions
+        const aggFunc = this.mapStatisticToAggFunc(stat);
+        
+        // Use DataAccessFacade.aggregate() - works for all backend types
+        const nativeData = await dataAccess.aggregate(
+          dataSource.type,
+          dataSource.reference,
+          aggFunc,
+          params.fieldName,
+          false // Don't return feature, just the value
+        );
+        
+        // Extract value from result
+        const value = this.extractStatValue(nativeData, stat);
+        if (value !== null && value !== undefined) {
+          result[stat] = value;
+        }
+        
+        // Get count from first calculation
+        if (count === 0 && stat === 'count') {
+          count = value || 0;
+        }
+      } catch (error) {
+        console.warn(`[StatisticsCalculatorOperator] Failed to calculate ${stat}:`, error);
+        // Continue with other statistics even if one fails
+      }
     }
     
-    // Build SQL query for requested statistics
-    const stats = params.statistics || ['count', 'min', 'max', 'avg', 'sum'];
-    const statExpressions = stats.map((stat: string) => {
-      switch (stat.toLowerCase()) {
-        case 'count': return 'COUNT(*) as count';
-        case 'min': return `MIN("${params.fieldName}") as min`;
-        case 'max': return `MAX("${params.fieldName}") as max`;
-        case 'avg': return `AVG("${params.fieldName}") as avg`;
-        case 'sum': return `SUM("${params.fieldName}") as sum`;
-        default: return null;
+    // If count wasn't calculated, get it separately
+    if (count === 0) {
+      try {
+        const countData = await dataAccess.aggregate(
+          dataSource.type,
+          dataSource.reference,
+          'COUNT',
+          params.fieldName,
+          false
+        );
+        count = this.extractStatValue(countData, 'count') || 0;
+      } catch (error) {
+        console.warn('[StatisticsCalculatorOperator] Failed to get count:', error);
       }
-    }).filter(Boolean);
+    }
     
-    const query = `SELECT ${statExpressions.join(', ')} FROM ${dataSource.reference}`;
+    return {
+      result,
+      count,
+      fieldName: params.fieldName
+    };
+  }
+  
+  /**
+   * Map statistic name to aggregate function
+   */
+  private mapStatisticToAggFunc(stat: string): string {
+    const mapping: Record<string, string> = {
+      'mean': 'AVG',
+      'median': 'MEDIAN',
+      'std_dev': 'STD_DEV',
+      'variance': 'VARIANCE',
+      'min': 'MIN',
+      'max': 'MAX',
+      'sum': 'SUM',
+      'count': 'COUNT'
+    };
     
+    return mapping[stat] || stat.toUpperCase();
+  }
+  
+  /**
+   * Extract statistic value from NativeData result
+   */
+  private extractStatValue(nativeData: any, stat: string): number | null {
     try {
-      const result = await (postGISBackend as any).executeRaw(query);
-      const row = result.rows[0];
+      // Result is stored in metadata or as a feature property
+      const props = nativeData?.metadata?.result?.features?.[0]?.properties;
       
-      return {
-        result: row,
-        count: parseInt(row.count) || 0,
-        fieldName: params.fieldName
+      if (!props) {
+        return null;
+      }
+      
+      // Map stat names to property keys
+      const keyMap: Record<string, string> = {
+        'mean': 'mean',
+        'median': 'median',
+        'std_dev': 'std_dev',
+        'variance': 'variance',
+        'min': 'min',
+        'max': 'max',
+        'sum': 'sum',
+        'count': 'count'
       };
+      
+      const key = keyMap[stat] || stat;
+      const value = props[key];
+      
+      return typeof value === 'number' ? value : null;
     } catch (error) {
-      console.error('[StatisticsCalculatorOperator] Failed to calculate statistics:', error);
-      const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`Statistics calculation failed: ${message}`);
+      console.warn(`[StatisticsCalculatorOperator] Failed to extract ${stat} value:`, error);
+      return null;
     }
   }
 }
