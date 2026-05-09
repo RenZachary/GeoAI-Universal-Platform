@@ -31,5 +31,13 @@ export type { StoredLLMConfig } from './LLMConfigService';
 export { ConversationService } from './ConversationService';
 export type { ConversationSummary, ChatMessage } from './ConversationService';
 
+export { VisualizationServicePublisher } from './VisualizationServicePublisher';
+export type { 
+  ServiceType,
+  ServiceMetadata,
+  ServicePublishResult,
+  ServiceRegistry
+} from './VisualizationServicePublisher';
+
 // MVTDynamicPublisher Singleton (re-export from utils)
 export { getMVTOnDemandPublisher, resetMVTOnDemandPublisher, MVTOnDemandPublisher } from '../utils/publishers/MVTOnDemandPublisher';
