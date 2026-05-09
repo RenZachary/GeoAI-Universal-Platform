@@ -1,3 +1,8 @@
+/**
+ * Tool Store - Manages Spatial Operators state
+ * 
+ * v2.0: Uses new /api/operators endpoints instead of deprecated /api/tools
+ */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { Tool } from '@/types'
