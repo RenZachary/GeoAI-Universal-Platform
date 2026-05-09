@@ -182,4 +182,80 @@ export class PostGISBackend implements DataBackend {
       return false;
     }
   }
+  
+  async getSchema(tableName: string): Promise<any> {
+    const pool = await this.getPool();
+    
+    // Query column information from information_schema
+    const columnsResult = await pool.query(`
+      SELECT 
+        column_name,
+        data_type,
+        is_nullable,
+        column_default,
+        character_maximum_length,
+        numeric_precision,
+        numeric_scale
+      FROM information_schema.columns
+      WHERE table_schema = $1 AND table_name = $2
+      ORDER BY ordinal_position
+    `, [this.schema, tableName]);
+    
+    // Get primary key information
+    const pkResult = await pool.query(`
+      SELECT kcu.column_name
+      FROM information_schema.table_constraints tc
+      JOIN information_schema.key_column_usage kcu 
+        ON tc.constraint_name = kcu.constraint_name
+        AND tc.table_schema = kcu.table_schema
+      WHERE tc.constraint_type = 'PRIMARY KEY'
+        AND tc.table_schema = $1
+        AND tc.table_name = $2
+    `, [this.schema, tableName]);
+    
+    const primaryKey = pkResult.rows.length > 0 ? pkResult.rows[0].column_name : undefined;
+    
+    // Get geometry column information
+    let geometryColumn: string | undefined;
+    let srid: number | undefined;
+    
+    try {
+      const geomResult = await pool.query(`
+        SELECT f_geometry_column, srid
+        FROM geometry_columns
+        WHERE f_table_schema = $1 AND f_table_name = $2
+      `, [this.schema, tableName]);
+      
+      if (geomResult.rows.length > 0) {
+        geometryColumn = geomResult.rows[0].f_geometry_column;
+        srid = geomResult.rows[0].srid;
+      }
+    } catch {
+      // geometry_columns view might not exist or table has no geometry
+    }
+    
+    // Build column info array
+    const columns = columnsResult.rows.map(row => ({
+      name: row.column_name,
+      type: row.data_type,
+      nullable: row.is_nullable === 'YES',
+      defaultValue: row.column_default,
+      maxLength: row.character_maximum_length,
+      precision: row.numeric_precision,
+      scale: row.numeric_scale,
+      isPrimaryKey: row.column_name === primaryKey,
+      isGeometryColumn: row.column_name === geometryColumn,
+      srid: row.column_name === geometryColumn ? srid : undefined
+    }));
+    
+    return {
+      tableName,
+      schema: this.schema,
+      columns,
+      primaryKey,
+      geometryColumn,
+      srid,
+      indexes: [] // Indexes can be added later if needed
+    };
+  }
 }

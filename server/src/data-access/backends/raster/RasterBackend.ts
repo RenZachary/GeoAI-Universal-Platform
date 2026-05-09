@@ -93,4 +93,10 @@ export class RasterBackend implements DataBackend {
       dataType: 'raster'
     };
   }
+  
+  async getSchema(_reference: string): Promise<any> {
+    // For raster backends, schema is not applicable
+    // Raster data has bands/pixels, not tabular schema
+    throw new Error('Schema extraction not applicable for raster data');
+  }
 }

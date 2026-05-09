@@ -7,7 +7,7 @@
 
 import type { NativeData, DataSourceType } from '../../core';
 import type { FilterCondition, BufferOptions, OverlayOptions } from '../interfaces';
-import type { DataBackend } from '../backends';
+import type { DataBackend } from '../backends/DataBackend';
 import { VectorBackend } from '../backends/vector';
 import { RasterBackend } from '../backends/raster';
 import { PostGISBackend } from '../backends/postgis';
@@ -218,5 +218,22 @@ export class DataAccessFacade {
   async validate(dataSourceType: string, reference: string): Promise<boolean> {
     const backend = this.getBackend(dataSourceType, reference);
     return backend.validate(reference);
+  }
+  
+  /**
+   * Get schema information for a data source
+   * For PostGIS: queries database metadata
+   * For file-based: returns cached metadata from registration
+   */
+  async getSchema(
+    dataSourceType: string,
+    reference: string,
+    tableName?: string
+  ): Promise<any> {
+    const backend = this.getBackend(dataSourceType, reference);
+    
+    // For PostGIS, use the table name if provided, otherwise use reference
+    const targetTable = tableName || reference;
+    return backend.getSchema(targetTable);
   }
 }

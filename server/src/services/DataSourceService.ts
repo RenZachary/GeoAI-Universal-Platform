@@ -226,74 +226,35 @@ export class DataSourceService {
       };
     }
 
-    // For PostGIS sources, query the database directly
-    if (dataSource.type === 'postgis' && dataSource.metadata?.connection) {
-      try {
-        const { Client } = await import('pg');
-        const connection = dataSource.metadata.connection;
-        
-        const client = new Client({
-          host: connection.host,
-          port: connection.port || 5432,
-          database: connection.database,
-          user: connection.user,
-          password: connection.password
-        });
-
-        await client.connect();
-
-        const schemaName = connection.schema || 'public';
-        const tableName = dataSource.metadata.tableName;
-
-        // Query table columns from information_schema
-        const result = await client.query(`
-          SELECT 
-            column_name,
-            data_type,
-            is_nullable,
-            character_maximum_length,
-            numeric_precision,
-            numeric_scale
-          FROM information_schema.columns
-          WHERE table_schema = $1 AND table_name = $2
-          ORDER BY ordinal_position
-        `, [schemaName, tableName]);
-
-        const fields = result.rows.map(row => ({
-          name: row.column_name,
-          type: row.data_type,
-          nullable: row.is_nullable === 'YES',
-          maxLength: row.character_maximum_length,
-          precision: row.numeric_precision,
-          scale: row.numeric_scale
-        }));
-
-        await client.end();
-
+    // Use DataAccessFacade to extract schema from the actual data source
+    const dataAccess = DataAccessFacade.getInstance();
+    
+    try {
+      const schema = await dataAccess.getSchema(
+        dataSource.type,
+        dataSource.reference,
+        dataSource.metadata?.tableName // For PostGIS, use table name
+      );
+      
+      return schema;
+    } catch (error) {
+      console.error(`[DataSourceService] Failed to extract schema via DataAccessFacade:`, error);
+      
+      // Fallback: return basic metadata for file-based sources
+      if (['geojson', 'shapefile', 'tif'].includes(dataSource.type)) {
         return {
-          tableName,
-          schema: schemaName,
-          fields,
-          geometryColumn: dataSource.metadata.geometryColumn,
-          geometryType: dataSource.metadata.geometryType,
-          srid: dataSource.metadata.srid
+          type: dataSource.type,
+          reference: dataSource.reference,
+          note: 'File-based data source - schema extracted during registration',
+          featureCount: dataSource.metadata?.featureCount,
+          bbox: dataSource.metadata?.bbox,
+          crs: dataSource.metadata?.crs
         };
-      } catch (error) {
-        console.error(`[DataSourceService] Failed to extract schema from database:`, error);
-        const message = error instanceof Error ? error.message : String(error);
-        throw new Error(`Failed to extract schema: ${message}`);
       }
+      
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to extract schema: ${message}`);
     }
-
-    // For file-based sources, return metadata from registration
-    return {
-      type: dataSource.type,
-      reference: dataSource.reference,
-      note: 'File-based data source - schema extracted during registration',
-      featureCount: dataSource.metadata?.featureCount,
-      bbox: dataSource.metadata?.bbox,
-      crs: dataSource.metadata?.crs
-    };
   }
 
   /**

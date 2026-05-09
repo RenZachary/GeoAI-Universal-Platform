@@ -136,6 +136,12 @@ export interface DataBackend {
    * Validate data format integrity
    */
   validate(reference: string): Promise<boolean>;
+  
+  /**
+   * Get schema information for a data source
+   * Returns column/field metadata including types, constraints, etc.
+   */
+  getSchema(reference: string): Promise<any>;
 }
 
 /**
@@ -218,4 +224,9 @@ export abstract class BaseBackend implements DataBackend {
   abstract delete(reference: string): Promise<void>;
   abstract getMetadata(reference: string): Promise<any>;
   abstract validate(reference: string): Promise<boolean>;
+  
+  // Default implementation for getSchema - can be overridden by subclasses
+  async getSchema(_reference: string): Promise<any> {
+    throw new Error(`Schema extraction not supported by ${this.backendType} backend`);
+  }
 }

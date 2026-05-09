@@ -336,4 +336,10 @@ export class VectorBackend implements DataBackend {
     
     return samples;
   }
+  
+  async getSchema(_reference: string): Promise<any> {
+    // For vector backends, schema is extracted from GeoJSON properties
+    // This method is typically not used for file-based sources
+    throw new Error('Schema extraction for vector files should use metadata from registration');
+  }
 }
