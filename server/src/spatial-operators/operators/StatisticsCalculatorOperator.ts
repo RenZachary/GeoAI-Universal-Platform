@@ -57,22 +57,40 @@ export class StatisticsCalculatorOperator extends SpatialOperator {
       throw new Error(`Data source not found: ${params.dataSourceId}`);
     }
     
-    // TODO: Implement statistics calculation using Backend
-    // For now, return placeholder result
-    console.warn('[StatisticsCalculatorOperator] Statistics calculation not yet implemented');
-    const result = {
-      type: dataSource.type,
-      reference: dataSource.reference,
-      metadata: {
-        statistics: {},
-        count: 0
-      }
-    } as any;
+    // Calculate statistics using PostGIS backend
+    const postGISBackend = dataAccess.getPostGISBackend();
+    if (!postGISBackend) {
+      throw new Error('PostGIS backend not configured');
+    }
     
-    return {
-      result: result.metadata?.statistics || {},
-      count: result.metadata?.count || 0,
-      fieldName: params.fieldName
-    };
+    // Build SQL query for requested statistics
+    const stats = params.statistics || ['count', 'min', 'max', 'avg', 'sum'];
+    const statExpressions = stats.map((stat: string) => {
+      switch (stat.toLowerCase()) {
+        case 'count': return 'COUNT(*) as count';
+        case 'min': return `MIN("${params.fieldName}") as min`;
+        case 'max': return `MAX("${params.fieldName}") as max`;
+        case 'avg': return `AVG("${params.fieldName}") as avg`;
+        case 'sum': return `SUM("${params.fieldName}") as sum`;
+        default: return null;
+      }
+    }).filter(Boolean);
+    
+    const query = `SELECT ${statExpressions.join(', ')} FROM ${dataSource.reference}`;
+    
+    try {
+      const result = await (postGISBackend as any).executeRaw(query);
+      const row = result.rows[0];
+      
+      return {
+        result: row,
+        count: parseInt(row.count) || 0,
+        fieldName: params.fieldName
+      };
+    } catch (error) {
+      console.error('[StatisticsCalculatorOperator] Failed to calculate statistics:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Statistics calculation failed: ${message}`);
+    }
   }
 }

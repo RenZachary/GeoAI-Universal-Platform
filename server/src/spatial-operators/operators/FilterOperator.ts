@@ -7,6 +7,7 @@ import { SpatialOperator, type OperatorContext } from '../SpatialOperator';
 import type { FilterCondition } from '../../data-access';
 import { DataAccessFacade } from '../../data-access';
 import { DataSourceRepository } from '../../data-access/repositories';
+import { ResultPersistenceService } from '../../services/ResultPersistenceService';
 import type Database from 'better-sqlite3';
 
 const FilterInputSchema = z.object({
@@ -63,6 +64,7 @@ export class FilterOperator extends SpatialOperator {
     
     const dataSourceRepo = new DataSourceRepository(this.db);
     const dataAccess = DataAccessFacade.getInstance(this.workspaceBase);
+    const resultPersistence = new ResultPersistenceService(this.db);
     
     const dataSource = dataSourceRepo.getById(params.dataSourceId);
     
@@ -79,10 +81,18 @@ export class FilterOperator extends SpatialOperator {
       conditions[0] as FilterCondition
     );
     
+    // Persist result to database (registers temp table)
+    const persistedResult = await resultPersistence.persistResult(
+      result,
+      'filter',
+      dataSource,
+      { conditions: params.conditions }
+    );
+    
     return {
-      result: result.metadata?.featureCount || 0,
-      originalCount: result.metadata?.originalCount || 0,
-      filteredCount: result.metadata?.featureCount || 0
+      result: persistedResult.metadata?.featureCount || 0,
+      originalCount: persistedResult.metadata?.originalCount || 0,
+      filteredCount: persistedResult.metadata?.featureCount || 0
     };
   }
 }

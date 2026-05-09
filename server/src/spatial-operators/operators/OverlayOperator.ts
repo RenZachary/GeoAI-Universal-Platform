@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { SpatialOperator, type OperatorContext } from '../SpatialOperator';
 import { DataAccessFacade } from '../../data-access';
 import { DataSourceRepository } from '../../data-access/repositories';
+import { ResultPersistenceService } from '../../services/ResultPersistenceService';
 import type Database from 'better-sqlite3';
 
 const OverlayInputSchema = z.object({
@@ -49,6 +50,7 @@ export class OverlayOperator extends SpatialOperator {
     
     const dataSourceRepo = new DataSourceRepository(this.db);
     const dataAccess = DataAccessFacade.getInstance(this.workspaceBase);
+    const resultPersistence = new ResultPersistenceService(this.db);
     
     // Query both data sources
     const dataSource1 = dataSourceRepo.getById(params.inputDataSourceId);
@@ -66,9 +68,17 @@ export class OverlayOperator extends SpatialOperator {
       params.operation
     );
     
+    // Persist result to database (registers temp table)
+    const persistedResult = await resultPersistence.persistResult(
+      result,
+      'overlay',
+      dataSource1,
+      { operation: params.operation }
+    );
+    
     return {
-      result: result.reference,
-      featureCount: result.metadata?.featureCount || 0
+      result: persistedResult.metadata?.result || persistedResult.reference,
+      featureCount: persistedResult.metadata?.featureCount || 0
     };
   }
 }

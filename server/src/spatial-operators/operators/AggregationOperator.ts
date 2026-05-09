@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { SpatialOperator, type OperatorContext } from '../SpatialOperator';
 import { DataAccessFacade } from '../../data-access';
 import { DataSourceRepository } from '../../data-access/repositories';
+import { ResultPersistenceService } from '../../services/ResultPersistenceService';
 import type Database from 'better-sqlite3';
 
 const AggregationInputSchema = z.object({
@@ -49,6 +50,7 @@ export class AggregationOperator extends SpatialOperator {
     
     const dataSourceRepo = new DataSourceRepository(this.db);
     const dataAccess = DataAccessFacade.getInstance(this.workspaceBase);
+    const resultPersistence = new ResultPersistenceService(this.db);
     
     const dataSource = dataSourceRepo.getById(params.dataSourceId);
     
@@ -64,8 +66,16 @@ export class AggregationOperator extends SpatialOperator {
       params.topN ? true : undefined  // Convert number to boolean for now
     );
     
+    // Persist result to database (registers temp table if PostGIS)
+    const persistedResult = await resultPersistence.persistResult(
+      result,
+      'aggregation',
+      dataSource,
+      { operation: params.operation, field: params.field }
+    );
+    
     return {
-      result: result.metadata?.value || result.metadata?.features || [],
+      result: persistedResult.metadata?.value || persistedResult.metadata?.features || [],
       operation: params.operation,
       field: params.field
     };
