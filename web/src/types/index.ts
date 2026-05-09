@@ -37,6 +37,7 @@ export interface MapLayer {
   visible: boolean
   opacity?: number
   style?: LayerStyle
+  styleUrl?: string  // URL to Mapbox Style JSON (for custom styling)
   sourceLayer?: string
   minZoom?: number
   maxZoom?: number

@@ -5,6 +5,8 @@ import { LayerType } from '@/types'
 import { createStyleFromBasemap } from '@/config/basemaps'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { StyleFactory } from '../utils/StyleFactory'
+import { GeometryAdapter } from '../utils/GeometryAdapter'
 
 export const useMapStore = defineStore('map', () => {
   // State
@@ -190,14 +192,14 @@ export const useMapStore = defineStore('map', () => {
     }
 
     // Check if this is a choropleth/thematic map with custom style
-    const styleUrl = layer.metadata?.styleUrl
+    const styleUrl = layer.styleUrl || layer.metadata?.styleUrl
     console.log('[Map Store] addMVTLayer - layer:', layer.id)
     console.log('[Map Store] addMVTLayer - metadata:', layer.metadata)
     console.log('[Map Store] addMVTLayer - styleUrl:', styleUrl)
     
     if (styleUrl) {
       console.log('[Map Store] Detected custom style, applying...')
-      // Apply custom style from backend
+      // Apply custom style from StyleFactory
       applyCustomStyleFromURL(map, layer, styleUrl)
     } else {
       console.log('[Map Store] No custom style, using default')
@@ -621,6 +623,191 @@ export const useMapStore = defineStore('map', () => {
       return
     }
 
+    // Extract style configuration from metadata if available
+    const styleConfig = service.metadata?.styleConfig
+    
+    // If styleConfig is provided, use StyleFactory to generate Mapbox style JSON
+    if (styleConfig) {
+      console.log('[Map Store] Applying styleConfig via StyleFactory:', styleConfig)
+      
+      // Get geometry type from metadata
+      const geometryType = service.metadata?.geometryType
+        ? GeometryAdapter.normalizeGeometryType(service.metadata.geometryType)
+        : undefined
+      
+      // Generate style based on type
+      let styleUrl: string | null = null
+      
+      switch (styleConfig.type) {
+        case 'uniform':
+          // Use StyleFactory to generate uniform style with geometry-aware rendering
+          StyleFactory.generateUniformStyle({
+            tilesetId: service.id,
+            layerName: styleConfig.layerName || 'default',
+            color: styleConfig.color || '#3388ff',
+            strokeWidth: styleConfig.strokeWidth || 2,
+            pointSize: 5,
+            opacity: styleConfig.opacity || 0.8,
+            geometryType,
+            minZoom: 0,
+            maxZoom: 22
+          }).then(style => {
+            // Save style as blob URL for immediate use
+            const blob = new Blob([JSON.stringify(style)], { type: 'application/json' })
+            const url = URL.createObjectURL(blob)
+            
+            // Add layer with custom style
+            const layer: Omit<MapLayer, 'createdAt'> = {
+              id: service.id,
+              type: layerType,
+              url: service.url,
+              visible: true,
+              opacity: styleConfig.opacity || 0.8,
+              metadata: service.metadata,
+              name: service.metadata?.name || service.id,
+              styleUrl: url // Use generated style URL
+            }
+            
+            addLayer(layer)
+          }).catch(error => {
+            console.error('[Map Store] Failed to generate uniform style:', error)
+            // Fallback to default styling
+            const layer: Omit<MapLayer, 'createdAt'> = {
+              id: service.id,
+              type: layerType,
+              url: service.url,
+              visible: true,
+              opacity: 0.8,
+              metadata: service.metadata,
+              name: service.metadata?.name || service.id
+            }
+            addLayer(layer)
+          })
+          return // Async operation, return early
+          
+        case 'choropleth':
+          // Use StyleFactory for choropleth rendering
+          StyleFactory.generateChoroplethStyle({
+            tilesetId: service.id,
+            layerName: styleConfig.layerName || 'default',
+            valueField: styleConfig.valueField,
+            breaks: styleConfig.breaks,
+            colorRamp: styleConfig.colorRamp || 'blues',
+            numClasses: styleConfig.numClasses || styleConfig.breaks.length - 1,
+            opacity: styleConfig.opacity || 0.8,
+            geometryType,
+            minZoom: 0,
+            maxZoom: 22
+          }).then(style => {
+            const blob = new Blob([JSON.stringify(style)], { type: 'application/json' })
+            const url = URL.createObjectURL(blob)
+            
+            const layer: Omit<MapLayer, 'createdAt'> = {
+              id: service.id,
+              type: layerType,
+              url: service.url,
+              visible: true,
+              opacity: styleConfig.opacity || 0.8,
+              metadata: service.metadata,
+              name: service.metadata?.name || service.id,
+              styleUrl: url
+            }
+            
+            addLayer(layer)
+          }).catch(error => {
+            console.error('[Map Store] Failed to generate choropleth style:', error)
+            // Fallback
+            const layer: Omit<MapLayer, 'createdAt'> = {
+              id: service.id,
+              type: layerType,
+              url: service.url,
+              visible: true,
+              opacity: 0.8,
+              metadata: service.metadata,
+              name: service.metadata?.name || service.id
+            }
+            addLayer(layer)
+          })
+          return
+          
+        case 'categorical':
+          // Use StyleFactory for categorical rendering
+          StyleFactory.generateCategoricalStyle({
+            tilesetId: service.id,
+            layerName: styleConfig.layerName || 'default',
+            categoryField: styleConfig.categoryField,
+            categories: styleConfig.categories || [],
+            colorScheme: styleConfig.colorPalette || 'set1',
+            opacity: styleConfig.opacity || 0.8,
+            geometryType,
+            minZoom: 0,
+            maxZoom: 22
+          }).then(style => {
+            const blob = new Blob([JSON.stringify(style)], { type: 'application/json' })
+            const url = URL.createObjectURL(blob)
+            
+            const layer: Omit<MapLayer, 'createdAt'> = {
+              id: service.id,
+              type: layerType,
+              url: service.url,
+              visible: true,
+              opacity: styleConfig.opacity || 0.8,
+              metadata: service.metadata,
+              name: service.metadata?.name || service.id,
+              styleUrl: url
+            }
+            
+            addLayer(layer)
+          }).catch(error => {
+            console.error('[Map Store] Failed to generate categorical style:', error)
+            // Fallback
+            const layer: Omit<MapLayer, 'createdAt'> = {
+              id: service.id,
+              type: layerType,
+              url: service.url,
+              visible: true,
+              opacity: 0.8,
+              metadata: service.metadata,
+              name: service.metadata?.name || service.id
+            }
+            addLayer(layer)
+          })
+          return
+          
+        case 'heatmap':
+          // Use StyleFactory for heatmap rendering
+          const heatmapStyle = StyleFactory.generateHeatmapStyle({
+            tilesetId: service.id,
+            layerName: styleConfig.layerName || 'default',
+            radius: styleConfig.radius || 30,
+            intensity: styleConfig.intensity || 1,
+            minZoom: 0,
+            maxZoom: 22
+          })
+          
+          const blob = new Blob([JSON.stringify(heatmapStyle)], { type: 'application/json' })
+          const url = URL.createObjectURL(blob)
+          
+          const layer: Omit<MapLayer, 'createdAt'> = {
+            id: service.id,
+            type: LayerType.Heatmap,
+            url: service.url,
+            visible: true,
+            opacity: 0.8,
+            metadata: service.metadata,
+            name: service.metadata?.name || service.id,
+            styleUrl: url
+          }
+          
+          addLayer(layer)
+          return
+          
+        default:
+          console.warn(`[Map Store] Unknown styleConfig type: ${styleConfig.type}`)
+      }
+    }
+
+    // Default: no styleConfig, use simple styling
     const layer: Omit<MapLayer, 'createdAt'> = {
       id: service.id,
       type: layerType,
@@ -628,11 +815,7 @@ export const useMapStore = defineStore('map', () => {
       visible: true,
       opacity: 0.8,
       metadata: service.metadata,
-      name: service.metadata?.name || service.id,
-      style: {
-        fillColor: '#409eff',
-        fillOpacity: 0.6
-      }
+      name: service.metadata?.name || service.id
     }
 
     // Add to store (will automatically add to map if visible)
