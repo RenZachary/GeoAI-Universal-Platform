@@ -21,6 +21,7 @@ import { SQLiteManagerInstance } from '../../storage/';
 import { resolvePlaceholders } from './PlaceholderResolver';
 import { VirtualDataSourceManagerInstance } from '../../data-access/managers/VirtualDataSourceManager';
 import type { ParallelGroup } from '../analyzers/ParallelTaskAnalyzer';
+import { VisualizationServicePublisher } from '../../services/VisualizationServicePublisher';
 
 // State interface for the GeoAI workflow
 export interface GeoAIState {
@@ -75,7 +76,7 @@ export interface VisualizationService {
   id: string;
   stepId?: string;
   goalId?: string;
-  type: 'mvt' | 'geojson' | 'image' | 'report';
+  type: 'mvt' | 'wms' | 'geojson' | 'image' | 'report';
   url: string;
   ttl: number;
   expiresAt: Date;
@@ -190,7 +191,7 @@ export function createGeoAIGraph(
         console.log(EnhancedExecutorInstance.generateSummary());
       }
       
-      // Publish visualization services for successful results
+      // Publish visualization services using unified publisher
       const allServices: VisualizationService[] = [];
       
       if (result.executionResults) {
@@ -210,19 +211,62 @@ export function createGeoAIGraph(
           }
         }
         
-        // Publish services in batch
+        // Publish services using unified VisualizationServicePublisher
         if (successfulResults.size > 0) {
-          const publishedServices = servicePublisher.publishBatch(successfulResults);
-          console.log(`[Plugin Executor] Published ${publishedServices.length} visualization services`);
-          allServices.push(...publishedServices);
+          const unifiedPublisher = VisualizationServicePublisher.getInstance(workspaceBase, db || undefined);
           
-          // Stream partial results to frontend if callback provided
-          if (onPartialResult) {
-            for (const service of publishedServices) {
-              console.log(`[Plugin Executor] Streaming partial result: ${service.id}`);
-              onPartialResult(service);
+          for (const [stepId, analysisResult] of successfulResults.entries()) {
+            try {
+              const dataType = analysisResult.data.type || 'geojson';
+              let publishResult;
+              
+              switch (dataType.toLowerCase()) {
+                case 'report':
+                case 'markdown':
+                  publishResult = unifiedPublisher.publishReport(
+                    stepId,
+                    analysisResult.data.content || '',
+                    86400000 // 24 hours for reports
+                  );
+                  break;
+                  
+                default:
+                  // GeoJSON and other vector/raster data
+                  publishResult = unifiedPublisher.publishGeoJSON(
+                    stepId,
+                    analysisResult.data,
+                    3600000 // 1 hour default
+                  );
+              }
+              
+              if (publishResult.success && publishResult.metadata) {
+                const service: VisualizationService = {
+                  id: publishResult.serviceId || stepId,
+                  stepId,
+                  goalId: analysisResult.goalId,
+                  type: publishResult.metadata.type as VisualizationService['type'],
+                  url: publishResult.url || '',
+                  ttl: publishResult.metadata.ttl || 3600000,
+                  expiresAt: publishResult.metadata.expiresAt || new Date(Date.now() + 3600000),
+                  metadata: publishResult.metadata.metadata
+                };
+                
+                allServices.push(service);
+                
+                console.log(`[Plugin Executor] Published ${publishResult.metadata.type} service: ${publishResult.serviceId}`);
+                
+                // Stream partial results to frontend if callback provided
+                if (onPartialResult) {
+                  console.log(`[Plugin Executor] Streaming partial result: ${service.id}`);
+                  onPartialResult(service);
+                }
+              }
+            } catch (error) {
+              console.error(`[Plugin Executor] Failed to publish service for ${stepId}:`, error);
             }
           }
+          
+          console.log(`[Plugin Executor] Published ${allServices.length} visualization services via unified publisher`);
         }
       }
       
