@@ -1,14 +1,19 @@
 /**
  * Data Source Publishing Service
  * 
- * Automatically publishes data sources as MVT (for vector) or WMS (for raster) services
+ * Simplified wrapper around VisualizationServicePublisher for data source publishing.
+ * Automatically publishes data sources as MVT (for vector) or WMS (for raster) services.
+ * 
+ * NOTE: This service is now a thin wrapper around VisualizationServicePublisher.
+ * Consider migrating direct calls to VisualizationServicePublisher.getInstance() in future.
  */
 
 import type Database from 'better-sqlite3';
 import { DataSourceRepository, type DataSourceRecord } from '../data-access/repositories';
-import { MVTOnDemandPublisher } from '../utils/publishers/MVTOnDemandPublisher';
-import { type MVTSource, type MVTTileOptions, type MVTPublishMetadata } from '../utils/publishers/base/MVTPublisherTypes';
-import { WMSPublisher } from '../utils/publishers/WMSPublisher';
+import { VisualizationServicePublisher } from './VisualizationServicePublisher';
+import type { MVTSource, MVTTileOptions } from '../utils/publishers/base/MVTPublisherTypes';
+import type { NativeData } from '../core';
+import type { WMSLayerOptions } from '../utils/publishers/base/WMSStategies/WMSPublisherTypes';
 import { ShapefileAccessor } from '../data-access';
 import fs from 'fs';
 
@@ -25,16 +30,13 @@ export interface PublishedServiceInfo {
 export class DataSourcePublishingService {
   private db: Database.Database;
   private dataSourceRepo: DataSourceRepository;
-  private mvtPublisher: MVTOnDemandPublisher;
-  private wmsPublisher: WMSPublisher;
+  private publisher: VisualizationServicePublisher;
   private workspaceBase: string;
 
-  constructor(db: Database.Database, workspaceBase: string, mvtPublisher?: MVTOnDemandPublisher) {
+  constructor(db: Database.Database, workspaceBase: string) {
     this.db = db;
     this.dataSourceRepo = new DataSourceRepository(db);
-    // Use provided publisher or get singleton instance
-    this.mvtPublisher = mvtPublisher || MVTOnDemandPublisher.getInstance(workspaceBase, 10000);
-    this.wmsPublisher = WMSPublisher.getInstance(workspaceBase, db);
+    this.publisher = VisualizationServicePublisher.getInstance(workspaceBase, db);
     this.workspaceBase = workspaceBase;
   }
 
@@ -75,11 +77,8 @@ export class DataSourcePublishingService {
 
       // Check MVT tilesets - dataSourceId is used as tilesetId
       if (dataSource.type !== 'tif') {
-        const mvtTilesets = this.mvtPublisher.listTilesets();
-        const isMVTPublished = mvtTilesets.some((ts: { tilesetId: string; metadata: MVTPublishMetadata }) => 
-          ts.tilesetId === dataSourceId
-        );
-        return isMVTPublished;
+        const service = this.publisher.getService(dataSourceId);
+        return service !== null && service.type === 'mvt';
       }
 
       // For TIF/WMS, check if there's an existing WMS service for this data source
@@ -87,8 +86,8 @@ export class DataSourcePublishingService {
       const wmsServiceId = dataSource.metadata?.wmsServiceId;
       if (wmsServiceId) {
         // Verify the service still exists
-        const metadata = this.wmsPublisher.getServiceMetadata(wmsServiceId);
-        return metadata !== null;
+        const metadata = this.publisher.getService(wmsServiceId);
+        return metadata !== null && metadata.type === 'wms';
       }
 
       return false;
@@ -267,20 +266,20 @@ export class DataSourcePublishingService {
       tilesetId: dataSource.id  // Use data source ID as tileset ID
     };
 
-    const result = await this.mvtPublisher.publish(source, options, dataSource.id);
+    const result = await this.publisher.publishMVT(source, options, dataSource.id);
 
     if (!result.success) {
       throw new Error(`Failed to publish MVT: ${result.error}`);
     }
 
-    console.log(`[DataSourcePublishingService] Published MVT tileset: ${result.tilesetId}`);
+    console.log(`[DataSourcePublishingService] Published MVT tileset: ${result.serviceId}`);
 
     return {
       dataSourceId: dataSource.id,
       serviceType: 'mvt',
       serviceUrl: `/api/mvt-dynamic/${dataSource.id}/{z}/{x}/{y}.pbf`,
-      tilesetId: result.tilesetId,
-      metadata: result.metadata
+      tilesetId: result.serviceId,
+      metadata: result.metadata || {}
     };
   }
 
@@ -308,11 +307,17 @@ export class DataSourcePublishingService {
     };
 
     // Generate WMS service
-    const serviceId = await this.wmsPublisher.generateService(nativeData, {
+    const publishResult = await this.publisher.publishWMS(nativeData, {
       name: dataSource.name,
       title: dataSource.name,
       srs: 'EPSG:4326'
     });
+    
+    if (!publishResult.success || !publishResult.serviceId) {
+      throw new Error(`Failed to publish WMS: ${publishResult.error}`);
+    }
+    
+    const serviceId = publishResult.serviceId;
 
     console.log(`[DataSourcePublishingService] Published WMS service: ${serviceId}`);
 
