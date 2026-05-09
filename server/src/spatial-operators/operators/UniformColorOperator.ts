@@ -49,7 +49,6 @@ export class UniformColorOperator extends SpatialOperator {
     }
     
     const dataSourceRepo = new DataSourceRepository(this.db);
-    const dataAccess = DataAccessFacade.getInstance(this.workspaceBase);
     const resultPersistence = new ResultPersistenceService(this.db);
     
     const dataSource = dataSourceRepo.getById(params.dataSourceId);
@@ -58,18 +57,29 @@ export class UniformColorOperator extends SpatialOperator {
       throw new Error(`Data source not found: ${params.dataSourceId}`);
     }
     
-    const result = await dataAccess.uniformColor(
-      dataSource.type,
-      dataSource.reference,
-      {
-        color: params.color,
-        opacity: params.opacity,
-        strokeWidth: params.strokeWidth
-      }
-    );
+    // Uniform color is a frontend rendering concern
+    // We just pass through the original data reference with style metadata
+    const styleConfig = {
+      type: 'uniform',
+      color: params.color,
+      opacity: params.opacity,
+      strokeWidth: params.strokeWidth,
+      layerName: params.layerName || dataSource.name
+    };
     
+    // Persist result with style metadata (no data transformation)
     const persisted = await resultPersistence.persistResult(
-      result,
+      {
+        id: `uniform_${Date.now()}`,
+        type: dataSource.type,
+        reference: dataSource.reference, // Pass through original reference
+        metadata: {
+          ...dataSource.metadata,
+          result: dataSource.reference, // Standardized output: pass through reference
+          styleConfig
+        },
+        createdAt: new Date()
+      },
       'uniform_color',
       dataSource,
       { color: params.color }
