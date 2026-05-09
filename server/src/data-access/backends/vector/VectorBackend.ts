@@ -242,6 +242,14 @@ export class VectorBackend implements DataBackend {
   // ========== Private Helper Methods ==========
   
   private async loadGeoJSON(reference: string): Promise<GeoJSONFeatureCollection> {
+    const ext = path.extname(reference).toLowerCase();
+    
+    // Handle Shapefile - convert to GeoJSON first
+    if (ext === '.shp' || reference.includes('shapefile')) {
+      return await this.loadShapefileAsGeoJSON(reference);
+    }
+    
+    // Handle GeoJSON file
     const content = fs.readFileSync(reference, 'utf-8');
     const geojson = JSON.parse(content);
     
@@ -257,6 +265,55 @@ export class VectorBackend implements DataBackend {
     }
     
     return geojson;
+  }
+  
+  /**
+   * Load a shapefile and convert to GeoJSON using ogr2ogr
+   */
+  private async loadShapefileAsGeoJSON(shpPath: string): Promise<GeoJSONFeatureCollection> {
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+    
+    // Generate temporary GeoJSON path
+    const outputDir = path.dirname(shpPath);
+    const baseName = path.basename(shpPath, '.shp');
+    const tempGeojsonPath = path.join(outputDir, `${baseName}_temp_${Date.now()}.geojson`);
+    
+    try {
+      // Use ogr2ogr to convert shapefile to GeoJSON
+      const command = `ogr2ogr -f "GeoJSON" "${tempGeojsonPath}" "${shpPath}"`;
+      await execAsync(command);
+      
+      // Read and parse the GeoJSON
+      const geojsonData = fs.readFileSync(tempGeojsonPath, 'utf-8');
+      const geojson = JSON.parse(geojsonData);
+      
+      // Clean up temporary file
+      fs.unlinkSync(tempGeojsonPath);
+      
+      // Ensure it's a FeatureCollection
+      if (geojson.type === 'Feature') {
+        return {
+          type: 'FeatureCollection',
+          features: [geojson]
+        };
+      }
+      
+      if (geojson.type !== 'FeatureCollection') {
+        throw new Error('Invalid GeoJSON format after shapefile conversion');
+      }
+      
+      return geojson;
+    } catch (error) {
+      // Clean up on error
+      if (fs.existsSync(tempGeojsonPath)) {
+        fs.unlinkSync(tempGeojsonPath);
+      }
+      
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to convert shapefile to GeoJSON: ${message}`);
+    }
   }
   
   private async saveGeoJSON(geojson: GeoJSONFeatureCollection): Promise<string> {
