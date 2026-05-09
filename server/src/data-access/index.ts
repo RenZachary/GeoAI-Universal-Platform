@@ -1,6 +1,8 @@
 /**
- * Data Access Layer - Main exports
- * Provides unified interface for all data source operations
+ * Data Access Layer - Type Definitions and Utilities
+ * 
+ * NOTE: Accessor implementations have been migrated to spatial-operators/backends.
+ * This module now only provides shared types and utility classes.
  */
 
 // Core interfaces (type-only exports)
@@ -18,12 +20,8 @@ export type {
   OverlayOptions,
 } from './interfaces';
 
-// Factory
-export { DataAccessorFactory } from './factories/DataAccessorFactory';
-
-// Accessors (for direct instantiation if needed)
-export { ShapefileAccessor } from './accessors/ShapefileAccessor';
-export { GeoTIFFAccessor } from './accessors/GeoTIFFAccessor';
+// Repositories
+export { DataSourceRepository } from './repositories/DataSourceRepository';
 
 // Utilities
 export { DataSourceDetector } from './utils/DataSourceDetector';
