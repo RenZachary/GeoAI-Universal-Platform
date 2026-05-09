@@ -115,23 +115,30 @@ export class SpatialOperatorController {
           }));
       }
 
-      // Filter by capability if provided (TODO: implement capabilities)
+      // Filter by capability if provided
       if (capability && typeof capability === 'string') {
-        // For now, no filtering since capabilities not implemented
-        console.warn('[SpatialOperator Controller] Capability filtering not yet implemented');
+        operators = operators.filter(op => {
+          const opMetadata = SpatialOperatorRegistryInstance.getOperator(op.operatorId)?.getMetadata();
+          return opMetadata?.capabilities?.includes(capability);
+        });
       }
 
       const response: OperatorListResponse = {
         success: true,
         count: operators.length,
-        operators: operators.map(opInfo => ({
-          id: opInfo.operatorId,
-          name: opInfo.name,
-          description: opInfo.description,
-          category: opInfo.category,
-          version: '1.0.0', // Default version
-          capabilities: [] // TODO: Add capabilities field to SpatialOperator
-        }))
+        operators: operators.map(opInfo => {
+          const op = SpatialOperatorRegistryInstance.getOperator(opInfo.operatorId);
+          const metadata = op?.getMetadata();
+          
+          return {
+            id: opInfo.operatorId,
+            name: opInfo.name,
+            description: opInfo.description,
+            category: opInfo.category,
+            version: metadata?.version || '1.0.0',
+            capabilities: metadata?.capabilities || []
+          };
+        })
       };
 
       res.json(response);
@@ -172,11 +179,11 @@ export class SpatialOperatorController {
           name: metadata.name,
           description: metadata.description,
           category: metadata.category,
-          version: '1.0.0', // Default version
-          capabilities: [], // TODO: Add capabilities to SpatialOperator
+          version: metadata.version || '1.0.0',
+          capabilities: metadata.capabilities || [],
           inputSchema: metadata.inputSchema,
           outputSchema: metadata.outputSchema,
-          examples: [] // TODO: Add examples to SpatialOperator metadata
+          examples: [] // Examples can be added to metadata in the future
         }
       };
 

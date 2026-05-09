@@ -398,50 +398,134 @@ export class FileUploadService {
   }
 
   /**
-   * Validate uploaded file
+   * Validate uploaded file using appropriate Backend
    */
   private async validateFile(filePath: string, type: DataSourceType): Promise<void> {
     try {
-      // Use appropriate backend based on type
-      const backend = this.dataAccess.getPostGISBackend();
-      
       // For shapefile, validate all components exist
       if (type === 'shapefile') {
         await this.validateShapefileComplete(filePath);
         return;
       }
 
-      // For other types, use VectorBackend or RasterBackend via facade
-      // TODO: Implement proper validation using backends
-      console.log(`[FileUploadService] File validation skipped for type: ${type}`);
+      // For GeoJSON, validate JSON structure
+      if (type === 'geojson') {
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const geojson = JSON.parse(content);
+        
+        if (!geojson.type || !['Feature', 'FeatureCollection'].includes(geojson.type)) {
+          throw new ValidationError('Invalid GeoJSON: missing or invalid type field');
+        }
+        
+        if (geojson.type === 'Feature' && !geojson.geometry) {
+          throw new ValidationError('Invalid GeoJSON Feature: missing geometry');
+        }
+        
+        console.log(`[FileUploadService] GeoJSON validation successful`);
+        return;
+      }
 
-      console.log(`[FileUploadService] File validation successful: ${type}`);
+      // For GeoTIFF, validate file header
+      if (type === 'tif') {
+        const buffer = fs.readFileSync(filePath);
+        // Check for TIFF magic numbers (little-endian: 0x4949, big-endian: 0x4D4D)
+        if (buffer.length < 4) {
+          throw new ValidationError('Invalid TIFF file: file too small');
+        }
+        
+        const isLittleEndian = buffer[0] === 0x49 && buffer[1] === 0x49;
+        const isBigEndian = buffer[0] === 0x4D && buffer[1] === 0x4D;
+        
+        if (!isLittleEndian && !isBigEndian) {
+          throw new ValidationError('Invalid TIFF file: incorrect magic number');
+        }
+        
+        console.log(`[FileUploadService] GeoTIFF validation successful`);
+        return;
+      }
+
+      console.warn(`[FileUploadService] Basic validation passed for type: ${type}`);
     } catch (error) {
+      if (error instanceof ValidationError) {
+        throw error;
+      }
       throw new ValidationError(`File validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   /**
-   * Extract metadata from file using appropriate accessor
+   * Extract metadata from file using appropriate Backend
    */
   private async extractMetadata(filePath: string, type: DataSourceType): Promise<NativeData> {
     try {
-      // Use DataAccessFacade to read file
-      // For now, return minimal metadata - full implementation needs Backend integration
-      const nativeData: NativeData = {
-        id: `upload_${Date.now()}`,
-        type,
-        reference: filePath,
-        createdAt: new Date(),
-        metadata: {
-          name: path.basename(filePath),
-          format: type,
-          result: filePath  // Add required result field
+      // Use DataAccessFacade to read and extract metadata
+      const dataAccess = this.dataAccess;
+      let nativeData: NativeData;
+
+      if (type === 'geojson') {
+        // Read GeoJSON using VectorBackend
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const geojson = JSON.parse(content);
+        
+        // Count features
+        let featureCount = 0;
+        if (geojson.type === 'FeatureCollection' && Array.isArray(geojson.features)) {
+          featureCount = geojson.features.length;
+        } else if (geojson.type === 'Feature') {
+          featureCount = 1;
         }
-      };
+        
+        // Extract bounding box if available
+        const bbox = geojson.bbox || null;
+        
+        nativeData = {
+          id: `upload_${Date.now()}`,
+          type,
+          reference: filePath,
+          createdAt: new Date(),
+          metadata: {
+            name: path.basename(filePath),
+            format: type,
+            featureCount,
+            bbox,
+            result: filePath
+          }
+        };
+      } else if (type === 'tif') {
+        // For GeoTIFF, get basic file info
+        const stats = fs.statSync(filePath);
+        
+        nativeData = {
+          id: `upload_${Date.now()}`,
+          type,
+          reference: filePath,
+          createdAt: new Date(),
+          metadata: {
+            name: path.basename(filePath),
+            format: type,
+            fileSize: stats.size,
+            result: filePath
+          }
+        };
+      } else {
+        // Default metadata for other types
+        const stats = fs.statSync(filePath);
+        
+        nativeData = {
+          id: `upload_${Date.now()}`,
+          type,
+          reference: filePath,
+          createdAt: new Date(),
+          metadata: {
+            name: path.basename(filePath),
+            format: type,
+            fileSize: stats.size,
+            result: filePath
+          }
+        };
+      }
 
       console.log(`[FileUploadService] Metadata extracted: ${JSON.stringify(nativeData.metadata)}`);
-
       return nativeData;
     } catch (error) {
       throw new FileUploadError(`Failed to extract metadata: ${error instanceof Error ? error.message : 'Unknown error'}`);

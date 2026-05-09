@@ -74,7 +74,9 @@ export class FilterOperator extends SpatialOperator {
     
     const conditions = Array.isArray(params.conditions) ? params.conditions : [params.conditions];
     
-    // For now, use the first condition - TODO: Support multiple conditions
+    // Note: DataAccessFacade.filter currently supports single condition only
+    // Multi-condition support requires Backend enhancement (AND/OR logic)
+    // Using first condition for now
     const result = await dataAccess.filter(
       dataSource.type,
       dataSource.reference,

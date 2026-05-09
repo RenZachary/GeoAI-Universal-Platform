@@ -136,7 +136,9 @@ export abstract class SpatialOperator {
       description: this.description,
       category: this.category,
       inputSchema: this.inputSchema.shape,
-      outputSchema: this.outputSchema.shape
+      outputSchema: this.outputSchema.shape,
+      capabilities: [] as string[], // Can be overridden by subclasses
+      version: '1.0.0' // Default version, can be overridden
     };
   }
 }

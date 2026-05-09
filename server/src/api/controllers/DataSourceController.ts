@@ -12,6 +12,7 @@
 
 import type { Request, Response } from 'express';
 import { z } from 'zod';
+import fs from 'fs';
 import type { DataSourceService } from '../../services';
 import { ConnectionError, ValidationError } from '../../services/DataSourceService';
 import { DataSourcePublishingService } from '../../services/DataSourcePublishingService';
@@ -149,13 +150,49 @@ export class DataSourceController {
    */
   async registerDataSource(req: Request, res: Response): Promise<void> {
     try {
-      // TODO: Add validation schema for manual registration
-      // const { name, type, reference, metadata } = req.body;
+      const { name, type, reference, metadata } = req.body;
       
-      // Delegate to service (implementation pending)
-      res.status(501).json({
-        success: false,
-        error: 'Manual data source registration not yet implemented'
+      // Validate required fields
+      if (!name || !type || !reference) {
+        res.status(400).json({
+          success: false,
+          error: 'Missing required fields: name, type, and reference are required'
+        });
+        return;
+      }
+      
+      // Validate type
+      const validTypes = ['shapefile', 'geojson', 'postgis', 'tif', 'mvt', 'wms'];
+      if (!validTypes.includes(type)) {
+        res.status(400).json({
+          success: false,
+          error: `Invalid type: ${type}. Must be one of: ${validTypes.join(', ')}`
+        });
+        return;
+      }
+      
+      // Check if reference exists (for file-based types)
+      if (['shapefile', 'geojson', 'tif'].includes(type)) {
+        if (!fs.existsSync(reference)) {
+          res.status(400).json({
+            success: false,
+            error: `File not found: ${reference}`
+          });
+          return;
+        }
+      }
+      
+      // Register data source
+      const dataSource = this.dataSourceService.registerManualDataSource({
+        name,
+        type: type as any,
+        reference,
+        metadata: metadata || {}
+      });
+      
+      res.status(201).json({
+        success: true,
+        data: dataSource
       });
     } catch (error) {
       this.handleError(res, error);

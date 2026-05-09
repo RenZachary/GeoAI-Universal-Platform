@@ -696,4 +696,31 @@ export class DataSourceService {
       parseFloat(match[4])  // maxY
     ];
   }
+
+  /**
+   * Register a data source manually (for file-based sources)
+   * 
+   * @param params - Data source parameters
+   * @returns Registered DataSourceRecord
+   */
+  registerManualDataSource(params: {
+    name: string;
+    type: 'shapefile' | 'geojson' | 'postgis' | 'tif' | 'mvt' | 'wms';
+    reference: string;
+    metadata?: Record<string, any>;
+  }): DataSourceRecord {
+    const { name, type, reference, metadata = {} } = params;
+    
+    // Create DataSourceRecord
+    const dataSource = this.dataSourceRepo.create(
+      name,
+      type,
+      reference,
+      metadata
+    );
+    
+    console.log(`[DataSourceService] Manually registered data source: ${name} (${type})`);
+    
+    return dataSource;
+  }
 }

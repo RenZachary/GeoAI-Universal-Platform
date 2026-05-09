@@ -70,15 +70,36 @@ export async function scanAndRegisterDataFiles(
       // Detect file type
       const type = detectFileType(file);
       
-      // TODO: Use DataAccessFacade or Backend to extract metadata
-      // For now, create minimal metadata
+      // Extract metadata using fs for basic info
       const stats = fs.statSync(fullPath);
-      const metadata = {
+      let metadata: any = {
         name: path.basename(file),
         format: type,
-        featureCount: 0,
         fileSize: stats.size
       };
+      
+      // For GeoJSON, extract feature count
+      if (type === 'geojson') {
+        try {
+          const content = fs.readFileSync(fullPath, 'utf-8');
+          const geojson = JSON.parse(content);
+          
+          if (geojson.type === 'FeatureCollection' && Array.isArray(geojson.features)) {
+            metadata.featureCount = geojson.features.length;
+          } else if (geojson.type === 'Feature') {
+            metadata.featureCount = 1;
+          }
+          
+          if (geojson.bbox) {
+            metadata.bbox = geojson.bbox;
+          }
+        } catch (error) {
+          console.warn(`    Warning: Could not parse GeoJSON metadata for ${file}`);
+          metadata.featureCount = 0;
+        }
+      } else {
+        metadata.featureCount = 0;
+      }
       
       // Register in database with the original path
       dataSourceRepo.create(
