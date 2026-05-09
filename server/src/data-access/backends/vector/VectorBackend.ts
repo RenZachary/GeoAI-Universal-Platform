@@ -268,51 +268,58 @@ export class VectorBackend implements DataBackend {
   }
   
   /**
-   * Load a shapefile and convert to GeoJSON using ogr2ogr
+   * Load a shapefile and convert to GeoJSON using the 'shapefile' library
+   * Supports Chinese encoding (GBK, GB2312, UTF-8)
    */
   private async loadShapefileAsGeoJSON(shpPath: string): Promise<GeoJSONFeatureCollection> {
-    const { exec } = await import('child_process');
-    const { promisify } = await import('util');
-    const execAsync = promisify(exec);
-    
-    // Generate temporary GeoJSON path
-    const outputDir = path.dirname(shpPath);
-    const baseName = path.basename(shpPath, '.shp');
-    const tempGeojsonPath = path.join(outputDir, `${baseName}_temp_${Date.now()}.geojson`);
-    
     try {
-      // Use ogr2ogr to convert shapefile to GeoJSON
-      const command = `ogr2ogr -f "GeoJSON" "${tempGeojsonPath}" "${shpPath}"`;
-      await execAsync(command);
+      // Import shapefile library dynamically
+      const shapefileModule = await import('shapefile');
       
-      // Read and parse the GeoJSON
-      const geojsonData = fs.readFileSync(tempGeojsonPath, 'utf-8');
-      const geojson = JSON.parse(geojsonData);
+      // Remove .shp extension for the shapefile library
+      const shapefilePath = shpPath.replace(/\.shp$/i, '');
       
-      // Clean up temporary file
-      fs.unlinkSync(tempGeojsonPath);
+      // Try multiple encodings for Chinese character support
+      const encodings = ['utf-8', 'gbk', 'gb2312', 'windows-1252'];
+      let lastError: Error | null = null;
       
-      // Ensure it's a FeatureCollection
-      if (geojson.type === 'Feature') {
-        return {
-          type: 'FeatureCollection',
-          features: [geojson]
-        };
+      for (const encoding of encodings) {
+        try {
+          console.log(`[VectorBackend] Trying shapefile with encoding: ${encoding}`);
+          
+          // Open shapefile with specified encoding
+          const source = await (shapefileModule as any).open(shapefilePath, undefined, { encoding });
+          
+          // Read all features
+          const features: any[] = [];
+          let result = await source.read();
+          
+          while (!result.done) {
+            if (result.value) {
+              features.push(result.value);
+            }
+            result = await source.read();
+          }
+          
+          console.log(`[VectorBackend] Successfully loaded shapefile with ${encoding} encoding, ${features.length} features`);
+          
+          // Return as FeatureCollection
+          return {
+            type: 'FeatureCollection',
+            features: features
+          };
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error(String(error));
+          console.log(`[VectorBackend] Failed with ${encoding} encoding, trying next...`);
+          continue;
+        }
       }
       
-      if (geojson.type !== 'FeatureCollection') {
-        throw new Error('Invalid GeoJSON format after shapefile conversion');
-      }
-      
-      return geojson;
+      // All encodings failed
+      throw new Error(`Failed to read shapefile with all encodings. Last error: ${lastError?.message}`);
     } catch (error) {
-      // Clean up on error
-      if (fs.existsSync(tempGeojsonPath)) {
-        fs.unlinkSync(tempGeojsonPath);
-      }
-      
       const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to convert shapefile to GeoJSON: ${message}`);
+      throw new Error(`Failed to load shapefile: ${message}`);
     }
   }
   
