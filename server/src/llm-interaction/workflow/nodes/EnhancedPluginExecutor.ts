@@ -201,16 +201,16 @@ export class EnhancedPluginExecutor {
     const step = targetPlan.steps[stepIndex];
 
     try {
-      // Get the tool/operator
-      const tool = ToolRegistryInstance.getTool(step.pluginId);
+      // Get the operator from registry (using operatorId)
+      const tool = ToolRegistryInstance.getTool(step.operatorId);
       
       if (!tool) {
-        console.error(`[Enhanced Executor] Tool not found: ${step.pluginId}`);
+        console.error(`[Enhanced Executor] Operator not found: ${step.operatorId}`);
         results.set(taskId, {
           id: taskId,
           goalId: targetPlan.goalId,
           status: 'failed',
-          error: `Tool not found: ${step.pluginId}`
+          error: `Operator not found: ${step.operatorId}`
         });
         this.metrics!.failedTasks++;
         return;
@@ -223,7 +223,7 @@ export class EnhancedPluginExecutor {
       if (streamWriter) {
         streamWriter.write(`data: ${JSON.stringify({
           type: 'tool_start',
-          tool: step.pluginId,
+          tool: step.operatorId,
           taskId: taskId,
           input: JSON.stringify(resolvedParameters).substring(0, 200),
           timestamp: Date.now()

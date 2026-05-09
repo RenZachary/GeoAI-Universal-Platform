@@ -4,6 +4,8 @@
  * This is a simple demonstration of how to write a custom plugin executor.
  * The execute function receives parameters and context (db, workspaceBase).
  * 
+ * IMPORTANT: Must export as named function 'execute', not default export!
+ * 
  * @param {Object} params - Input parameters from the plugin call
  * @param {Object} context - Execution context
  * @param {Database} context.db - SQLite database instance
@@ -11,7 +13,7 @@
  * @returns {Object} Result object with id, type, reference, metadata, createdAt
  */
 
-export default async function execute(params, context) {
+export async function execute(params, context) {
   const { db, workspaceBase } = context;
   const { dataSourceId, multiplier = 2, operation = 'count' } = params;
 

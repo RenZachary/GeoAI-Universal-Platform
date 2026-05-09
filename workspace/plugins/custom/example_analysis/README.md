@@ -31,10 +31,11 @@ Defines the plugin's metadata, input/output schemas, and capabilities:
 
 ## executor.js
 
-Implements the execution logic. Must export a default async function:
+Implements the execution logic. **Must export a named async function called `execute`**:
 
 ```javascript
-export default async function execute(params, context) {
+// ✅ CORRECT: Named export
+export async function execute(params, context) {
   const { db, workspaceBase } = context;
   
   // Your custom logic here
@@ -47,6 +48,9 @@ export default async function execute(params, context) {
     createdAt: new Date()
   };
 }
+
+// ❌ WRONG: Default export (will cause error)
+// export default async function execute(params, context) { ... }
 ```
 
 ### Parameters

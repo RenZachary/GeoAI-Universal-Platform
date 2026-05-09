@@ -58,7 +58,7 @@ export type { ParallelGroup } from '../analyzers/ParallelTaskAnalyzer';
 
 export interface ExecutionStep {
   stepId: string;
-  pluginId: string;
+  operatorId: string; // SpatialOperator ID (matches TaskPlanner output)
   parameters: Record<string, any>;
   dependsOn?: string[];
 }

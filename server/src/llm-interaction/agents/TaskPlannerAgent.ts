@@ -162,8 +162,8 @@ export class TaskPlannerAgent {
           const deduplicatedPlan = this.removeDuplicateSteps(plan);
           if (deduplicatedPlan.steps.length !== plan.steps.length) {
             console.warn(`[Task Planner] Removed ${plan.steps.length - deduplicatedPlan.steps.length} duplicate steps from plan`);
-            console.log(`[Task Planner] Original steps:`, plan.steps.map(s => s.pluginId));
-            console.log(`[Task Planner] Deduplicated steps:`, deduplicatedPlan.steps.map(s => s.pluginId));
+            console.log(`[Task Planner] Original steps:`, plan.steps.map(s => s.operatorId));
+            console.log(`[Task Planner] Deduplicated steps:`, deduplicatedPlan.steps.map(s => s.operatorId));
           }
 
           // STAGE 2.6: Ensure stepId global uniqueness by adding goalId prefix if missing
@@ -478,7 +478,7 @@ export class TaskPlannerAgent {
 
     for (let i = 0; i < plan.steps.length; i++) {
       const step = plan.steps[i];
-      if (terminalPluginIds.includes(step.pluginId)) {
+      if (terminalPluginIds.includes(step.operatorId)) {
         terminalNodeCount++;
         terminalNodeIndex = i;
       }
@@ -487,14 +487,14 @@ export class TaskPlannerAgent {
     // Rule 1: At most one terminal node
     if (terminalNodeCount > 1) {
       console.error(`[Task Planner] VALIDATION FAILED: Plan has ${terminalNodeCount} terminal nodes (max 1 allowed)`);
-      console.error(`[Task Planner] Steps:`, plan.steps.map(s => s.pluginId));
+      console.error(`[Task Planner] Steps:`, plan.steps.map(s => s.operatorId));
       return null;
     }
 
     // Rule 2: Terminal node must be the last step
     if (terminalNodeCount === 1 && terminalNodeIndex !== plan.steps.length - 1) {
       console.error(`[Task Planner] VALIDATION FAILED: Terminal node at index ${terminalNodeIndex} is not the last step`);
-      console.error(`[Task Planner] Terminal node: ${plan.steps[terminalNodeIndex].pluginId}`);
+      console.error(`[Task Planner] Terminal node: ${plan.steps[terminalNodeIndex].operatorId}`);
       console.error(`[Task Planner] Expected at index: ${plan.steps.length - 1}`);
 
       // Fix: Move terminal node to the end
@@ -546,26 +546,26 @@ export class TaskPlannerAgent {
       return plan;
     }
 
-    const seenPlugins = new Set<string>();
+    const seenOperators = new Set<string>();
     const uniqueSteps: ExecutionStep[] = [];
-    const uniquePluginIds: string[] = [];
+    const uniqueOperatorIds: string[] = [];
 
     for (const step of plan.steps) {
-      if (!seenPlugins.has(step.pluginId)) {
-        seenPlugins.add(step.pluginId);
+      if (!seenOperators.has(step.operatorId)) {
+        seenOperators.add(step.operatorId);
         uniqueSteps.push(step);
-        if (!uniquePluginIds.includes(step.pluginId)) {
-          uniquePluginIds.push(step.pluginId);
+        if (!uniqueOperatorIds.includes(step.operatorId)) {
+          uniqueOperatorIds.push(step.operatorId);
         }
       } else {
-        console.warn(`[Task Planner] Removing duplicate step with plugin: ${step.pluginId}`);
+        console.warn(`[Task Planner] Removing duplicate step with operator: ${step.operatorId}`);
       }
     }
 
     return {
       ...plan,
       steps: uniqueSteps,
-      requiredPlugins: uniquePluginIds
+      requiredPlugins: uniqueOperatorIds
     };
   }
 }
