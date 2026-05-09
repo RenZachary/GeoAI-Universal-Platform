@@ -1,105 +1,14 @@
 # GeoAI-UP v2.0 重构升级文档
 
-## 📚 快速导航
+## 🚀 快速开始
 
-**新加入? 从这里开始** → [01-DOCUMENT-STRUCTURE.md](./01-DOCUMENT-STRUCTURE.md) (5分钟了解文档层次)
+**新加入团队？** → 先阅读 [01-DOCUMENT-STRUCTURE.md](./01-DOCUMENT-STRUCTURE.md) 了解文档组织
 
----
-
-## ⭐ 核心文档 (按阅读顺序)
-
-### 1. [02-REFACTORING-PLAN-v2.0.md](./02-REFACTORING-PLAN-v2.0.md) - 总体重构规划
-**阅读时间**: 15分钟 | **重要性**: ⭐⭐⭐⭐⭐
-
-**核心内容**:
-- LLM自主因子推断 (零配置,无需行业知识库)
-- SpatialOperator统一架构
-- 数据访问层重构
-- 并行执行引擎
-- 12周实施路线图
-
-**适合**: 所有人必读
+**想直接开始？** → 阅读 [02-REFACTORING-PLAN-v2.0.md](./02-REFACTORING-PLAN-v2.0.md) (核心规划)
 
 ---
 
-### 2. [03-SPATIAL-OPERATOR-ARCHITECTURE.md](./03-SPATIAL-OPERATOR-ARCHITECTURE.md) - 算子架构
-**阅读时间**: 20分钟 | **重要性**: ⭐⭐⭐⭐
-
-**核心内容**:
-- SpatialOperator抽象基类
-- 实现示例 (Buffer, KernelDensity, WeightedOverlay)
-- v1.0 → v2.0 迁移指南
-
-**适合**: 后端开发者
-
----
-
-### 3. [04-GIS-TASK-SPLITTING-STRATEGY.md](./04-GIS-TASK-SPLITTING-STRATEGY.md) - 任务拆分策略
-**阅读时间**: 15分钟 | **重要性**: ⭐⭐⭐⭐
-
-**核心内容**:
-- DataSourceSemanticAnalyzer设计
-- LLM自主推断流程
-- 并行任务分析器
-
-**适合**: AI/LLM开发者
-
----
-
-### 4. [05-DATA-ACCESS-FACADE.md](./05-DATA-ACCESS-FACADE.md) - 数据访问门面
-**阅读时间**: 20分钟 | **重要性**: ⭐⭐⭐⭐
-
-**核心内容**:
-- DataBackend接口设计 (Vector/Raster/PostGIS)
-- DataAccessFacade路由逻辑
-- Turf.js vs GDAL 技术选型说明
-- 后端实现示例
-
-**适合**: 数据层开发者、GIS后端工程师
-
----
-
-### 5. [06-MIGRATION-GUIDE.md](./06-MIGRATION-GUIDE.md) - 迁移指南
-**阅读时间**: 30分钟 | **重要性**: ⭐⭐⭐
-
-**核心内容**:
-- 8周分阶段迁移计划
-- 代码迁移示例 (v1.0 → v2.0对照)
-- 自动化迁移脚本
-- 测试与部署清单
-- 回滚策略
-
-**适合**: 运维工程师、系统集成商、升级实施团队
-
----
-
-## 🎯 快速开始
-
-### 对于新加入的开发者
-
-1. **首先阅读**: [02-REFACTORING-PLAN-v2.0.md](./02-REFACTORING-PLAN-v2.0.md) 了解整体架构
-2. **然后深入**: 根据你的职责选择对应文档
-   - LLM/AI开发 → [04-GIS-TASK-SPLITTING-STRATEGY.md](./04-GIS-TASK-SPLITTING-STRATEGY.md)
-   - 后端开发 → [03-SPATIAL-OPERATOR-ARCHITECTURE.md](./03-SPATIAL-OPERATOR-ARCHITECTURE.md)
-   - 数据层开发 → [05-DATA-ACCESS-FACADE.md](./05-DATA-ACCESS-FACADE.md)
-3. **实践操作**: 参考 [06-MIGRATION-GUIDE.md](./06-MIGRATION-GUIDE.md) 进行代码重构
-
-### 对于架构评审委员会
-
-1. 审阅 [02-REFACTORING-PLAN-v2.0.md](./02-REFACTORING-PLAN-v2.0.md) 的目标与收益
-2. 评估 Breaking Changes 对现有用户的影响
-3. 确认12周实施时间表的可行性
-4. 批准技术债务清理优先级
-
-### 对于产品经理
-
-1. 关注 [02-REFACTORING-PLAN-v2.0.md](./02-REFACTORING-PLAN-v2.0.md) 中的用户体验改进
-2. 了解新功能: 数据预校验、并行执行、中间结果查看
-3. 规划v2.0发布后的用户沟通策略
-
----
-
-## 📊 核心改进概览
+## 📊 v2.0 核心改进
 
 | 维度 | v1.0 | v2.0 | 提升 |
 |------|------|------|------|
@@ -112,13 +21,31 @@
 
 ---
 
-## 🗂️ 目录结构
+## 🎯 按角色选择文档
+
+### 👨‍💻 开发者
+- **后端开发**: [03-SPATIAL-OPERATOR-ARCHITECTURE.md](./03-SPATIAL-OPERATOR-ARCHITECTURE.md)
+- **AI/LLM开发**: [04-GIS-TASK-SPLITTING-STRATEGY.md](./04-GIS-TASK-SPLITTING-STRATEGY.md)
+- **数据层开发**: [05-DATA-ACCESS-FACADE.md](./05-DATA-ACCESS-FACADE.md)
+
+### 🏗️ 架构师/技术负责人
+- [02-REFACTORING-PLAN-v2.0.md](./02-REFACTORING-PLAN-v2.0.md) - 整体架构与路线图
+
+### 🔧 运维/实施团队
+- [06-MIGRATION-GUIDE.md](./06-MIGRATION-GUIDE.md) - 8周迁移计划
+
+### 📋 产品经理
+- [02-REFACTORING-PLAN-v2.0.md](./02-REFACTORING-PLAN-v2.0.md) - "预期收益"章节
+
+---
+
+## 📁 文档目录
 
 ```
 docs/v2.0/
-├── 00-README.md                          # 本文档 (导航)
-├── 01-DOCUMENT-STRUCTURE.md              # 文档层次说明
-├── 02-REFACTORING-PLAN-v2.0.md          # 总体重构规划 ⭐
+├── 00-README.md                          # 本文档 (快速入口)
+├── 01-DOCUMENT-STRUCTURE.md              # 文档层次与决策树
+├── 02-REFACTORING-PLAN-v2.0.md          # ⭐ 核心重构规划
 ├── 03-SPATIAL-OPERATOR-ARCHITECTURE.md  # 算子架构设计
 ├── 04-GIS-TASK-SPLITTING-STRATEGY.md    # 任务拆分策略
 ├── 05-DATA-ACCESS-FACADE.md             # 数据访问门面

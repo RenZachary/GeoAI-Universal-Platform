@@ -1,81 +1,12 @@
 # v2.0 文档层次结构
 
-## 📚 文档导航 (按重要性排序)
-
-### ⭐ 核心文档 (必读)
-
-#### 1. [02-REFACTORING-PLAN-v2.0.md](./02-REFACTORING-PLAN-v2.0.md) - 总体重构规划
-**文件大小**: ~900行 (精简后)  
-**阅读时间**: 15分钟  
-**核心内容**:
-- ✅ LLM自主因子推断 (零配置,无需行业知识库)
-- ✅ SpatialOperator统一架构 (替代Plugin/Executor/Tool三层)
-- ✅ 数据访问层重构 (DataBackend抽象)
-- ✅ 并行执行引擎 (DAG编排)
-- ✅ 12周实施路线图
-
-**适合**: 所有人 (架构师、开发者、产品经理)
+> **本文档提供详细的阅读决策树和v1.0 vs v2.0对比分析**
+>
+> 快速导航请参考 [00-README.md](./00-README.md)
 
 ---
 
-### 🔧 技术细节文档 (按需阅读)
-
-#### 2. [03-SPATIAL-OPERATOR-ARCHITECTURE.md](./03-SPATIAL-OPERATOR-ARCHITECTURE.md) - 算子架构设计
-**文件大小**: ~800行  
-**阅读时间**: 20分钟  
-**核心内容**:
-- SpatialOperator抽象基类定义
-- 3个实现示例 (Buffer, KernelDensity, WeightedOverlay)
-- 注册表模式与LangChain集成
-- v1.0 → v2.0 迁移指南
-
-**适合**: 后端开发者、插件开发者
-
----
-
-#### 3. [04-GIS-TASK-SPLITTING-STRATEGY.md](./04-GIS-TASK-SPLITTING-STRATEGY.md) - 任务拆分策略
-**文件大小**: ~700行  
-**阅读时间**: 15分钟  
-**核心内容**:
-- DataSourceSemanticAnalyzer (数据源语义分析)
-- LLM自主推断流程 (数据驱动 + 常识推理)
-- 并行任务分析器 (DAG依赖图)
-- 实际案例演示
-
-**适合**: LLM Agents开发者、AI工程师
-
----
-
-### 📖 补充文档 (已完成)
-
-#### 4. [05-DATA-ACCESS-FACADE.md](./05-DATA-ACCESS-FACADE.md) - 数据访问门面
-**文件大小**: ~860行  
-**阅读时间**: 20分钟  
-**核心内容**:
-- DataBackend接口设计 (GDAL/PostGIS/WebService)
-- DataAccessFacade路由逻辑
-- 后端实现示例
-- 性能优化策略 (缓存、并行)
-
-**适合**: 数据层开发者、GIS后端工程师
-
----
-
-#### 5. [06-MIGRATION-GUIDE.md](./06-MIGRATION-GUIDE.md) - 迁移指南
-**文件大小**: ~845行  
-**阅读时间**: 30分钟  
-**核心内容**:
-- 8周分阶段迁移计划
-- 代码迁移示例 (v1.0 → v2.0对照)
-- 自动化迁移脚本
-- 测试与部署清单
-- 回滚策略
-
-**适合**: 运维工程师、系统集成商、升级实施团队
-
----
-
-## 🎯 快速决策树
+## 🎯 详细阅读决策树
 
 ```
 你是?
