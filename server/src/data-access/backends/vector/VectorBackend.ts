@@ -17,6 +17,7 @@ import { OverlayOperation } from './operations/OverlayOperation';
 import { FilterOperation } from './operations/FilterOperation';
 import { AggregateOperation } from './operations/AggregateOperation';
 import { SpatialJoinOperation } from './operations/SpatialJoinOperation';
+import { tryMultipleEncodings } from '../../utils/ShapefileEncodingUtils';
 
 interface GeoJSONFeatureCollection {
   type: 'FeatureCollection';
@@ -269,7 +270,7 @@ export class VectorBackend implements DataBackend {
   
   /**
    * Load a shapefile and convert to GeoJSON using the 'shapefile' library
-   * Supports Chinese encoding (GBK, GB2312, UTF-8)
+   * Uses shared ShapefileEncodingUtils for intelligent encoding detection
    */
   private async loadShapefileAsGeoJSON(shpPath: string): Promise<GeoJSONFeatureCollection> {
     try {
@@ -279,44 +280,24 @@ export class VectorBackend implements DataBackend {
       // Remove .shp extension for the shapefile library
       const shapefilePath = shpPath.replace(/\.shp$/i, '');
       
-      // Try multiple encodings for Chinese character support
-      const encodings = ['utf-8', 'gbk', 'gb2312', 'windows-1252'];
-      let lastError: Error | null = null;
+      console.log(`[VectorBackend] Loading shapefile: ${shapefilePath}`);
       
-      for (const encoding of encodings) {
-        try {
-          console.log(`[VectorBackend] Trying shapefile with encoding: ${encoding}`);
-          
-          // Open shapefile with specified encoding
-          const source = await (shapefileModule as any).open(shapefilePath, undefined, { encoding });
-          
-          // Read all features
-          const features: any[] = [];
-          let result = await source.read();
-          
-          while (!result.done) {
-            if (result.value) {
-              features.push(result.value);
-            }
-            result = await source.read();
-          }
-          
-          console.log(`[VectorBackend] Successfully loaded shapefile with ${encoding} encoding, ${features.length} features`);
-          
-          // Return as FeatureCollection
-          return {
-            type: 'FeatureCollection',
-            features: features
-          };
-        } catch (error) {
-          lastError = error instanceof Error ? error : new Error(String(error));
-          console.log(`[VectorBackend] Failed with ${encoding} encoding, trying next...`);
-          continue;
-        }
-      }
+      // Use shared encoding utility with automatic detection
+      const features = await tryMultipleEncodings(
+        async (encoding) => {
+          return await (shapefileModule as any).open(shapefilePath, undefined, { encoding });
+        },
+        shapefilePath,
+        (message) => console.log(`[VectorBackend] ${message}`)
+      );
       
-      // All encodings failed
-      throw new Error(`Failed to read shapefile with all encodings. Last error: ${lastError?.message}`);
+      console.log(`[VectorBackend] Successfully loaded shapefile with ${features.length} features`);
+      
+      // Return as FeatureCollection
+      return {
+        type: 'FeatureCollection',
+        features: features
+      };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(`Failed to load shapefile: ${message}`);

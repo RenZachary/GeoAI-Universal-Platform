@@ -37,3 +37,5 @@ export { DataSourceDetector } from './utils/DataSourceDetector';
 export { PostGISPoolManager } from './utils/PostGISPoolManager';
 export { PostGISConnectionParser } from './utils/PostGISConnectionParser';
 export { parseConnectionConfig, convertDistanceUnit } from './utils/PostGISUtils';
+export { tryMultipleEncodings, validateStringEncoding, SUPPORTED_ENCODINGS } from './utils/ShapefileEncodingUtils';
+export type { FeatureWithProperties, SupportedEncoding } from './utils/ShapefileEncodingUtils';

@@ -4,7 +4,7 @@ import fs from 'fs';
 import type { DataSourceType, NativeData } from '../../../../core/index';
 import type { MVTTileOptions } from '../MVTPublisherTypes';
 import path from 'path';
-import { tryMultipleEncodings } from '../../../ShapefileEncodingUtils';
+import { tryMultipleEncodings } from '../../../../data-access';
 import { GeoJSONMVTTStrategy } from './GeoJSONMVTTStrategy';
 /**
  * Shapefile MVT Strategy - Converts to GeoJSON first, then uses geojson-vt
