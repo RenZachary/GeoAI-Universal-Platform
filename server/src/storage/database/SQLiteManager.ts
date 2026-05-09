@@ -131,17 +131,44 @@ class SQLiteManager {
     // Visualization services table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS visualization_services (
-        id TEXT PRIMARY KEY,
+        service_id TEXT PRIMARY KEY,
         service_type TEXT NOT NULL,
         url TEXT NOT NULL,
-        data_source_id TEXT NOT NULL,
-        metadata TEXT NOT NULL,
-        ttl INTEGER NOT NULL,
-        expires_at INTEGER NOT NULL,
-        is_active INTEGER NOT NULL DEFAULT 1,
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        expires_at DATETIME,
+        ttl INTEGER,
+        last_accessed_at DATETIME,
+        access_count INTEGER DEFAULT 0,
+        metadata_json TEXT
       )
     `);
+
+    // Migration: Check if old schema exists (with 'id' column) and recreate if needed
+    try {
+      const tableInfo = this.db.prepare("PRAGMA table_info(visualization_services)").all() as any[];
+      const hasOldSchema = tableInfo.some(col => col.name === 'id' && !tableInfo.some(c => c.name === 'service_id'));
+      
+      if (hasOldSchema) {
+        console.log('[SQLiteManager] Migrating visualization_services table to new schema...');
+        this.db.exec('DROP TABLE IF EXISTS visualization_services');
+        this.db.exec(`
+          CREATE TABLE visualization_services (
+            service_id TEXT PRIMARY KEY,
+            service_type TEXT NOT NULL,
+            url TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            expires_at DATETIME,
+            ttl INTEGER,
+            last_accessed_at DATETIME,
+            access_count INTEGER DEFAULT 0,
+            metadata_json TEXT
+          )
+        `);
+        console.log('[SQLiteManager] visualization_services table migrated successfully');
+      }
+    } catch (error) {
+      console.warn('[SQLiteManager] Schema migration check failed:', error);
+    }
 
     // Prompt templates table (for tracking, actual templates are files)
     this.db.exec(`
