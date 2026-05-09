@@ -17,6 +17,7 @@ import { OverlayOperation } from './operations/OverlayOperation';
 import { FilterOperation } from './operations/FilterOperation';
 import { AggregateOperation } from './operations/AggregateOperation';
 import { SpatialJoinOperation } from './operations/SpatialJoinOperation';
+import { VectorStatisticalOperation } from './operations/VectorStatisticalOperation';
 import { tryMultipleEncodings } from '../../utils/ShapefileEncodingUtils';
 
 interface GeoJSONFeatureCollection {
@@ -34,6 +35,7 @@ export class VectorBackend implements DataBackend {
   private filterOp: FilterOperation;
   private aggregateOp: AggregateOperation;
   private spatialJoinOp: SpatialJoinOperation;
+  private statisticalOp: VectorStatisticalOperation;
   
   constructor(workspaceBase?: string) {
     this.workspaceBase = workspaceBase || process.cwd();
@@ -42,6 +44,7 @@ export class VectorBackend implements DataBackend {
     this.filterOp = new FilterOperation();
     this.aggregateOp = new AggregateOperation();
     this.spatialJoinOp = new SpatialJoinOperation();
+    this.statisticalOp = new VectorStatisticalOperation();
   }
   
   canHandle(dataSourceType: string, _reference: string): boolean {
