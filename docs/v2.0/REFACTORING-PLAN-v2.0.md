@@ -72,6 +72,22 @@ private filterPluginsByGoalDescription(goal: any): string[] {
 
 #### 1.2 重构方案 (v2.0)
 
+**核心设计理念: 智能因子推断 (Intelligent Factor Inference)**
+
+v2.0的核心优势是**无需用户显式指定分析因子**,LLM会基于以下三层机制自动推断:
+
+1. **行业知识库驱动**: 从预定义的行业因子库中匹配标准因子
+2. **数据可用性校验**: 只使用平台当前可用的数据源
+3. **常识推理补充**: 对于非标准场景,基于地理学常识动态生成因子
+
+**三种交互模式**:
+
+| 模式 | 用户输入示例 | LLM行为 | 适用场景 |
+|------|------------|---------|----------|
+| **完全自动** | "帮我选址开婴幼儿店" | 从知识库加载标准因子+数据校验 | 80%常规场景 |
+| **半自动** | "选址时重点考虑学校和医院" | 加载标准因子+用户强调的因子优先 | 15%定制场景 |
+| **完全手动** | "用人口数据和路网做叠加分析" | 直接使用用户指定的算子 | 5%专业场景 |
+
 **新增组件**:
 
 1. **GISIndustryKnowledgeBase** - 行业选址因子库
@@ -129,28 +145,44 @@ export class GoalSplitterAgent {
   private dataChecker: DataAvailabilityChecker;
   
   async execute(state: GeoAIStateType): Promise<Partial<GeoAIStateType>> {
-    // Layer 1: 语义解析
+    // Layer 1: 语义解析 - 识别用户意图和行业类型
     const semanticResult = await this.parseSemantics(state.userInput);
+    // → { taskType: 'site_selection', industry: 'retail_baby_store', ... }
     
-    // Layer 2: 行业因子补全
+    // Layer 2: 行业因子补全 - 从知识库加载标准因子
     const industryProfile = this.knowledgeBase.getFactorsForIndustry(semanticResult.industry);
+    // → 返回6个标准因子: [population_0_6, kindergarten, hospital, road, competitor, housing_price]
     
-    // Layer 3: 数据可用性校验
+    // Layer 3: 数据可用性校验 - 检查平台有哪些数据
     const dataValidation = await this.dataChecker.checkRequiredData(
       industryProfile.coreFactors.map(f => f.requiredDataSources).flat()
     );
+    // → { 
+    //     available: ['population_grid_0_6', 'poi_education_kindergarten', 'road_network'],
+    //     missing: ['poi_healthcare_maternal', 'poi_competitor_baby_store', 'housing_price_raster']
+    //   }
     
-    if (!dataValidation.isComplete) {
+    // Layer 4: 智能因子筛选 - 只保留有数据的因子
+    const selectedFactors = industryProfile.coreFactors.filter(factor => {
+      const hasData = factor.requiredDataSources.every(source => 
+        dataValidation.available.includes(source)
+      );
+      return hasData;
+    });
+    
+    // Layer 5: 生成可解释的分析计划
+    if (selectedFactors.length === 0) {
       return {
         goals: [],
         errors: [{ 
           goalId: 'validation', 
-          error: `Missing required data: ${dataValidation.missingSources.join(', ')}` 
+          error: `Missing required data: ${dataValidation.missingSources.join(', ')}`,
+          suggestions: dataValidation.suggestions // 提供替代方案
         }]
       };
     }
     
-    // Layer 4: 生成结构化目标
+    // 生成最终目标
     return {
       goals: [{
         id: generateId(),
@@ -158,14 +190,58 @@ export class GoalSplitterAgent {
         type: 'spatial_site_selection',
         parameters: {
           industry: semanticResult.industry,
-          factors: industryProfile.coreFactors,
-          analysisRange: semanticResult.range
+          factors: selectedFactors.map(f => ({
+            factorId: f.factorId,
+            name: f.name,
+            weight: f.defaultWeight,
+            dataSource: f.requiredDataSources[0],
+            rationale: f.rationale // "为什么选择这个因子"
+          })),
+          skippedFactors: industryProfile.coreFactors
+            .filter(f => !selectedFactors.includes(f))
+            .map(f => ({
+              factorId: f.factorId,
+              reason: `Missing data: ${f.requiredDataSources.join(', ')}`,
+              suggestion: '请上传相关数据或使用替代因子'
+            }))
         },
         priority: 5
       }]
     };
   }
+  
+  private async parseSemantics(userInput: string): Promise<SemanticResult> {
+    // 使用LLM进行意图识别和行业分类
+    const prompt = await this.promptManager.loadTemplate('intent-classification-v2');
+    const result = await this.llm.invoke(prompt, { userInput });
+    return result;
+  }
 }
+```
+
+**用户看到的反馈示例**:
+```markdown
+## 选址分析计划
+
+✅ **已选择的分析因子** (基于可用数据):
+1. **0-6岁人口密度** (权重: 25%)
+   - 数据来源: population_grid_0_6
+   - 理由: 婴幼儿用品店核心客群是0-6岁儿童家庭
+
+2. **幼儿园 proximity** (权重: 20%)
+   - 数据来源: poi_education_kindergarten
+   - 理由: 家长接送孩子时会产生顺便购物需求
+
+3. **道路可达性** (权重: 15%)
+   - 数据来源: road_network
+   - 理由: 良好的交通可达性提升店铺曝光度
+
+⚠️ **跳过的因子** (缺少数据):
+- 妇幼医院 proximity (缺少数据: poi_healthcare_maternal)
+- 竞品避让 (缺少数据: poi_competitor_baby_store)
+- 房价圈层 (缺少数据: housing_price_raster)
+
+💡 **建议**: 上传缺失数据可获得更准确的分析结果，或点击"开始分析"使用现有因子。
 ```
 
 **重构后的TaskPlannerAgent**:
@@ -177,29 +253,87 @@ export class TaskPlannerAgent {
     const executionPlans = new Map<string, ExecutionPlan>();
     
     for (const goal of state.goals) {
-      // Stage 1: 业务阶段拆分
-      const businessPhases = this.splitBusinessPhases(goal);
-      
-      // Stage 2: GIS流程拆解
-      const gisWorkflows = await this.decomposeToGISWorkflows(businessPhases);
-      
-      // Stage 3: 原子算子映射
-      const atomicSteps = await this.mapToAtomicOperators(gisWorkflows);
-      
-      // Stage 4: 并行/串行分析
-      const dependencyGraph = this.parallelAnalyzer.analyzeDependencies(atomicSteps);
-      
-      // Stage 5: 生成带依赖关系的执行计划
-      executionPlans.set(goal.id, {
-        goalId: goal.id,
-        steps: this.flattenDAG(dependencyGraph),
-        requiredPlugins: this.extractRequiredPlugins(atomicSteps),
-        parallelGroups: dependencyGraph.parallelGroups, // 新增:并行组信息
-        executionMode: 'hybrid' // 新增:混合执行模式
-      });
+      // 检查是否为专家模式 (用户显式指定算子)
+      if (goal.parameters?.expertMode) {
+        // 模式3: 完全手动 - 直接解析用户指定的算子序列
+        executionPlans.set(goal.id, await this.handleExpertMode(goal));
+      } else if (goal.parameters?.userSpecifiedFactors) {
+        // 模式2: 半自动 - 合并用户因子 + 标准因子
+        executionPlans.set(goal.id, await this.handleSemiAutoMode(goal));
+      } else {
+        // 模式1: 完全自动 - 使用GoalSplitter推荐的因子
+        executionPlans.set(goal.id, await this.handleFullAutoMode(goal));
+      }
     }
     
     return { executionPlans };
+  }
+  
+  /**
+   * 模式1: 完全自动 - 标准流程
+   */
+  private async handleFullAutoMode(goal: AnalysisGoal): Promise<ExecutionPlan> {
+    // Stage 1: 业务阶段拆分
+    const businessPhases = this.splitBusinessPhases(goal);
+    
+    // Stage 2: GIS流程拆解
+    const gisWorkflows = await this.decomposeToGISWorkflows(businessPhases);
+    
+    // Stage 3: 原子算子映射
+    const atomicSteps = await this.mapToAtomicOperators(gisWorkflows);
+    
+    // Stage 4: 并行/串行分析
+    const dependencyGraph = this.parallelAnalyzer.analyzeDependencies(atomicSteps);
+    
+    // Stage 5: 生成带依赖关系的执行计划
+    return {
+      goalId: goal.id,
+      steps: this.flattenDAG(dependencyGraph),
+      requiredOperators: this.extractRequiredOperators(atomicSteps),
+      parallelGroups: dependencyGraph.parallelGroups,
+      executionMode: 'hybrid'
+    };
+  }
+  
+  /**
+   * 模式2: 半自动 - 用户强调某些因子
+   */
+  private async handleSemiAutoMode(goal: AnalysisGoal): Promise<ExecutionPlan> {
+    const userFactors = goal.parameters.userSpecifiedFactors;
+    const standardFactors = goal.parameters.factors;
+    
+    // 合并因子，提升用户强调因子的权重
+    const mergedFactors = this.mergeFactorsWithPriority(userFactors, standardFactors);
+    
+    // 重新归一化权重
+    this.normalizeWeights(mergedFactors);
+    
+    // 继续标准流程
+    return await this.handleFullAutoMode({
+      ...goal,
+      parameters: { ...goal.parameters, factors: mergedFactors }
+    });
+  }
+  
+  /**
+   * 模式3: 完全手动 - 专家模式
+   */
+  private async handleExpertMode(goal: AnalysisGoal): Promise<ExecutionPlan> {
+    // 直接解析用户指定的算子序列
+    const operatorSequence = await this.parseOperatorSequence(goal.description);
+    
+    return {
+      goalId: goal.id,
+      steps: operatorSequence.map((op, index) => ({
+        stepId: `step_${index}`,
+        pluginId: op.operator,
+        parameters: op.params,
+        dependsOn: index > 0 ? [`step_${index - 1}`] : []
+      })),
+      requiredOperators: operatorSequence.map(op => op.operator),
+      parallelGroups: [], // 专家模式不自动并行
+      executionMode: 'sequential'
+    };
   }
 }
 ```
@@ -209,10 +343,79 @@ export class TaskPlannerAgent {
 **新增提示词文件**:
 ```
 workspace/llm/prompts/en-US/
-├── goal-splitting-v2.md          # 新版目标拆分(含行业因子)
-├── task-planning-v2.md           # 新版任务规划(含并行分析)
-├── industry-factor-library.json  # 行业因子配置
-└── atomic-operator-mapping.md    # 算子映射规则
+├── intent-classification-v2.md      # 意图识别与行业分类
+├── goal-splitting-v2.md             # 新版目标拆分(含智能因子推断)
+├── task-planning-v2.md              # 新版任务规划(含并行分析)
+├── industry-factor-library.json     # 行业因子配置
+└── atomic-operator-mapping.md       # 算子映射规则
+```
+
+**intent-classification-v2.md 核心内容**:
+```markdown
+# Intent Classification & Industry Detection (v2.0)
+
+## Role
+You are a GIS spatial analysis expert. Your task is to classify user intent and detect the industry type.
+
+## Classification Categories
+
+### Task Types
+- `site_selection`: Finding optimal locations for businesses/facilities
+- `suitability_analysis`: Evaluating areas based on multiple criteria
+- `risk_assessment`: Identifying high-risk zones (flood, earthquake, etc.)
+- `general_query`: Non-spatial questions or simple data queries
+
+### Industry Types (for site_selection)
+When task_type is 'site_selection', identify the industry:
+- `retail_baby_store`: Baby products store, children's shop
+- `retail_restaurant`: Restaurant, cafe, food service
+- `healthcare_clinic`: Community clinic, pharmacy, medical center
+- `education_training`: School, training center, tutoring
+- `logistics_warehouse`: Warehouse, distribution center
+- `retail_general`: General retail (if industry unclear)
+
+## Output Format
+Return JSON with:
+{
+  "taskType": "site_selection",
+  "industry": "retail_baby_store",
+  "confidence": 0.95,
+  "geographicScope": "default_coverage",
+  "userSpecifiedFactors": [], // If user explicitly mentioned factors
+  "expertMode": false // True if user specified exact operators
+}
+
+## Examples
+
+### Example 1: Fully Automatic
+User: "Help me find the best location for a baby store"
+Output: {
+  "taskType": "site_selection",
+  "industry": "retail_baby_store",
+  "confidence": 0.98,
+  "userSpecifiedFactors": [],
+  "expertMode": false
+}
+
+### Example 2: Semi-Automatic
+User: "For restaurant选址, focus on foot traffic and office buildings"
+Output: {
+  "taskType": "site_selection",
+  "industry": "retail_restaurant",
+  "confidence": 0.92,
+  "userSpecifiedFactors": ["foot_traffic", "office_buildings"],
+  "expertMode": false
+}
+
+### Example 3: Expert Mode
+User: "Buffer the population data by 500m, then overlay with road network"
+Output: {
+  "taskType": "spatial_analysis",
+  "industry": null,
+  "confidence": 0.99,
+  "userSpecifiedFactors": [],
+  "expertMode": true
+}
 ```
 
 **goal-splitting-v2.md 核心内容**:
@@ -222,32 +425,67 @@ workspace/llm/prompts/en-US/
 ## Role
 You are a GIS spatial analysis expert specializing in site selection and suitability analysis.
 
-## Task
-Analyze user input and extract:
-1. **Explicit Requirements**: Directly stated analysis goals
-2. **Implicit Factors**: Industry-standard location factors (use Industry Factor Library)
-3. **Data Requirements**: Specific spatial datasets needed
-4. **Analysis Scope**: Geographic range and constraints
+## Intelligent Factor Inference Strategy
 
-## Industry Factor Library Reference
-When user mentions an industry, automatically include standard factors:
+When users don't specify analysis factors, automatically infer based on:
 
-### Retail - Baby Store
-- Population density (0-6 years age group)
-- Proximity to schools/kindergartens
-- Proximity to hospitals/maternal care
-- Traffic accessibility (road network)
-- Competitor locations (avoidance zones)
-- Residential property values (income proxy)
+### 1. Industry Knowledge Base
+Load standard factors from industry profiles:
+
+#### Retail - Baby Store
+- Population density (0-6 years age group) → Core customer base
+- Proximity to schools/kindergartens → Parent pickup/drop-off traffic
+- Proximity to hospitals/maternal care → Family-oriented area indicator
+- Traffic accessibility (road network) → Store visibility and access
+- Competitor locations → Avoidance zones (if data available)
+- Residential property values → Income level proxy
+
+#### Retail - Restaurant
+- Foot traffic density → Customer volume potential
+- Office building proximity → Lunch/dinner demand
+- Tourist attraction proximity → Visitor customer base
+- Public transport access → Customer convenience
+- Competitor density → Market saturation check
+
+### 2. Data Availability Check
+Only include factors where data exists in the platform:
+- If population data missing → Skip or suggest alternative (nighttime light)
+- If competitor data missing → Skip or use general retail POI
+- Always prioritize available data over ideal factors
+
+### 3. Common Sense Reasoning
+For non-standard scenarios, apply geographic principles:
+- Retail needs customer density + accessibility
+- Healthcare needs population coverage + emergency access
+- Education needs residential concentration + safety
 
 ## Output Format
 Return structured JSON with:
 {
   "industry": "retail_baby_store",
-  "explicitGoals": [...],
-  "implicitFactors": [...],
-  "requiredDataSources": ["population_grid", "poi_schools", "poi_hospitals", ...],
-  "analysisRange": "default_coverage"
+  "explicitGoals": ["Find optimal locations for baby store"],
+  "inferredFactors": [
+    {
+      "factorId": "population_density_0_6",
+      "name": "0-6岁人口密度",
+      "dataSource": "population_grid_0_6",
+      "weight": 0.25,
+      "rationale": "婴幼儿用品店核心客群是0-6岁儿童家庭"
+    },
+    // ... more factors
+  ],
+  "skippedFactors": [
+    {
+      "factorId": "competitor_avoidance",
+      "reason": "Missing data: poi_competitor_baby_store",
+      "suggestion": "Upload competitor data or use general retail POI"
+    }
+  ],
+  "analysisRange": "default_coverage",
+  "expectedOutput": {
+    "type": "points_with_scores",
+    "format": "geojson"
+  }
 }
 ```
 
@@ -1235,6 +1473,11 @@ interface ExecutionPlan {
 - **等待时间**: -40% (并行执行)
 - **错误提示**: 更明确(指出缺失数据和替代方案)
 - **可解释性**: 提供中间结果查看
+- **智能化程度**: 
+  - **无需显式指定因子**: LLM自动从知识库推断 (80%场景)
+  - **支持半自动模式**: 用户强调某些因子，LLM调整权重 (15%场景)
+  - **保留专家模式**: 专业用户可直接指定算子序列 (5%场景)
+  - **透明决策过程**: 展示为什么选择/跳过每个因子
 
 ---
 
