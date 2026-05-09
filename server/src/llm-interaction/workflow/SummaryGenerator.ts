@@ -309,8 +309,8 @@ export class SummaryGenerator {
       if (successCount > 0) {
         summary += '**Successful Operations:**\n\n';
         results.filter(r => r.status === 'success').forEach(result => {
-          const pluginName = result.metadata?.pluginId || 'Unknown';
-          summary += `- ✅ ${pluginName}: Completed successfully\n`;
+          const operatorName = result.metadata?.operatorId || 'Unknown';
+          summary += `- ✅ ${operatorName}: Completed successfully\n`;
         });
         summary += '\n';
       }
@@ -319,8 +319,8 @@ export class SummaryGenerator {
       if (failCount > 0) {
         summary += '**Failed Operations:**\n\n';
         results.filter(r => r.status === 'failed').forEach(result => {
-          const pluginName = result.metadata?.pluginId || 'Unknown';
-          summary += `- ❌ ${pluginName}: ${result.error}\n`;
+          const operatorName = result.metadata?.operatorId || 'Unknown';
+          summary += `- ❌ ${operatorName}: ${result.error}\n`;
         });
         summary += '\n';
       }
@@ -359,8 +359,8 @@ export class SummaryGenerator {
     if (successCount > 0) {
       summary += 'Successful:\n';
       results.filter(r => r.status === 'success').forEach(result => {
-        const pluginName = result.metadata?.pluginId || 'Unknown';
-        summary += `- ${pluginName}\n`;
+        const operatorName = result.metadata?.operatorId || 'Unknown';
+        summary += `- ${operatorName}\n`;
       });
       summary += '\n';
     }
@@ -368,8 +368,8 @@ export class SummaryGenerator {
     if (failCount > 0) {
       summary += 'Failed:\n';
       results.filter(r => r.status === 'failed').forEach(result => {
-        const pluginName = result.metadata?.pluginId || 'Unknown';
-        summary += `- ${pluginName}: ${result.error}\n`;
+        const operatorName = result.metadata?.operatorId || 'Unknown';
+        summary += `- ${operatorName}: ${result.error}\n`;
       });
     }
     
@@ -385,12 +385,12 @@ export class SummaryGenerator {
     for (const result of results) {
       if (result.status !== 'success' || !result.data) continue;
       
-      const pluginName = result.metadata?.pluginId || 'Unknown';
+      const operatorName = result.metadata?.operatorId || 'Unknown';
       
       // Pass the complete result structure to LLM
       // Let LLM understand and summarize it naturally
       const resultData = {
-        plugin: pluginName,
+        operator: operatorName,
         operation: result.metadata?.parameters?.operation || 'unknown',
         data: result.data.metadata?.result || result.data.metadata
       };

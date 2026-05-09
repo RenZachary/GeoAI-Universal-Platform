@@ -263,7 +263,7 @@ export class EnhancedPluginExecutor {
       if (streamWriter) {
         streamWriter.write(`data: ${JSON.stringify({
           type: 'tool_complete',
-          tool: step.pluginId,
+          tool: step.operatorId,
           taskId: taskId,
           output: JSON.stringify(parsedResult).substring(0, 2000),
           timestamp: Date.now()

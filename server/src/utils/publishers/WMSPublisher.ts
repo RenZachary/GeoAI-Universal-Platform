@@ -23,7 +23,7 @@ import {
 } from './base/WMSStategies/WMSPublisherTypes';
 import { GeoTIFFWMSStategy } from './base/WMSStategies/GeoTIFFWMSStategy';
 
-// Re-export types for backward compatibility
+// Re-export types for external use
 export type { WMSLayerOptions, WMSGetMapParams, WMSServiceMetadata, WMSPublishResult };
 export { WMSGenerationStrategy };
 

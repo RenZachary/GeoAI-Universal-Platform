@@ -20,7 +20,7 @@ export interface DependencyGraph {
 
 export interface TaskNode {
   taskId: string;
-  pluginId: string;
+  operatorId: string; // SpatialOperator ID
   inputs: Set<string>; // Data dependencies (input data sources)
   outputs: Set<string>; // Data produced
   estimatedTimeMs: number;
@@ -71,7 +71,7 @@ export class ParallelTaskAnalyzer {
         // Create node for this task
         const node: TaskNode = {
           taskId,
-          pluginId: step.pluginId,
+          operatorId: step.operatorId,
           inputs: new Set(this.extractInputs(step)),
           outputs: new Set(this.extractOutputs(step)),
           estimatedTimeMs: this.estimateTaskTime(step)
@@ -158,8 +158,8 @@ export class ParallelTaskAnalyzer {
       'query': 500
     };
     
-    const pluginId = step.pluginId || '';
-    const baseTime = baseTimes[pluginId] || 1000; // Default 1 second
+    const operatorId = step.operatorId || '';
+    const baseTime = baseTimes[operatorId] || 1000; // Default 1 second
     
     // Complexity estimation could be added based on parameter analysis
     // For now, use simple lookup table
@@ -360,7 +360,7 @@ export class ParallelTaskAnalyzer {
       
       for (const taskId of group.tasks) {
         const step = stepMap.get(taskId);
-        report += `  - ${taskId}: ${step?.pluginId || 'unknown'}\n`;
+        report += `  - ${taskId}: ${step?.operatorId || 'unknown'}\n`;
       }
     }
     

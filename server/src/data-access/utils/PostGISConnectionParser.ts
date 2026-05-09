@@ -13,7 +13,7 @@ export class PostGISConnectionParser {
    * 
    * Priority:
    * 1. Use metadata.connection if available (preferred)
-   * 2. Parse URL format (legacy support)
+   * 2. Parse URL format (postgis://...)
    * 
    * @param sourceReference - Reference string (schema.table or postgis://...)
    * @param metadata - Optional metadata containing connection info
@@ -43,7 +43,7 @@ export class PostGISConnectionParser {
         };
       }
 
-      // Priority 2: Parse URL format (legacy support)
+      // Priority 2: Parse URL format (postgis://...)
       if (sourceReference.startsWith('postgis://')) {
         const url = new URL(sourceReference);
         if (url.protocol !== 'postgis:') return null;

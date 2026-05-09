@@ -2,7 +2,7 @@
  * SpatialOperator Controller - REST API for Spatial Operators
  * 
  * Provides complete REST API for managing and executing SpatialOperators.
- * This controller replaces the deprecated ToolController in v2.0.
+ * This is the primary controller in v2.0 architecture.
  * 
  * Endpoints:
  * - GET    /api/operators              - List all operators with metadata

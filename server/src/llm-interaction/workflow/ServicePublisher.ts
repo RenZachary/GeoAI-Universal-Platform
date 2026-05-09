@@ -48,9 +48,9 @@ export class ServicePublisher {
             ttl: 3600000, // 1 hour default
             expiresAt: new Date(Date.now() + 3600000),
             metadata: {
-                // Merge data.metadata (from executor) with result.metadata (from plugin execution)
+                // Merge data.metadata (from executor) with result.metadata (from operator execution)
                 ...result.data?.metadata,  // Contains styleUrl, tilesetId, etc.
-                ...result.metadata,        // Contains pluginId, parameters, executedAt
+                ...result.metadata,        // Contains operatorId, parameters, executedAt
                 resultType: result.data.type || 'unknown',
                 generatedAt: new Date().toISOString()
             }

@@ -580,7 +580,7 @@ export class DataSourceService {
         featureCount: table.rowCount, // Alias for consistency with file-based sources
         description: table.description,
         fields: table.fields, // Store as object array [{name, type}, ...]
-        fieldSchemas: table.fields || [] // Keep detailed schema for backward compatibility
+        fieldSchemas: table.fields
       }
     );
 

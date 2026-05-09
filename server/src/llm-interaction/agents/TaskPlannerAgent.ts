@@ -329,14 +329,6 @@ export class TaskPlannerAgent {
               }
               return `${fieldName} (${fieldType})`;
             }
-            // If field is a string (legacy format)
-            else if (typeof field === 'string') {
-              const info = sampleValues[field];
-              if (info?.isNumeric) {
-                return `${field} (numeric)`;
-              }
-              return field;
-            }
             return String(field);
           });
           lines.push(`  Fields: ${fieldInfo.join(', ')}`);
