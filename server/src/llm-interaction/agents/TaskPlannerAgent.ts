@@ -9,13 +9,15 @@ import { LLMAdapterFactory } from '../adapters/LLMAdapterFactory';
 import type { PromptManager } from '../managers/PromptManager';
 import type { GeoAIStateType, ExecutionPlan, ExecutionStep } from '../workflow/GeoAIGraph';
 import { SpatialOperatorRegistryInstance } from '../../spatial-operators';
-import { DataSourceRepository } from '../../data-access/repositories';
+import { DataSourceRepository } from '../../data-access';
 import { SQLiteManagerInstance } from '../../storage/';
+import { ParallelTaskAnalyzer } from '../analyzers/ParallelTaskAnalyzer';
 
 export class TaskPlannerAgent {
   private llmConfig: LLMConfig;
   private promptManager: PromptManager;
   private dataSourceRepo: DataSourceRepository;
+  private parallelAnalyzer: ParallelTaskAnalyzer;
 
   constructor(
     llmConfig: LLMConfig,
@@ -23,7 +25,9 @@ export class TaskPlannerAgent {
   ) {
     this.llmConfig = llmConfig;
     this.promptManager = promptManager;
-    this.dataSourceRepo = new DataSourceRepository(SQLiteManagerInstance.getDatabase());
+    const db = SQLiteManagerInstance.getDatabase();
+    this.dataSourceRepo = new DataSourceRepository(db);
+    this.parallelAnalyzer = new ParallelTaskAnalyzer();
   }
 
   /**
@@ -201,8 +205,19 @@ export class TaskPlannerAgent {
 
       console.log(`[Task Planner] Created ${executionPlans.size} execution plans`);
 
+      // STAGE 4: Analyze parallel execution opportunities
+      console.log('[Task Planner] Stage 4: Analyzing parallel execution opportunities...');
+      const parallelGroups = this.parallelAnalyzer.analyzeParallelGroups(executionPlans);
+      const executionMode = this.parallelAnalyzer.recommendExecutionMode(parallelGroups);
+      
+      // Generate and log analysis report
+      const report = this.parallelAnalyzer.generateReport(parallelGroups, executionPlans);
+      console.log(report);
+
       return {
         executionPlans,
+        parallelGroups, // NEW: Include parallel task groups
+        executionMode,  // NEW: Include recommended execution mode
         currentStep: 'execution'
       };
 

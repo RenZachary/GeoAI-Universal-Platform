@@ -8,14 +8,23 @@ import { LLMAdapterFactory } from '../adapters/LLMAdapterFactory';
 import type { PromptManager } from '../managers/PromptManager';
 import type { GeoAIStateType, AnalysisGoal } from '../workflow/GeoAIGraph';
 import { SpatialOperatorRegistryInstance } from '../../spatial-operators';
+import { DataSourceSemanticAnalyzer } from '../analyzers/DataSourceSemanticAnalyzer';
+import { DataSourceRepository } from '../../data-access';
+import { SQLiteManagerInstance } from '../../storage/';
 
 export class GoalSplitterAgent {
   private llmConfig: LLMConfig;
   private promptManager: PromptManager;
+  private dataSourceAnalyzer: DataSourceSemanticAnalyzer;
 
   constructor(llmConfig: LLMConfig, promptManager: PromptManager) {
     this.llmConfig = llmConfig;
     this.promptManager = promptManager;
+    
+    // Initialize data source semantic analyzer
+    const db = SQLiteManagerInstance.getDatabase();
+    const dataSourceRepo = new DataSourceRepository(db);
+    this.dataSourceAnalyzer = new DataSourceSemanticAnalyzer(dataSourceRepo);
   }
 
   /**
@@ -41,6 +50,15 @@ export class GoalSplitterAgent {
         return `${op.operatorId} (${op.category}): ${op.description}`;
       }).join('\n');
 
+      // Analyze available data sources semantically
+      console.log('[Goal Splitter] Analyzing available data sources...');
+      const dataSourcesInfo = await this.dataSourceAnalyzer.analyzeAllDataSources();
+      const dataSourcesForLLM = dataSourcesInfo.map(ds => {
+        return `- ${ds.name} (${ds.category}): ${ds.description}\n  Use cases: ${ds.suggestedUseCases.join(', ')}`;
+      }).join('\n\n');
+
+      console.log(`[Goal Splitter] Found ${dataSourcesInfo.length} data sources`);
+
       // Define output schema for structured output
       const goalSchema = z.object({
         id: z.string().describe('Unique identifier for the goal'),
@@ -58,10 +76,11 @@ export class GoalSplitterAgent {
       // Create chain
       const chain = promptTemplate.pipe(modelWithStructuredOutput);
 
-      // Invoke with user input and available operators
+      // Invoke with user input, available operators, and data sources
       const goals = await chain.invoke({
         userInput: state.userInput,
         availableExecutors: operatorsForLLM,
+        availableDataSources: dataSourcesForLLM,
         timestamp: new Date().toISOString()
       }) as AnalysisGoal[];
 

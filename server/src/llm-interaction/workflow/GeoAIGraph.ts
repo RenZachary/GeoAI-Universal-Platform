@@ -19,6 +19,7 @@ import { reportDecisionNode } from './nodes/ReportDecisionNode';
 import { SQLiteManagerInstance } from '../../storage/';
 import { resolvePlaceholders } from './PlaceholderResolver';
 import { VirtualDataSourceManagerInstance } from '../../data-access/managers/VirtualDataSourceManager';
+import type { ParallelGroup } from '../analyzers/ParallelTaskAnalyzer';
 
 // State interface for the GeoAI workflow
 export interface GeoAIState {
@@ -27,6 +28,8 @@ export interface GeoAIState {
   messages?: BaseMessage[];
   goals?: AnalysisGoal[];
   executionPlans?: Map<string, ExecutionPlan>;
+  parallelGroups?: ParallelGroup[]; // NEW v2.0: Parallel task groups
+  executionMode?: 'sequential' | 'parallel' | 'hybrid'; // NEW v2.0: Execution mode recommendation
   executionResults?: Map<string, AnalysisResult>;
   visualizationServices?: VisualizationService[];
   summary?: string;
@@ -47,6 +50,9 @@ export interface ExecutionPlan {
   steps: ExecutionStep[];
   requiredPlugins: string[];
 }
+
+// Re-export ParallelGroup for external use
+export type { ParallelGroup } from '../analyzers/ParallelTaskAnalyzer';
 
 export interface ExecutionStep {
   stepId: string;
@@ -82,6 +88,8 @@ const GeoAIStateAnnotation = Annotation.Root({
   messages: Annotation<BaseMessage[]>,
   goals: Annotation<AnalysisGoal[]>,
   executionPlans: Annotation<Map<string, ExecutionPlan>>,
+  parallelGroups: Annotation<ParallelGroup[]>, // NEW v2.0
+  executionMode: Annotation<'sequential' | 'parallel' | 'hybrid'>, // NEW v2.0
   executionResults: Annotation<Map<string, AnalysisResult>>,
   visualizationServices: Annotation<VisualizationService[]>,
   summary: Annotation<string>,
