@@ -42,18 +42,56 @@ export class PostGISBackend implements DataBackend {
    * Helper to build common metadata for PostGIS operations
    * Ensures consistent metadata structure with connection info for MVT publishing
    */
-  private buildMetadata(
+  private async buildMetadata(
     resultTable: string,
     description: string,
     additionalMetadata?: Record<string, any>
-  ): any {
+  ): Promise<any> {
     const fullReference = `${TEMP_SCHEMA}.${resultTable}`;
+    
+    // Detect geometry type and feature count from the newly created table
+    let geometryType = 'Unknown';
+    let featureCount = 0;
+    
+    try {
+      const pool = await this.getPool();
+      
+      // 1. Get feature count
+      const countResult = await pool.query(`SELECT COUNT(*) as count FROM ${fullReference}`);
+      featureCount = parseInt(countResult.rows[0].count);
+      console.log(`[PostGISBackend] Detected feature count for ${resultTable}: ${featureCount}`);
+      
+      // 2. Get geometry type: Try sampling first (most reliable for temp tables)
+      if (featureCount > 0) {
+        const sampleResult = await pool.query(`SELECT ST_GeometryType(geom) as geom_type FROM ${fullReference} LIMIT 1`);
+        if (sampleResult.rows.length > 0 && sampleResult.rows[0].geom_type) {
+          geometryType = sampleResult.rows[0].geom_type;
+          console.log(`[PostGISBackend] Detected geometry type via sampling: ${geometryType}`);
+        }
+      }
+      
+      // 3. Fallback to geometry_columns view if sampling failed
+      if (geometryType === 'Unknown') {
+        const typeResult = await pool.query(`
+          SELECT type FROM geometry_columns 
+          WHERE f_table_schema = $1 AND f_table_name = $2 AND f_geometry_column = 'geom'
+        `, [TEMP_SCHEMA, resultTable]);
+        
+        if (typeResult.rows.length > 0) {
+          geometryType = typeResult.rows[0].type;
+          console.log(`[PostGISBackend] Detected geometry type via geometry_columns: ${geometryType}`);
+        }
+      }
+    } catch (error) {
+      console.error(`[PostGISBackend] CRITICAL: Failed to detect metadata for ${resultTable}:`, error);
+    }
     
     return {
       result: fullReference,
       schema: TEMP_SCHEMA,
       description,
-      featureCount: 0,
+      featureCount,
+      geometryType,
       // Include connection info for MVT publishing
       connection: {
         host: this.config.host,
@@ -71,16 +109,16 @@ export class PostGISBackend implements DataBackend {
   /**
    * Helper to build NativeData response with standard structure
    */
-  private buildNativeData(
+  private async buildNativeData(
     resultTable: string,
     description: string,
     additionalMetadata?: Record<string, any>
-  ): NativeData {
+  ): Promise<NativeData> {
     return {
       id: generateId(),
       type: 'postgis',
       reference: `${TEMP_SCHEMA}.${resultTable}`,
-      metadata: this.buildMetadata(resultTable, description, additionalMetadata),
+      metadata: await this.buildMetadata(resultTable, description, additionalMetadata),
       createdAt: new Date()
     };
   }

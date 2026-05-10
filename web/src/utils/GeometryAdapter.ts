@@ -48,36 +48,40 @@ export class GeometryAdapter {
       throw new Error('Geometry type must be a non-empty string');
     }
     
-    // Normalize to title case and remove underscores/spaces
-    const normalized = type.trim()
-      .toLowerCase()
-      .replace(/[_\s]/g, '')
-      .replace(/^./, c => c.toUpperCase())
-      .replace(/([a-z])([A-Z])/g, '$1 $2')
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join('');
+    // First, try direct matching with lowercase and underscore handling
+    const lowerType = type.trim().toLowerCase();
     
-    // Handle common variations
+    // Handle common variations including PostGIS ST_ prefix
     const variations: Record<string, GeometryType> = {
       'point': 'Point',
+      'st_point': 'Point',
       'multipoint': 'MultiPoint',
+      'st_multipoint': 'MultiPoint',
       'linestring': 'LineString',
+      'st_linestring': 'LineString',
       'multilinestring': 'MultiLineString',
+      'st_multilinestring': 'MultiLineString',
       'polygon': 'Polygon',
+      'st_polygon': 'Polygon',
       'multipolygon': 'MultiPolygon',
+      'st_multipolygon': 'MultiPolygon',
       'geometrycollection': 'GeometryCollection',
-      'geomcollection': 'GeometryCollection'
+      'st_geomcollection': 'GeometryCollection'
     };
     
-    const result = variations[normalized.toLowerCase()];
-    
-    if (!result) {
-      console.warn(`Unknown geometry type: "${type}". Defaulting to Polygon.`);
-      return 'Polygon';
+    // Try direct match first (handles st_polygon, polygon, etc.)
+    if (variations[lowerType]) {
+      return variations[lowerType];
     }
     
-    return result;
+    // Fallback: Normalize by removing underscores and spaces
+    const normalized = lowerType.replace(/[_\s]/g, '');
+    if (variations[normalized]) {
+      return variations[normalized];
+    }
+    
+    console.warn(`Unknown geometry type: "${type}". Defaulting to Polygon.`);
+    return 'Polygon';
   }
   
   /**

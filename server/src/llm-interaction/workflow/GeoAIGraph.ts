@@ -18,6 +18,7 @@ import { reportDecisionNode } from './nodes/ReportDecisionNode';
 import { EnhancedExecutorInstance } from './nodes/EnhancedPluginExecutor';
 import { SQLiteManagerInstance } from '../../storage/';
 import { VirtualDataSourceManagerInstance } from '../../data-access/managers/VirtualDataSourceManager';
+import { ToolRegistryInstance } from '../tools/ToolRegistry';
 import type { ParallelGroup } from '../analyzers/ParallelTaskAnalyzer';
 import { VisualizationServicePublisher } from '../../services/VisualizationServicePublisher';
 import { MVTStrategyPublisher } from '../../utils/publishers/MVTStrategyPublisher';
@@ -227,6 +228,29 @@ export function createGeoAIGraph(
           
           for (const [stepId, analysisResult] of successfulResults.entries()) {
             try {
+              // ARCHITECTURAL DECISION: Only publish results from visualization operators
+              // This ensures that styling is always applied and prevents duplicate layers
+              const operatorId = analysisResult.metadata?.operatorId;
+              let shouldPublish = false;
+              
+              if (operatorId) {
+                const operator = ToolRegistryInstance.getOperator(operatorId);
+                if (operator && operator.category === 'visualization') {
+                  shouldPublish = true;
+                  console.log(`[Plugin Executor] Step ${stepId} is a visualization operator (${operatorId}), proceeding with publish`);
+                } else {
+                  console.log(`[Plugin Executor] Skipping publish for step ${stepId}: operator category is '${operator?.category}', not 'visualization'`);
+                }
+              } else {
+                // Fallback: If no operatorId in metadata, check if it's a report
+                const dataType = analysisResult.data.type || 'geojson';
+                if (dataType.toLowerCase() === 'report' || dataType.toLowerCase() === 'markdown') {
+                  shouldPublish = true;
+                }
+              }
+              
+              if (!shouldPublish) continue;
+
               const dataType = analysisResult.data.type || 'geojson';
               let publishResult;
               
@@ -241,16 +265,9 @@ export function createGeoAIGraph(
                   break;
                   
                 default: {
-                  // All vector data should be published as MVT using MVTStrategyPublisher
-                  // MVTStrategyPublisher supports GeoJSON, Shapefile, and PostGIS natively
-                  console.log(`[Plugin Executor] Publishing MVT for step ${stepId}, data type: ${analysisResult.data.type}`);
-                  console.log(`[Plugin Executor] analysisResult.data structure:`, JSON.stringify({
-                    id: analysisResult.data?.id,
-                    type: analysisResult.data?.type,
-                    reference: analysisResult.data?.reference,
-                    hasMetadata: !!analysisResult.data?.metadata,
-                    metadataKeys: analysisResult.data?.metadata ? Object.keys(analysisResult.data.metadata) : []
-                  }, null, 2));
+                  // All vector data from visualization operators should be published as MVT
+                  console.log(`[Plugin Executor] Publishing MVT for visualization step ${stepId}, data type: ${analysisResult.data.type}`);
+                  console.log(`[Plugin Executor] Style config present:`, !!analysisResult.data?.metadata?.styleConfig);
                   
                   const mvtStrategyPublisher = MVTStrategyPublisher.getInstance(workspaceBase, db || undefined);
                   

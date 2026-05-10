@@ -405,90 +405,35 @@ export class TaskPlannerAgent {
   }
 
   /**
-   * Filter operators based on goal description using keyword analysis
-   * This method intelligently infers required operator categories from natural language description
+   * Filter operators based on goal description using minimal category-based filtering
+   * 
+   * DESIGN PRINCIPLE: Let LLM make the final decision
+   * This method only excludes obviously irrelevant operators (like report generation)
+   * The actual operator selection is done by LLM in Stage 2 with full semantic understanding
    */
   private filterPluginsByGoalDescription(goal: any): string[] {
     console.log(`[Task Planner] Filtering operators for goal: ${goal.id}`);
     console.log(`[Task Planner] Goal description:`, goal.description);
     
-    const description = goal.description.toLowerCase();
     const allOperators = SpatialOperatorRegistryInstance.listOperators();
-    const matchingOperators: string[] = [];
     
-    // Detect if goal implies visualization/display requirement
-    const needsVisualization = this.detectVisualizationIntent(description);
-    
-    // Simple keyword-based filtering for analysis operations
-    if (description.includes('buffer') || description.includes('缓冲区')) {
-      matchingOperators.push('buffer_analysis');
-    }
-    if (description.includes('overlay') || description.includes('叠加') || description.includes('intersect')) {
-      matchingOperators.push('overlay_analysis');
-    }
-    if (description.includes('filter') || description.includes('过滤')) {
-      matchingOperators.push('filter');
-    }
-    if (description.includes('heatmap') || description.includes('热力图')) {
-      matchingOperators.push('heatmap_generator');
-    }
-    if (description.includes('choropleth') || description.includes('分级色彩')) {
-      matchingOperators.push('choropleth_renderer');
-    }
-    if (description.includes('statistics') || description.includes('统计')) {
-      matchingOperators.push('statistics_calculator', 'aggregation');
-    }
-    if (description.includes('query') || description.includes('查询') || description.includes('list')) {
-      matchingOperators.push('data_source_query');
-    }
-    
-    // If visualization is needed, include all visualization operators
-    if (needsVisualization) {
-      console.log(`[Task Planner] Visualization intent detected, adding visualization operators`);
-      const visualizationOperators = allOperators
-        .filter(op => op.category === 'visualization')
-        .map(op => op.operatorId);
+    // Minimal filtering: exclude operators that are NOT spatial analysis/visualization tools
+    // Report generation is handled separately by ReportDecisionNode, not as a plugin step
+    const candidateOperators = allOperators.filter(op => {
+      // Exclude report/textual output operators - they're handled outside the execution plan
+      if (op.category === 'reporting' || op.category === 'textual') {
+        return false;
+      }
       
-      // Add visualization operators that aren't already in the list
-      visualizationOperators.forEach(opId => {
-        if (!matchingOperators.includes(opId)) {
-          matchingOperators.push(opId);
-        }
-      });
-    }
+      // Include all other operators (analysis, visualization, geometry, query, etc.)
+      // Let LLM decide which ones are appropriate based on goal description
+      return true;
+    });
     
-    // If no specific match, include all operators as fallback
-    if (matchingOperators.length === 0) {
-      console.log(`[Task Planner] No specific keywords matched, using all operators`);
-      return allOperators.map(op => op.operatorId);
-    }
+    const candidateIds = candidateOperators.map(op => op.operatorId);
     
-    console.log(`[Task Planner] Filtered to ${matchingOperators.length} operators:`, matchingOperators);
-    return matchingOperators;
-  }
-  
-  /**
-   * Detect if goal description implies visualization/display intent
-   * Uses abstract pattern matching rather than hardcoded keywords
-   */
-  private detectVisualizationIntent(description: string): boolean {
-    // Display/presentation verbs (English and Chinese)
-    const displayVerbs = [
-      'display', 'show', 'visualize', 'render', 'present', 'map',
-      '展示', '显示', '可视化', '渲染', '呈现', '制图'
-    ];
-    
-    // Visual styling terms
-    const visualTerms = [
-      'color', 'colour', 'style', 'theme', 'symbol',
-      '颜色', '样式', '主题', '符号', '红色', '蓝色', '绿色'
-    ];
-    
-    // Check if description contains any of these patterns
-    const hasDisplayVerb = displayVerbs.some(verb => description.includes(verb));
-    const hasVisualTerm = visualTerms.some(term => description.includes(term));
-    
-    return hasDisplayVerb || hasVisualTerm;
+    console.log(`[Task Planner] Providing ${candidateIds.length} operators to LLM for selection`);
+    return candidateIds;
   }
 
   /**

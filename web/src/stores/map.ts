@@ -235,20 +235,25 @@ export const useMapStore = defineStore('map', () => {
         console.log('[Map Store] Removed old source:', layer.id)
       }
       
-      // Convert relative URL to absolute
-      const fullStyleUrl = styleUrl.startsWith('http')
+      // Convert relative URL to absolute (but NOT for blob URLs)
+      const fullStyleUrl = styleUrl.startsWith('http') || styleUrl.startsWith('blob:')
         ? styleUrl
         : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${styleUrl}`
 
       console.log(`[Map Store] Loading custom style from: ${fullStyleUrl}`)
 
-      // Fetch the style JSON
-      const response = await fetch(fullStyleUrl)
-      if (!response.ok) {
-        throw new Error(`Failed to load style: ${response.status} ${response.statusText}`)
+      // Fetch the style JSON (handle blob URLs directly)
+      let styleJson: any;
+      if (styleUrl.startsWith('blob:')) {
+        const response = await fetch(styleUrl);
+        styleJson = await response.json();
+      } else {
+        const response = await fetch(fullStyleUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to load style: ${response.status} ${response.statusText}`);
+        }
+        styleJson = await response.json();
       }
-
-      const styleJson = await response.json()
       // console.log('[Map Store] Style JSON loaded:', JSON.stringify(styleJson, null, 2))
 
       // Add vector source
@@ -269,6 +274,8 @@ export const useMapStore = defineStore('map', () => {
       // Add layers from style JSON
       if (styleJson.layers && Array.isArray(styleJson.layers)) {
         console.log(`[Map Store] Processing ${styleJson.layers.length} layers from style`)
+        
+        const addedLayerIds: string[] = [];
         
         styleJson.layers.forEach((styleLayer: any, index: number) => {
           console.log(`\n[Map Store] --- Layer ${index + 1} ---`)
@@ -295,35 +302,28 @@ export const useMapStore = defineStore('map', () => {
             layerToAdd.maxzoom = styleLayer.maxzoom
             console.log('[Map Store] Layer to add - Maxzoom:', layerToAdd.maxzoom)
           }
-          if (styleLayer.layout) {
-            layerToAdd.layout = styleLayer.layout
-            console.log('[Map Store] Layer to add - Layout:', JSON.stringify(layerToAdd.layout))
-          }
-          if (styleLayer.filter) {
-            layerToAdd.filter = styleLayer.filter
-            console.log('[Map Store] Layer to add - Filter:', JSON.stringify(layerToAdd.filter))
-          }
           
-          const layerExists = map.getLayer(layerToAdd.id)
-          console.log('[Map Store] Layer already exists?', !!layerExists)
-          
-          if (!layerExists) {
-            try {
-              console.log('[Map Store] Attempting to add layer...')
-              map.addLayer(layerToAdd)
-              console.log('[Map Store] ✅ Layer added successfully')
-              
-              // Verify layer was added
-              const addedLayer = map.getLayer(layerToAdd.id)
-              console.log('[Map Store] Verified layer exists:', !!addedLayer)
-            } catch (error) {
-              console.error(`[Map Store] ❌ Failed to add layer ${layerToAdd.id}:`, error)
-              console.error('[Map Store] Error details:', error instanceof Error ? error.message : error)
-            }
-          } else {
-            console.warn('[Map Store] ⚠️  Layer already exists, skipping')
+          try {
+            map.addLayer(layerToAdd)
+            addedLayerIds.push(styleLayer.id)
+            console.log(`[Map Store] ✅ Layer added successfully: ${styleLayer.id}`)
+          } catch (error) {
+            console.error(`[Map Store] ❌ Failed to add layer ${styleLayer.id}:`, error)
           }
         })
+
+        // Update the layer record in store to reflect the actual layer IDs in the map
+        if (addedLayerIds.length > 0) {
+          const layerIndex = layers.value.findIndex(l => l.id === layer.id)
+          if (layerIndex !== -1) {
+            // Store the actual sub-layer IDs in metadata for querying
+            layers.value[layerIndex].metadata = {
+              ...layers.value[layerIndex].metadata,
+              actualLayerIds: addedLayerIds
+            }
+            console.log(`[Map Store] Updated layer metadata with actualLayerIds:`, addedLayerIds)
+          }
+        }
       } else {
         console.warn('[Map Store] No layers found in style JSON')
       }
@@ -868,9 +868,24 @@ export const useMapStore = defineStore('map', () => {
           }
         }
         
+        // Filter out layers that don't actually exist in the current style
+        let layersToQueryFinal = layersToQuery;
+        
+        // If we have actualLayerIds from custom style, use those instead
+        if (layer.metadata?.actualLayerIds && layer.metadata.actualLayerIds.length > 0) {
+          layersToQueryFinal = layer.metadata.actualLayerIds;
+        }
+        
+        const existingLayers = layersToQueryFinal.filter(id => map.getLayer(id))
+        
+        if (existingLayers.length === 0) {
+          console.warn(`[Map Store] No valid layers found for query: ${layer.id}`)
+          return
+        }
+        
         // Use MapLibre's queryRenderedFeatures
         const features = map.queryRenderedFeatures(bbox, {
-          layers: layersToQuery
+          layers: existingLayers
         })
 
         if (features && features.length > 0) {

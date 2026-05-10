@@ -12,6 +12,7 @@ import type { GeoAIStateType, ExecutionPlan, AnalysisResult } from '../GeoAIGrap
 import type { ParallelGroup } from '../../analyzers/ParallelTaskAnalyzer';
 import { ToolRegistryInstance } from '../../tools/ToolRegistry';
 import { resolvePlaceholders } from '../PlaceholderResolver';
+import { VirtualDataSourceManagerInstance } from '../../../data-access/managers/VirtualDataSourceManager';
 import type Database from 'better-sqlite3';
 import { SQLiteManagerInstance } from '../../../storage/';
 
@@ -84,6 +85,7 @@ export class EnhancedPluginExecutor {
           state.executionPlans,
           state.parallelGroups,
           executionResults,
+          state,
           streamWriter
         );
       } else {
@@ -91,6 +93,7 @@ export class EnhancedPluginExecutor {
         await this.executeSequentially(
           state.executionPlans,
           executionResults,
+          state,
           streamWriter
         );
       }
@@ -128,6 +131,7 @@ export class EnhancedPluginExecutor {
     plans: Map<string, ExecutionPlan>,
     parallelGroups: ParallelGroup[],
     results: Map<string, AnalysisResult>,
+    state: GeoAIStateType,
     streamWriter?: any
   ): Promise<void> {
     console.log(`[Enhanced Executor] Executing ${parallelGroups.length} parallel groups...`);
@@ -140,14 +144,14 @@ export class EnhancedPluginExecutor {
       if (group.tasks.length === 1) {
         // Single task - execute sequentially
         const taskId = group.tasks[0];
-        await this.executeSingleTask(taskId, plans, results, streamWriter);
+        await this.executeSingleTask(taskId, plans, results, state, streamWriter);
       } else {
         // Multiple tasks - execute in parallel
         console.log(`[Enhanced Executor] Executing ${group.tasks.length} tasks in parallel...`);
 
         const taskPromises = group.tasks.map(async (taskId: string) => {
           try {
-            await this.executeSingleTask(taskId, plans, results, streamWriter);
+            await this.executeSingleTask(taskId, plans, results, state, streamWriter);
           } catch (error) {
             console.error(`[Enhanced Executor] Task ${taskId} failed in parallel group:`, error);
             throw error;
@@ -169,6 +173,7 @@ export class EnhancedPluginExecutor {
     taskId: string,
     plans: Map<string, ExecutionPlan>,
     results: Map<string, AnalysisResult>,
+    state: GeoAIStateType,
     streamWriter?: any
   ): Promise<void> {
     console.log(`[Enhanced Executor] Executing task: ${taskId}`);
@@ -229,6 +234,24 @@ export class EnhancedPluginExecutor {
 
       // Resolve placeholders in parameters
       const resolvedParameters = resolvePlaceholders(step.parameters, results);
+
+      // Register virtual data sources from previous steps immediately if they haven't been yet
+      // This ensures that tasks in the same workflow can reference each other's outputs
+      for (const [prevStepId, prevResult] of results.entries()) {
+        if (prevResult.status === 'success' && prevResult.data?.id) {
+          // Check if this result is already registered as a virtual source
+          const existingSource = VirtualDataSourceManagerInstance.getById(prevResult.data.id);
+          if (!existingSource) {
+            VirtualDataSourceManagerInstance.register({
+              id: prevResult.data.id,
+              conversationId: state.conversationId,
+              stepId: prevStepId,
+              data: prevResult.data as any
+            });
+            console.log(`[Enhanced Executor] Early registration of virtual source: ${prevResult.data.id}`);
+          }
+        }
+      }
 
       // Send tool_start event
       if (streamWriter) {
@@ -346,6 +369,7 @@ export class EnhancedPluginExecutor {
   private async executeSequentially(
     plans: Map<string, ExecutionPlan>,
     results: Map<string, AnalysisResult>,
+    state: GeoAIStateType,
     streamWriter?: any
   ): Promise<void> {
     console.log('[Enhanced Executor] Executing sequentially (no parallel groups)...');
@@ -354,7 +378,7 @@ export class EnhancedPluginExecutor {
       console.log(`\n[Enhanced Executor] === Goal: ${goalId} ===`);
 
       for (const step of plan.steps) {
-        await this.executeSingleTask(step.stepId, plans, results, streamWriter);
+        await this.executeSingleTask(step.stepId, plans, results, state, streamWriter);
       }
     }
   }
