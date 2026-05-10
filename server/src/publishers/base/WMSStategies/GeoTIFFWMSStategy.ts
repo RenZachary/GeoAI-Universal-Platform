@@ -7,7 +7,7 @@
 import fs from 'fs';
 import path from 'path';
 import { LRUCache } from 'lru-cache';
-import type { DataSourceType } from '../../../../core/index';
+import type { DataSourceType } from '../../../core/index';
 import type {
   WMSLayerOptions,
   WMSGetMapParams,

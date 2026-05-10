@@ -12,13 +12,13 @@
  * - Tile ID generation
  */
 
-import type { DataSourceType, NativeData } from '../../../../core/index';
-import { PostGISTileGenerator, type PostGISTileQuery } from '../PostGISTileGenerator';
-import { PostGISConnectionParser } from '../../../../data-access';
-import type { PostGISConnectionConfig } from '../../../../core';
+import type { DataSourceType, NativeData } from '../../../core/index';
+import { PostGISTileGenerator, type PostGISTileQuery } from '../../../publishers/base/PostGISTileGenerator';
+import { PostGISConnectionParser } from '../../../data-access';
+import type { PostGISConnectionConfig } from '../../../core';
 import type { MVTTileGenerationStrategy } from './MVTTileGenerationStrategy';
 import type Database from 'better-sqlite3';
-import type { MVTTileOptions } from '../MVTPublisherTypes';
+import type { MVTTileOptions } from '../../../publishers/base/MVTPublisherTypes';
 
 export class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
     private tileGenerator: PostGISTileGenerator;

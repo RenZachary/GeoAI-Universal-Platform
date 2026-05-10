@@ -10,9 +10,9 @@
 
 import fs from 'fs';
 import path from 'path';
-import type { DataSourceType, NativeData } from '../../core/index';
+import type { DataSourceType, NativeData } from '../core/index';
 import type Database from 'better-sqlite3';
-import { DataSourceRepository } from '../../data-access/repositories';
+import { DataSourceRepository } from '../data-access/repositories';
 import type { WMSGenerationStrategy } from './base/BaseWMSPublisher';
 import { BaseWMSPublisher } from './base/BaseWMSPublisher';
 import {

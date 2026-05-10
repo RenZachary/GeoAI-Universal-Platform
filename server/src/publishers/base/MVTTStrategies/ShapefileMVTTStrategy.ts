@@ -1,10 +1,10 @@
 import type { MVTTileGenerationStrategy } from './MVTTileGenerationStrategy';
 
 import fs from 'fs';
-import type { DataSourceType, NativeData } from '../../../../core/index';
-import type { MVTTileOptions } from '../MVTPublisherTypes';
+import type { DataSourceType, NativeData } from '../../../core/index';
+import type { MVTTileOptions } from '../../../publishers/base/MVTPublisherTypes';
 import path from 'path';
-import { tryMultipleEncodings } from '../../../../data-access';
+import { tryMultipleEncodings } from '../../../data-access';
 import { GeoJSONMVTTStrategy } from './GeoJSONMVTTStrategy';
 
 /**

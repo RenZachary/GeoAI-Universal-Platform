@@ -48,4 +48,4 @@ export type {
 } from '../api/controllers/SpatialOperatorController';
 
 // MVTDynamicPublisher Singleton (re-export from utils)
-export { getMVTOnDemandPublisher, resetMVTOnDemandPublisher, MVTOnDemandPublisher } from '../utils/publishers/MVTOnDemandPublisher';
+export { getMVTOnDemandPublisher, resetMVTOnDemandPublisher, MVTOnDemandPublisher } from '../publishers/MVTOnDemandPublisher';

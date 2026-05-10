@@ -12,11 +12,11 @@
  */
 
 import type Database from 'better-sqlite3';
-import { MVTStrategyPublisher } from '../utils/publishers/MVTStrategyPublisher';
-import { WMSPublisher } from '../utils/publishers/WMSPublisher';
-import type { MVTSource, MVTTileOptions } from '../utils/publishers/base/MVTPublisherTypes';
+import { MVTStrategyPublisher } from '../publishers/MVTStrategyPublisher';
+import { WMSPublisher } from '../publishers/WMSPublisher';
+import type { MVTSource, MVTTileOptions } from '../publishers/base/MVTPublisherTypes';
 import type { NativeData } from '../core';
-import type { WMSLayerOptions } from '../utils/publishers/base/WMSStategies/WMSPublisherTypes';
+import type { WMSLayerOptions } from '../publishers/base/WMSStategies/WMSPublisherTypes';
 
 // ============================================================================
 // Type Definitions

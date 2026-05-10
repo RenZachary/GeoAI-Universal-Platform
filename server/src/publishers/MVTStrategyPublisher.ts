@@ -9,7 +9,7 @@
  * - Strategy: Handles tile generation logic only
  */
 
-import type { DataSourceType, NativeData } from '../../core/index';
+import type { DataSourceType, NativeData } from '../core/index';
 import type Database from 'better-sqlite3';
 import { BaseMVTPublisher, type MVTPublishResult } from './base/BaseMVTPublisher';
 import { type MVTTileOptions } from './base/MVTPublisherTypes';

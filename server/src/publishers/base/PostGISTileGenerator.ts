@@ -6,8 +6,8 @@
  */
 
 import type { Pool } from 'pg';
-import type { PostGISConnectionConfig, ParsedPostGISReference } from '../../../core';
-import { PostGISPoolManager } from '../../../data-access';
+import type { PostGISConnectionConfig, ParsedPostGISReference } from '../../core';
+import { PostGISPoolManager } from '../../data-access';
 
 export interface PostGISTileQuery {
   tableName?: string;

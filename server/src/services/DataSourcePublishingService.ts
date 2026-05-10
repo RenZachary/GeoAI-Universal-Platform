@@ -11,7 +11,7 @@
 import type Database from 'better-sqlite3';
 import { DataSourceRepository, type DataSourceRecord } from '../data-access/repositories';
 import { VisualizationServicePublisher } from './VisualizationServicePublisher';
-import type { MVTSource, MVTTileOptions } from '../utils/publishers/base/MVTPublisherTypes';
+import type { MVTSource, MVTTileOptions } from '../publishers/base/MVTPublisherTypes';
 import { wrapError } from '../core';
 import fs from 'fs';
 import path from 'path';

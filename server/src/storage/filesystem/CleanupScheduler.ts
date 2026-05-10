@@ -4,8 +4,8 @@
  */
 
 import { WorkspaceManagerInstance } from './WorkspaceManager';
-import { MVTStrategyPublisher } from '../../utils/publishers/MVTStrategyPublisher';
-import { WMSPublisher } from '../../utils/publishers/WMSPublisher';
+import { MVTStrategyPublisher } from '../../publishers/MVTStrategyPublisher';
+import { WMSPublisher } from '../../publishers/WMSPublisher';
 import path from 'path';
 import fs from 'fs';
 import { SQLiteManagerInstance } from '../database/SQLiteManager';

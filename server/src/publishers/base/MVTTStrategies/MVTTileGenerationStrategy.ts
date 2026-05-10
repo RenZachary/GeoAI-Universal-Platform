@@ -1,5 +1,5 @@
-import type { DataSourceType, NativeData } from "../../../../core";
-import type { MVTTileOptions } from "../MVTPublisherTypes";
+import type { DataSourceType, NativeData } from "../../../core";
+import type { MVTTileOptions } from "../../../publishers/base/MVTPublisherTypes";
 
 export type GeoJSONVT = any;
 

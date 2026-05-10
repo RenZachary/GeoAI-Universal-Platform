@@ -7,7 +7,7 @@
 
 import type { Request, Response } from 'express';
 import { VisualizationServicePublisher } from '../../services/VisualizationServicePublisher';
-import type { MVTSource, MVTTileOptions } from '../../utils/publishers/base/MVTPublisherTypes';
+import type { MVTSource, MVTTileOptions } from '../../publishers/base/MVTPublisherTypes';
 
 export class MVTController {
   private servicePublisher: VisualizationServicePublisher;

@@ -1,6 +1,6 @@
 import geojsonvt from "geojson-vt";
-import type { DataSourceType, NativeData } from "../../../../core";
-import type { MVTTileOptions } from "../MVTPublisherTypes";
+import type { DataSourceType, NativeData } from "../../../core";
+import type { MVTTileOptions } from "../../../publishers/base/MVTPublisherTypes";
 import type { MVTTileGenerationStrategy } from "./MVTTileGenerationStrategy";
 import vtPbf from 'vt-pbf';
 

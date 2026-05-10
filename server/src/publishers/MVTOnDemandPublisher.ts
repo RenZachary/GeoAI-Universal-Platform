@@ -14,7 +14,7 @@ import geojsonvt from 'geojson-vt';
 import vtPbf from 'vt-pbf';
 import fs from 'fs';
 import path from 'path';
-import { wrapError } from '../../core';
+import { wrapError } from '../core';
 import { BaseMVTPublisher } from './base/BaseMVTPublisher';
 import { PostGISTileGenerator } from './base/PostGISTileGenerator';
 import {

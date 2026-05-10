@@ -18,7 +18,7 @@ import { ConnectionError, ValidationError } from '../../services/DataSourceServi
 import { DataSourcePublishingService } from '../../services/DataSourcePublishingService';
 import type { DataSourceRecord } from '../../data-access/repositories';
 import type Database from 'better-sqlite3';
-import type { MVTOnDemandPublisher } from '../../utils/publishers/MVTOnDemandPublisher';
+import type { MVTOnDemandPublisher } from '../../publishers/MVTOnDemandPublisher';
 
 // ============================================================================
 // Validation Schemas
