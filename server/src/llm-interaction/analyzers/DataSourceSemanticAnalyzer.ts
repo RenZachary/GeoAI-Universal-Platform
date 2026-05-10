@@ -6,7 +6,7 @@
  */
 
 import type { DataSourceRecord } from '../../data-access';
-import { DataSourceRepository } from '../../data-access';
+import type { DataSourceRepository } from '../../data-access';
 
 export interface DataSourceSemanticInfo {
   id: string;

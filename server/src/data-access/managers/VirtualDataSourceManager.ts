@@ -104,14 +104,21 @@ export class VirtualDataSourceManager {
       if (ds.conversationId === conversationId) {
         toDelete.push(id);
         
-        // Delete physical file if it exists
+        // Delete physical file if it exists AND is a temporary file
         try {
           if (ds.reference && !ds.reference.startsWith('/api/')) {
             // It's a file path, not a URL
             const filePath = ds.reference;
-            if (fs.existsSync(filePath)) {
+            
+            // Only delete files in temp directories, NOT original data sources
+            const isInTempDir = filePath.includes('/temp/') || filePath.includes('\\temp\\') ||
+                               filePath.includes('/workspace/temp/') || filePath.includes('\\workspace\\temp\\');
+            
+            if (isInTempDir && fs.existsSync(filePath)) {
               fs.unlinkSync(filePath);
               console.log(`[VirtualDataSourceManager] Deleted temp file: ${filePath}`);
+            } else if (!isInTempDir) {
+              console.log(`[VirtualDataSourceManager] Skipping deletion of non-temp file: ${filePath}`);
             }
           }
         } catch (error) {

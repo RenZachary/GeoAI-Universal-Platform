@@ -116,10 +116,68 @@ export class MVTOnDemandPublisher extends BaseMVTPublisher {
   }
 
   private constructor(workspaceBase: string, cacheSize: number = 10000) {
-    super(workspaceBase, 'mvt-dynamic');  // Call base class constructor
+    super(workspaceBase, 'mvt');  // Only pass subdirectory name, base class adds 'results/'
     this.tileCache = new InMemoryTileCache(cacheSize);
     
+    // Load existing MVT services from disk into cache
+    void this.loadExistingServices();
+    
     console.log('[MVT On-Demand Publisher] Initialized');
+  }
+
+  /**
+   * Load existing MVT services from disk into memory cache
+   * This ensures services persist across server restarts
+   */
+  private async loadExistingServices(): Promise<void> {
+    try {
+      console.log(`[MVT On-Demand Publisher] Checking for existing services in: ${this.mvtOutputDir}`);
+      
+      if (!fs.existsSync(this.mvtOutputDir)) {
+        console.log(`[MVT On-Demand Publisher] Directory does not exist: ${this.mvtOutputDir}`);
+        return;
+      }
+      
+      const entries = fs.readdirSync(this.mvtOutputDir, { withFileTypes: true });
+      console.log(`[MVT On-Demand Publisher] Found ${entries.length} entries in directory`);
+      
+      let loadedCount = 0;
+      
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const metadataPath = path.join(this.mvtOutputDir, entry.name, 'metadata.json');
+          if (fs.existsSync(metadataPath)) {
+            try {
+              const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
+              
+              // Restore tileset metadata
+              this.tilesetMetadata.set(entry.name, metadata);
+              
+              // For GeoJSON file sources, we need to reload the tile index
+              if (metadata.sourceType === 'geojson-file' && metadata.filePath) {
+                // Note: We don't preload the tile index here to avoid memory overhead
+                // It will be lazily loaded when the first tile is requested
+                console.log(`[MVT On-Demand Publisher] Found GeoJSON tileset: ${entry.name}`);
+              } else if (metadata.sourceType === 'postgis') {
+                console.log(`[MVT On-Demand Publisher] Found PostGIS tileset: ${entry.name}`);
+              }
+              
+              loadedCount++;
+            } catch (error) {
+              console.error(`[MVT On-Demand Publisher] Failed to load tileset ${entry.name}:`, error);
+            }
+          }
+        }
+      }
+      
+      if (loadedCount > 0) {
+        console.log(`[MVT On-Demand Publisher] Loaded ${loadedCount} existing tilesets from disk`);
+      } else {
+        console.log(`[MVT On-Demand Publisher] No tilesets found to load`);
+      }
+    } catch (error) {
+      console.error('[MVT On-Demand Publisher] Failed to load existing services:', error);
+    }
   }
 
   /**
@@ -205,7 +263,7 @@ export class MVTOnDemandPublisher extends BaseMVTPublisher {
       this.tilesetMetadata.set(tilesetId, metadata);
       this.saveMetadata(tilesetId, metadata);
 
-      const serviceUrl = `/api/mvt/${tilesetId}/{z}/{x}/{y}.pbf`;
+      const serviceUrl = `/api/services/mvt/${tilesetId}/{z}/{x}/{y}.pbf`;
 
       console.log(`[MVT On-Demand Publisher] Published successfully: ${tilesetId}`);
       console.log(`[MVT On-Demand Publisher] Service URL: ${serviceUrl}`);

@@ -84,7 +84,10 @@ export class GeoJSONMVTTStrategy implements MVTTileGenerationStrategy {
             format: 'pbf',
             strategy: 'geojson',  // Must match the registered strategy key
             sourceFile: sourceReference,
-            featureCount
+            featureCount,
+            // Include styleConfig and geometryType for frontend rendering
+            styleConfig: nativeData.metadata?.styleConfig || null,
+            geometryType: nativeData.metadata?.geometryType || null
         };
 
         const metadataPath = path.join(tilesetDir, 'metadata.json');

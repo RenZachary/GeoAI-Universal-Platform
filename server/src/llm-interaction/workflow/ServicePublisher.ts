@@ -49,7 +49,7 @@ export class ServicePublisher {
             expiresAt: new Date(Date.now() + 3600000),
             metadata: {
                 // Merge data.metadata (from executor) with result.metadata (from operator execution)
-                ...result.data?.metadata,  // Contains styleUrl, tilesetId, etc.
+                ...result.data?.metadata,  // Contains styleConfig, tilesetId, etc.
                 ...result.metadata,        // Contains operatorId, parameters, executedAt
                 resultType: result.data.type || 'unknown',
                 generatedAt: new Date().toISOString()

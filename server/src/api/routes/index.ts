@@ -140,18 +140,11 @@ export class ApiRouter {
       this.router.delete('/plugins/:id', (req, res) => this.pluginManagementController?.deletePlugin(req, res));
     }
 
-    // MVT service endpoints (on-demand tile generation via strategy pattern)
-    this.router.get('/services/mvt', (req, res) => this.mvtServiceController.listTilesets(req, res));
-    this.router.get('/services/mvt/:tilesetId/metadata', (req, res) => this.mvtServiceController.getMetadata(req, res));
-    this.router.get('/services/mvt/:tilesetId/:z/:x/:y.pbf', (req, res) => this.mvtServiceController.serveTile(req, res));
-    this.router.delete('/services/mvt/:tilesetId', (req, res) => this.mvtServiceController.deleteTileset(req, res));
-
-    // MVT on-demand publisher endpoints (on-demand tile generation)
-    this.router.post('/mvt-dynamic/publish', (req, res) => this.mvtOnDemandController.publish(req, res));
-    this.router.get('/mvt-dynamic/list', (req, res) => this.mvtOnDemandController.listTilesets(req, res));
-    this.router.get('/mvt-dynamic/:tilesetId/metadata', (req, res) => this.mvtOnDemandController.getMetadata(req, res));
-    this.router.get('/mvt-dynamic/:tilesetId/:z/:x/:y.pbf', (req, res) => this.mvtOnDemandController.getTile(req, res));
-    this.router.delete('/mvt-dynamic/:tilesetId', (req, res) => this.mvtOnDemandController.deleteTileset(req, res));
+    // MVT service endpoints (on-demand tile generation via MVTOnDemandPublisher)
+    this.router.get('/services/mvt', (req, res) => this.mvtOnDemandController.listTilesets(req, res));
+    this.router.get('/services/mvt/:tilesetId/metadata', (req, res) => this.mvtOnDemandController.getMetadata(req, res));
+    this.router.get('/services/mvt/:tilesetId/:z/:x/:y.pbf', (req, res) => this.mvtOnDemandController.getTile(req, res));
+    this.router.delete('/services/mvt/:tilesetId', (req, res) => this.mvtOnDemandController.deleteTileset(req, res));
 
     // WMS service endpoints
     this.router.get('/services/wms', (req, res) => this.wmsServiceController.listServices(req, res));

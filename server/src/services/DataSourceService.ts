@@ -11,7 +11,7 @@
 import type { DataSourceRepository} from '../data-access/repositories';
 import { type DataSourceRecord } from '../data-access/repositories';
 import { DataAccessFacade } from '../data-access';
-import type { PostGISConnectionConfig } from '../core';
+import { wrapError, type PostGISConnectionConfig } from '../core';
 import { PostGISCleanupScheduler } from '../storage';
 import type Database from 'better-sqlite3';
 
@@ -253,7 +253,7 @@ export class DataSourceService {
       }
       
       const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to extract schema: ${message}`);
+      throw wrapError(error, `Failed to extract schema: ${message}`);
     }
   }
 

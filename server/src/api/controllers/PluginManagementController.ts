@@ -8,8 +8,7 @@ import type { CustomPluginLoader } from '../../spatial-operators/plugins/CustomP
 import path from 'path';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
-import { WorkspaceManagerInstance } from '../../storage/filesystem/WorkspaceManager';
-import { WORKSPACE_DIRS } from '../../core';
+import { WorkspaceManagerInstance } from '../../storage';
 
 export class PluginManagementController {
   private pluginLoader: CustomPluginLoader;

@@ -4,7 +4,6 @@
 
 import { z } from 'zod';
 import { SpatialOperator, type OperatorContext } from '../SpatialOperator';
-import { DataAccessFacade } from '../../data-access';
 import { DataSourceRepository } from '../../data-access/repositories';
 import { ResultPersistenceService } from '../../services/ResultPersistenceService';
 import type Database from 'better-sqlite3';
@@ -18,8 +17,23 @@ const UniformColorInputSchema = z.object({
 });
 
 const UniformColorOutputSchema = z.object({
-  result: z.string().describe('MVT service URL or GeoJSON path'),
-  styleUrl: z.string().describe('Style configuration URL')
+  id: z.string().describe('Unique identifier'),
+  type: z.string().describe('Data type (geojson, postgis, etc.)'),
+  reference: z.string().describe('File path or table reference'),
+  metadata: z.object({
+    result: z.string().describe('Output file path or reference'),
+    styleConfig: z.object({
+      type: z.literal('uniform'),
+      color: z.string(),
+      opacity: z.number(),
+      strokeWidth: z.number(),
+      layerName: z.string()
+    }).optional(),
+    geometryType: z.string().optional(),
+    featureCount: z.number().optional()
+  })
+  .catchall(z.any()) // Allow additional metadata fields (e.g., PostGIS connection info)
+  .describe('Metadata including style configuration')
 });
 
 export class UniformColorOperator extends SpatialOperator {
@@ -68,6 +82,9 @@ export class UniformColorOperator extends SpatialOperator {
     };
     
     // Persist result with style metadata (no data transformation)
+    console.log(`[UniformColorOperator] Source dataSource.metadata keys:`, Object.keys(dataSource.metadata || {}));
+    console.log(`[UniformColorOperator] Has connection info:`, !!dataSource.metadata?.connection);
+    
     const persisted = await resultPersistence.persistResult(
       {
         id: `uniform_${Date.now()}`,
@@ -75,6 +92,7 @@ export class UniformColorOperator extends SpatialOperator {
         reference: dataSource.reference, // Pass through original reference
         metadata: {
           ...dataSource.metadata,
+          dataSourceId: dataSource.id, // Add dataSourceId for secure password retrieval
           result: dataSource.reference, // Standardized output: pass through reference
           styleConfig
         },
@@ -85,9 +103,15 @@ export class UniformColorOperator extends SpatialOperator {
       { color: params.color }
     );
     
+    console.log(`[UniformColorOperator] Persisted result metadata keys:`, Object.keys(persisted.metadata || {}));
+    console.log(`[UniformColorOperator] Persisted has connection info:`, !!persisted.metadata?.connection);
+    
+    // Return complete NativeData structure so metadata is preserved
     return {
-      result: persisted.reference,
-      styleUrl: persisted.metadata?.styleUrl || ''
+      id: persisted.id,
+      type: persisted.type,
+      reference: persisted.reference,
+      metadata: persisted.metadata
     };
   }
 }

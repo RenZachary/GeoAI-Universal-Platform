@@ -5,8 +5,8 @@
  * Replaces the old DataAccessorFactory pattern.
  */
 
-import type { NativeData, DataSourceType } from '../../core';
-import type { FilterCondition, BufferOptions, OverlayOptions } from '../interfaces';
+import type { NativeData } from '../../core';
+import type { FilterCondition, BufferOptions } from '../interfaces';
 import type { DataBackend } from '../backends/DataBackend';
 import { VectorBackend } from '../backends/vector';
 import { RasterBackend } from '../backends/raster';

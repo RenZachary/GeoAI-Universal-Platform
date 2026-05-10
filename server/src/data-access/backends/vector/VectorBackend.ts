@@ -9,7 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import * as turf from '@turf/turf';
 import type { NativeData, DataMetadata } from '../../../core';
-import { generateId } from '../../../core';
+import { generateId, wrapError } from '../../../core';
 import type { FilterCondition, BufferOptions } from '../../interfaces';
 import type { DataBackend } from '../DataBackend';
 import { BufferOperation } from './operations/BufferOperation';
@@ -303,7 +303,7 @@ export class VectorBackend implements DataBackend {
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to load shapefile: ${message}`);
+      throw wrapError(error, `Failed to load shapefile: ${message}`);
     }
   }
   

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * DataBackend - Unified abstraction for data operations
  * 
@@ -5,8 +6,8 @@
  * Each Backend handles a specific data type (Vector, Raster, Database).
  */
 
-import type { NativeData, DataSourceType } from '../../core';
-import type { FilterCondition, BufferOptions, OverlayOptions } from '../interfaces';
+import type { NativeData } from '../../core';
+import type { FilterCondition, BufferOptions } from '../interfaces';
 
 /**
  * Base interface for all data backends

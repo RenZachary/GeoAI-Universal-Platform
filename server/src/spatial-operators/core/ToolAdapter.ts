@@ -6,7 +6,7 @@
  */
 
 import { DynamicStructuredTool } from '@langchain/core/tools';
-import { z } from 'zod';
+import type { z } from 'zod';
 import type { SpatialOperator } from '../SpatialOperator';
 
 export class ToolAdapter {
@@ -30,6 +30,15 @@ export class ToolAdapter {
           
           // Execute the operator with the provided parameters
           const result = await operator.execute(input);
+          
+          // Debug: Log the result structure before serialization
+          console.log(`[ToolAdapter] Operator result structure:`, {
+            success: result.success,
+            hasData: 'data' in result,
+            dataType: typeof result.data,
+            dataKeys: result.data ? Object.keys(result.data) : [],
+            dataMetadataKeys: result.data?.metadata ? Object.keys(result.data.metadata) : []
+          });
           
           // Return serialized result
           return JSON.stringify(result, null, 2);

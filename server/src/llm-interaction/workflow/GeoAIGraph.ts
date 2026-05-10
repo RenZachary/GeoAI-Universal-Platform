@@ -11,17 +11,16 @@ import type Database from 'better-sqlite3';
 import { PromptManager } from '../managers/PromptManager';
 import { GoalSplitterAgent } from '../agents/GoalSplitterAgent';
 import { TaskPlannerAgent } from '../agents/TaskPlannerAgent';
-import { ToolRegistryInstance } from '../tools/ToolRegistry';
 import { ConversationBufferMemoryWithSQLite } from '../managers/ConversationMemoryManager';
 import { ServicePublisher } from './ServicePublisher';
 import { SummaryGenerator } from './SummaryGenerator';
 import { reportDecisionNode } from './nodes/ReportDecisionNode';
 import { EnhancedExecutorInstance } from './nodes/EnhancedPluginExecutor';
 import { SQLiteManagerInstance } from '../../storage/';
-import { resolvePlaceholders } from './PlaceholderResolver';
 import { VirtualDataSourceManagerInstance } from '../../data-access/managers/VirtualDataSourceManager';
 import type { ParallelGroup } from '../analyzers/ParallelTaskAnalyzer';
 import { VisualizationServicePublisher } from '../../services/VisualizationServicePublisher';
+import { MVTStrategyPublisher } from '../../utils/publishers/MVTStrategyPublisher';
 
 // State interface for the GeoAI workflow
 export interface GeoAIState {
@@ -131,7 +130,6 @@ export function createGeoAIGraph(
   const taskPlanner = new TaskPlannerAgent(llmConfig, promptManager);
   
   // Initialize service publisher and summary generator
-  const servicePublisher = new ServicePublisher();
   const summaryGenerator = new SummaryGenerator(workspaceBase, 'en-US', llmConfig);
   
   const workflow = new StateGraph(GeoAIStateAnnotation)
@@ -195,19 +193,26 @@ export function createGeoAIGraph(
       const allServices: VisualizationService[] = [];
       
       if (result.executionResults) {
-        // Filter successful results
+        // Filter successful results that need visualization
         const successfulResults = new Map<string, AnalysisResult>();
         for (const [stepId, analysisResult] of result.executionResults.entries()) {
           if (analysisResult.status === 'success' && analysisResult.data) {
-            successfulResults.set(stepId, analysisResult);
+            // Check if this result needs visualization (marked by EnhancedPluginExecutor)
+            const needsVisualization = analysisResult.metadata?.needsVisualization;
             
-            // Register virtual data source for cross-step reference
-            VirtualDataSourceManagerInstance.register({
-              id: analysisResult.data.id,
-              conversationId: state.conversationId,
-              stepId: stepId,
-              data: analysisResult.data as any
-            });
+            if (needsVisualization) {
+              successfulResults.set(stepId, analysisResult);
+              
+              // Register virtual data source for cross-step reference
+              VirtualDataSourceManagerInstance.register({
+                id: analysisResult.data.id,
+                conversationId: state.conversationId,
+                stepId: stepId,
+                data: analysisResult.data as any
+              });
+            } else {
+              console.log(`[Plugin Executor] Skipping non-visualization result for step ${stepId} (operator category: ${analysisResult.metadata?.operatorId})`);
+            }
           }
         }
         
@@ -230,13 +235,57 @@ export function createGeoAIGraph(
                   );
                   break;
                   
-                default:
-                  // GeoJSON and other vector/raster data
-                  publishResult = unifiedPublisher.publishGeoJSON(
-                    stepId,
-                    analysisResult.data,
-                    3600000 // 1 hour default
-                  );
+                default: {
+                  // All vector data should be published as MVT using MVTStrategyPublisher
+                  // MVTStrategyPublisher supports GeoJSON, Shapefile, and PostGIS natively
+                  console.log(`[Plugin Executor] Publishing MVT for step ${stepId}, data type: ${analysisResult.data.type}`);
+                  console.log(`[Plugin Executor] analysisResult.data structure:`, JSON.stringify({
+                    id: analysisResult.data?.id,
+                    type: analysisResult.data?.type,
+                    reference: analysisResult.data?.reference,
+                    hasMetadata: !!analysisResult.data?.metadata,
+                    metadataKeys: analysisResult.data?.metadata ? Object.keys(analysisResult.data.metadata) : []
+                  }, null, 2));
+                  
+                  const mvtStrategyPublisher = MVTStrategyPublisher.getInstance(workspaceBase, db || undefined);
+                  
+                  const mvtOptions = {
+                    minZoom: 0,
+                    maxZoom: 18,
+                    extent: 4096,
+                    layerName: 'default'
+                  };
+                  
+                  // Use MVTStrategyPublisher which handles different data types correctly
+                  const mvtResult = await mvtStrategyPublisher.publish(analysisResult.data, mvtOptions);
+                  console.log(`[Plugin Executor] MVT publish result:`, mvtResult);
+                  
+                  if (mvtResult.success) {
+                    // Convert MVTStrategyPublisher result to ServicePublishResult format
+                    publishResult = {
+                      success: true,
+                      serviceId: mvtResult.tilesetId,
+                      url: mvtResult.serviceUrl,
+                      metadata: {
+                        id: mvtResult.tilesetId,
+                        type: 'mvt',
+                        url: mvtResult.serviceUrl,
+                        createdAt: new Date(),
+                        ttl: 3600000,
+                        expiresAt: new Date(Date.now() + 3600000),
+                        metadata: mvtResult.metadata
+                      }
+                    };
+                    console.log(`[Plugin Executor] MVT service created: ${publishResult.serviceId}`);
+                  } else {
+                    console.error(`[Plugin Executor] MVT publish failed:`, mvtResult.error);
+                    publishResult = {
+                      success: false,
+                      error: mvtResult.error
+                    };
+                  }
+                  break;
+                }
               }
               
               if (publishResult.success && publishResult.metadata) {
@@ -248,7 +297,11 @@ export function createGeoAIGraph(
                   url: publishResult.url || '',
                   ttl: publishResult.metadata.ttl || 3600000,
                   expiresAt: publishResult.metadata.expiresAt || new Date(Date.now() + 3600000),
-                  metadata: publishResult.metadata.metadata
+                  metadata: {
+                    // Merge operator metadata (operatorId, etc.) with data metadata (styleConfig, etc.)
+                    ...analysisResult.metadata,  // Contains operatorId, executedAt
+                    ...publishResult.metadata.metadata  // Contains styleConfig, geometryType, etc.
+                  }
                 };
                 
                 allServices.push(service);

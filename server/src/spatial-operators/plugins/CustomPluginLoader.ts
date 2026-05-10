@@ -5,10 +5,8 @@
 
 import fs from 'fs';
 import path from 'path';
-import {  pathToFileURL } from 'url';
-import type { Plugin, PluginCategory } from '../../core';
+import type { PluginCategory } from '../../core';
 import { SpatialOperatorRegistryInstance } from '../SpatialOperatorRegistry';
-import { ToolAdapter } from '../core/ToolAdapter';
 import { CustomPluginAdapter } from '../core/CustomPluginAdapter';
 
 export interface PluginManifest {
@@ -138,9 +136,11 @@ export class CustomPluginLoader {
     SpatialOperatorRegistryInstance.register(adapter);
     console.log(`[CustomPluginLoader] Registered custom operator: ${manifest.name} (${manifest.id})`);
 
-    // Also convert to LangChain Tool for LLM integration
-    const tool = ToolAdapter.convertToTool(adapter);
-    console.log(`[CustomPluginLoader] Created LangChain tool for: ${manifest.name}`);
+    // Also register with ToolRegistry for LLM integration
+    const { ToolRegistryInstance } = await import('../../llm-interaction/tools/ToolRegistry');
+    await ToolRegistryInstance.registerOperator(adapter);
+    
+    console.log(`[CustomPluginLoader] Registered LangChain tool for: ${manifest.name}`);
 
     // Update status
     this.pluginStatuses.set(manifest.id, {
@@ -200,7 +200,7 @@ export class CustomPluginLoader {
   /**
    * Disable a plugin
    */
-  disablePlugin(pluginId: string): void {
+  async disablePlugin(pluginId: string): Promise<void> {
     const status = this.pluginStatuses.get(pluginId);
     
     if (!status) {
@@ -214,6 +214,10 @@ export class CustomPluginLoader {
 
     // Unregister from SpatialOperatorRegistry
     SpatialOperatorRegistryInstance.unregister(pluginId);
+
+    // Also unregister from ToolRegistry
+    const { ToolRegistryInstance } = await import('../../llm-interaction/tools/ToolRegistry');
+    ToolRegistryInstance.unregisterOperator(pluginId);
 
     // Update status
     status.status = 'disabled';
@@ -247,7 +251,7 @@ export class CustomPluginLoader {
   /**
    * Delete a plugin (remove from filesystem and registry)
    */
-  deletePlugin(pluginId: string): void {
+  async deletePlugin(pluginId: string): Promise<void> {
     const status = this.pluginStatuses.get(pluginId);
     
     if (!status) {
@@ -259,6 +263,10 @@ export class CustomPluginLoader {
     // Unregister if enabled
     if (status.status === 'enabled') {
       SpatialOperatorRegistryInstance.unregister(pluginId);
+      
+      // Also unregister from ToolRegistry
+      const { ToolRegistryInstance } = await import('../../llm-interaction/tools/ToolRegistry');
+      ToolRegistryInstance.unregisterOperator(pluginId);
     }
 
     // Remove from filesystem

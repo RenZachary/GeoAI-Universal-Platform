@@ -258,7 +258,7 @@ export class SpatialOperatorController {
       
       // Determine error type
       let statusCode = 500;
-      let errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
       // Zod validation errors are client errors (400)
       if (errorMessage.includes('validation') || errorMessage.includes('invalid')) {

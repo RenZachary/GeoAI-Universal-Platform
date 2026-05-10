@@ -18,7 +18,6 @@ import {
   extractGeoTIFFMetadata,
   renderTile,
   bboxesOverlap,
-  clipBbox,
   transformBbox
 } from './GDALTileRenderer';
 

@@ -32,7 +32,7 @@ export class EnhancedPluginExecutor {
   constructor() {
     // Database will be initialized lazily on first use
   }
-  
+
   /**
    * Get database instance (lazy initialization)
    */
@@ -98,7 +98,7 @@ export class EnhancedPluginExecutor {
       // Finalize metrics
       this.metrics.endTime = Date.now();
       const duration = (this.metrics.endTime - this.metrics.startTime) / 1000;
-      
+
       console.log(`[Enhanced Executor] Execution completed in ${duration.toFixed(2)}s`);
       console.log(`[Enhanced Executor] Results: ${this.metrics.completedTasks} succeeded, ${this.metrics.failedTasks} failed`);
 
@@ -109,7 +109,7 @@ export class EnhancedPluginExecutor {
 
     } catch (error) {
       console.error('[Enhanced Executor] Execution failed:', error);
-      
+
       return {
         executionResults,
         currentStep: 'output',
@@ -144,7 +144,7 @@ export class EnhancedPluginExecutor {
       } else {
         // Multiple tasks - execute in parallel
         console.log(`[Enhanced Executor] Executing ${group.tasks.length} tasks in parallel...`);
-        
+
         const taskPromises = group.tasks.map(async (taskId: string) => {
           try {
             await this.executeSingleTask(taskId, plans, results, streamWriter);
@@ -194,7 +194,9 @@ export class EnhancedPluginExecutor {
         status: 'failed',
         error: `Task not found: ${taskId}`
       });
-      this.metrics!.failedTasks++;
+      if (this.metrics) {
+        this.metrics.failedTasks++;
+      }
       return;
     }
 
@@ -210,7 +212,7 @@ export class EnhancedPluginExecutor {
     try {
       // Get the operator from registry (using operatorId)
       const tool = ToolRegistryInstance.getTool(step.operatorId);
-      
+
       if (!tool) {
         console.error(`[Enhanced Executor] Operator not found: ${step.operatorId}`);
         results.set(taskId, {
@@ -219,7 +221,9 @@ export class EnhancedPluginExecutor {
           status: 'failed',
           error: `Operator not found: ${step.operatorId}`
         });
-        this.metrics!.failedTasks++;
+        if (this.metrics) {
+          this.metrics.failedTasks++;
+        }
         return;
       }
 
@@ -250,6 +254,26 @@ export class EnhancedPluginExecutor {
       }
 
       // Store result
+      console.log(`[Enhanced Executor] Task ${taskId} - parsedResult structure:`, {
+        hasSuccess: 'success' in parsedResult,
+        success: parsedResult.success,
+        hasData: 'data' in parsedResult,
+        dataType: typeof parsedResult.data,
+        dataKeys: parsedResult.data ? Object.keys(parsedResult.data) : []
+      });
+
+      // Check if this operator produces visualization-ready NativeData
+      const operatorId = parsedResult.metadata?.operatorId;
+      let needsVisualization = false;
+
+      if (operatorId) {
+        const operator = ToolRegistryInstance.getOperator(operatorId);
+        if (operator && operator.category === 'visualization') {
+          needsVisualization = true;
+          console.log(`[Enhanced Executor] Task ${taskId} - operator ${operatorId} is visualization category, will publish MVT`);
+        }
+      }
+
       const result: AnalysisResult = {
         id: taskId,
         goalId: targetPlan.goalId,
@@ -257,9 +281,16 @@ export class EnhancedPluginExecutor {
         data: parsedResult.data || parsedResult,
         error: parsedResult.error,
         metadata: {
-          executedAt: new Date().toISOString()
+          // Preserve operator metadata from tool execution
+          ...parsedResult.metadata,  // Contains operatorId, executedAt, etc.
+          executedAt: new Date().toISOString(),
+          needsVisualization  // Add flag for GeoAIGraph
         }
       };
+
+      console.log(`[Enhanced Executor] Task ${taskId} - stored result.data type:`, result.data?.type);
+      console.log(`[Enhanced Executor] Task ${taskId} - stored result.data reference:`, result.data?.reference);
+      console.log(`[Enhanced Executor] Task ${taskId} - stored result.data has metadata:`, !!result.data?.metadata);
 
       results.set(taskId, result);
 
@@ -278,16 +309,18 @@ export class EnhancedPluginExecutor {
       }
 
       if (result.status === 'success') {
-        this.metrics!.completedTasks++;
         console.log(`[Enhanced Executor] Task ${taskId} completed successfully`);
       } else {
-        this.metrics!.failedTasks++;
         console.error(`[Enhanced Executor] Task ${taskId} failed:`, result.error);
+      }
+      
+      if (this.metrics) {
+        this.metrics.completedTasks++;
       }
 
     } catch (error) {
       console.error(`[Enhanced Executor] Task ${taskId} execution error:`, error);
-      
+
       results.set(taskId, {
         id: taskId,
         goalId: targetPlan.goalId,
@@ -295,7 +328,9 @@ export class EnhancedPluginExecutor {
         error: error instanceof Error ? error.message : String(error)
       });
       
-      this.metrics!.failedTasks++;
+      if (this.metrics) {
+        this.metrics.failedTasks++;
+      }
     }
   }
 
@@ -426,7 +461,7 @@ export class EnhancedPluginExecutor {
       return 'No execution metrics available';
     }
 
-    const duration = this.metrics.endTime 
+    const duration = this.metrics.endTime
       ? ((this.metrics.endTime - this.metrics.startTime) / 1000).toFixed(2)
       : 'N/A';
 

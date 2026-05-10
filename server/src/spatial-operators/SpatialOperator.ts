@@ -5,7 +5,7 @@
  * type-safe operator pattern using Zod schemas for validation.
  */
 
-import { z } from 'zod';
+import type { z } from 'zod';
 import type { NativeData } from '../core';
 
 /**

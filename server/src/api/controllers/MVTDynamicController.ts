@@ -19,7 +19,7 @@ export class MVTOnDemandController {
   }
 
   /**
-   * POST /api/mvt-dynamic/publish - Publish a new MVT service
+   * POST /api/services/mvt/publish - Publish a new MVT service
    * 
    * Request body examples:
    * 
@@ -158,7 +158,7 @@ export class MVTOnDemandController {
   }
 
   /**
-   * GET /api/mvt-dynamic/:tilesetId/:z/:x/:y.pbf - Get MVT tile
+   * GET /api/services/mvt/:tilesetId/:z/:x/:y.pbf - Get MVT tile
    */
   async getTile(req: Request, res: Response): Promise<void> {
     try {
@@ -210,7 +210,7 @@ export class MVTOnDemandController {
   }
 
   /**
-   * GET /api/mvt-dynamic/list - List all published tilesets
+   * GET /api/services/mvt/list - List all published tilesets
    */
   async listTilesets(req: Request, res: Response): Promise<void> {
     try {
@@ -222,7 +222,7 @@ export class MVTOnDemandController {
           count: tilesets.length,
           tilesets: tilesets.map((ts: any) => ({
             tilesetId: ts.tilesetId,
-            serviceUrl: `/api/mvt-dynamic/${ts.tilesetId}/{z}/{x}/{y}.pbf`,
+            serviceUrl: `/api/services/mvt/${ts.tilesetId}/{z}/{x}/{y}.pbf`,
             metadata: ts.metadata
           }))
         }
@@ -238,7 +238,7 @@ export class MVTOnDemandController {
   }
 
   /**
-   * DELETE /api/mvt-dynamic/:tilesetId - Delete a published tileset
+   * DELETE /api/services/mvt/:tilesetId - Delete a published tileset
    */
   async deleteTileset(req: Request, res: Response): Promise<void> {
     try {
@@ -269,7 +269,7 @@ export class MVTOnDemandController {
   }
 
   /**
-   * GET /api/mvt-dynamic/:tilesetId/metadata - Get tileset metadata
+   * GET /api/services/mvt/:tilesetId/metadata - Get tileset metadata
    */
   async getMetadata(req: Request, res: Response): Promise<void> {
     try {
@@ -291,7 +291,7 @@ export class MVTOnDemandController {
         success: true,
         data: {
           tilesetId: tileset.tilesetId,
-          serviceUrl: `/api/mvt-dynamic/${tileset.tilesetId}/{z}/{x}/{y}.pbf`,
+          serviceUrl: `/api/services/mvt/${tileset.tilesetId}/{z}/{x}/{y}.pbf`,
           metadata: tileset.metadata
         }
       });

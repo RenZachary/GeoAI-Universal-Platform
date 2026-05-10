@@ -12,9 +12,10 @@ import type Database from 'better-sqlite3';
 import { DataSourceRepository, type DataSourceRecord } from '../data-access/repositories';
 import { VisualizationServicePublisher } from './VisualizationServicePublisher';
 import type { MVTSource, MVTTileOptions } from '../utils/publishers/base/MVTPublisherTypes';
-import type { NativeData } from '../core';
-import type { WMSLayerOptions } from '../utils/publishers/base/WMSStategies/WMSPublisherTypes';
+import { wrapError } from '../core';
 import fs from 'fs';
+import path from 'path';
+import { WorkspaceManagerInstance } from '../storage';
 
 export interface PublishedServiceInfo {
   dataSourceId: string;
@@ -77,16 +78,38 @@ export class DataSourcePublishingService {
       // Check MVT tilesets - dataSourceId is used as tilesetId
       if (dataSource.type !== 'tif') {
         const service = this.publisher.getService(dataSourceId);
-        return service !== null && service.type === 'mvt';
+        if (!service || service.type !== 'mvt') {
+          return false;
+        }
+        
+        // Verify that the actual tileset directory and metadata.json exist
+        const mvtOutputDir = path.join(this.workspaceBase, 'results', 'mvt');  // Match BaseMVTPublisher structure
+        const metadataPath = path.join(mvtOutputDir, dataSourceId, 'metadata.json');
+        const exists = fs.existsSync(metadataPath);
+        
+        if (!exists) {
+          console.log(`[DataSourcePublishingService] Service record exists but tileset directory missing for: ${dataSourceId}`);
+          return false;
+        }
+        
+        return true;
       }
 
       // For TIF/WMS, check if there's an existing WMS service for this data source
       // by looking at the metadata stored in the data source
       const wmsServiceId = dataSource.metadata?.wmsServiceId;
       if (wmsServiceId) {
-        // Verify the service still exists
-        const metadata = this.publisher.getService(wmsServiceId);
-        return metadata !== null && metadata.type === 'wms';
+        // Verify the service still exists by checking disk metadata file
+        const wmsOutputDir = path.join(this.workspaceBase, 'results', 'wms');
+        const metadataPath = path.join(wmsOutputDir, wmsServiceId, 'metadata.json');
+        const exists = fs.existsSync(metadataPath);
+        
+        if (!exists) {
+          console.log(`[DataSourcePublishingService] WMS service record exists but metadata file missing for: ${wmsServiceId}`);
+          return false;
+        }
+        
+        return true;
       }
 
       return false;
@@ -152,7 +175,7 @@ export class DataSourcePublishingService {
         publishedInfo = {
           dataSourceId,
           serviceType: 'mvt',
-          serviceUrl: `/api/mvt-dynamic/${dataSourceId}/{z}/{x}/{y}.pbf`,
+          serviceUrl: `/api/services/mvt/${dataSourceId}/{z}/{x}/{y}.pbf`,
           tilesetId: dataSourceId,
           metadata: {}
         };
@@ -226,12 +249,22 @@ export class DataSourcePublishingService {
       const { promisify } = await import('util');
       const execAsync = promisify(exec);
       
-      const geojsonPath = shpPath.replace('.shp', '.geojson');
+      // Save converted GeoJSON in temp directory using WorkspaceManager
+      const tempDir = WorkspaceManagerInstance.getDirectoryPath('TEMP');
+      const conversionSubdir = path.join(tempDir, 'shapefile-conversions');
+      
+      if (!fs.existsSync(conversionSubdir)) {
+        fs.mkdirSync(conversionSubdir, { recursive: true });
+      }
+      
+      const baseName = path.basename(shpPath, '.shp');
+      const geojsonPath = path.join(conversionSubdir, `${baseName}_${Date.now()}.geojson`);
+      
       try {
         await execAsync(`ogr2ogr -f "GeoJSON" "${geojsonPath}" "${shpPath}"`);
         console.log(`[DataSourcePublishingService] Shapefile converted to GeoJSON: ${geojsonPath}`);
-      } catch (error) {
-        throw new Error(`Failed to convert shapefile to GeoJSON: ${error instanceof Error ? error.message : String(error)}`);
+      } catch (error) {        
+        throw wrapError(error, `Failed to convert shapefile to GeoJSON`);
       }
       
       source = {
@@ -274,7 +307,7 @@ export class DataSourcePublishingService {
     return {
       dataSourceId: dataSource.id,
       serviceType: 'mvt',
-      serviceUrl: `/api/mvt-dynamic/${dataSource.id}/{z}/{x}/{y}.pbf`,
+      serviceUrl: `/api/services/mvt/${dataSource.id}/{z}/{x}/{y}.pbf`,
       tilesetId: result.serviceId,
       metadata: result.metadata || {}
     };

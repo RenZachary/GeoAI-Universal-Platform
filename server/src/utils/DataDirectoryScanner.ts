@@ -1,10 +1,9 @@
 import fs from 'fs';
 import path from 'path';
-import { v4 as uuidv4 } from 'uuid';
 import { DataSourceRepository } from '../data-access/repositories';
-import { DataAccessFacade } from '../data-access';
 import type { DataSourceType } from '../core';
 import { SQLiteManagerInstance } from '../storage';
+import e from 'express';
 
 /**
  * Scan data directory and register unregistered files
@@ -45,7 +44,6 @@ export async function scanAndRegisterDataFiles(
   
   // Initialize services
   const dataSourceRepo = new DataSourceRepository(SQLiteManagerInstance.getDatabase());
-  const dataAccess = DataAccessFacade.getInstance(workspaceBase);
   
   // Check which files are already registered
   const existingSources = dataSourceRepo.listAll();
@@ -72,7 +70,7 @@ export async function scanAndRegisterDataFiles(
       
       // Extract metadata using fs for basic info
       const stats = fs.statSync(fullPath);
-      let metadata: any = {
+      const metadata: any = {
         name: path.basename(file),
         format: type,
         fileSize: stats.size
@@ -94,7 +92,7 @@ export async function scanAndRegisterDataFiles(
             metadata.bbox = geojson.bbox;
           }
         } catch (error) {
-          console.warn(`    Warning: Could not parse GeoJSON metadata for ${file}`);
+          console.warn(`    Warning: Could not parse GeoJSON metadata for ${file}`,e);
           metadata.featureCount = 0;
         }
       } else {

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * RasterBackend - Handles raster data operations using geotiff.js
  */

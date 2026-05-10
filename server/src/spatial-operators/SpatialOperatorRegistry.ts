@@ -5,7 +5,7 @@
  * replacing the old Plugin/Executor/Tool registration system.
  */
 
-import { SpatialOperator } from './SpatialOperator';
+import type { SpatialOperator } from './SpatialOperator';
 
 export class SpatialOperatorRegistry {
   private static instance: SpatialOperatorRegistry;

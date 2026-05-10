@@ -19,8 +19,23 @@ const ChoroplethInputSchema = z.object({
 });
 
 const ChoroplethOutputSchema = z.object({
-  result: z.string().describe('MVT service URL or GeoJSON path'),
-  styleUrl: z.string().describe('Style configuration URL')
+  id: z.string().describe('Unique identifier'),
+  type: z.string().describe('Data type (geojson, postgis, etc.)'),
+  reference: z.string().describe('File path or table reference'),
+  metadata: z.object({
+    result: z.string().describe('Output file path or reference'),
+    styleConfig: z.object({
+      type: z.literal('choropleth'),
+      valueField: z.string(),
+      classification: z.string(),
+      numClasses: z.number(),
+      colorRamp: z.string(),
+      opacity: z.number(),
+      layerName: z.string()
+    }).optional(),
+    geometryType: z.string().optional(),
+    featureCount: z.number().optional()
+  }).describe('Metadata including style configuration')
 });
 
 export class ChoroplethOperator extends SpatialOperator {
@@ -88,9 +103,12 @@ export class ChoroplethOperator extends SpatialOperator {
       { valueField: params.valueField }
     );
     
+    // Return complete NativeData structure so metadata is preserved
     return {
-      result: persisted.reference,
-      styleUrl: persisted.metadata?.styleUrl || ''
+      id: persisted.id,
+      type: persisted.type,
+      reference: persisted.reference,
+      metadata: persisted.metadata
     };
   }
 }

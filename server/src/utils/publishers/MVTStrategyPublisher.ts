@@ -51,10 +51,8 @@ export class MVTStrategyPublisher extends BaseMVTPublisher {
     this.strategies = new Map();
     this.registerStrategy('geojson', new GeoJSONMVTTStrategy(this.mvtOutputDir));
     this.registerStrategy('shapefile', new ShapefileMVTTStrategy(this.mvtOutputDir));
-    // Register PostGIS strategy with database connection support
-    if (db) {
-      this.registerStrategy('postgis', new PostGISMVTTStrategy(this.mvtOutputDir, db));
-    }
+    // Always register PostGIS strategy - connection info comes from NativeData metadata, not SQLite
+    this.registerStrategy('postgis', new PostGISMVTTStrategy(this.mvtOutputDir, db!));
   }
 
   /**
@@ -86,6 +84,8 @@ export class MVTStrategyPublisher extends BaseMVTPublisher {
       console.log('[MVT Strategy Publisher] Publishing tiles from NativeData (on-demand generation)...');
       console.log(`[MVT Strategy Publisher] Data source type: ${nativeData.type}`);
       console.log(`[MVT Strategy Publisher] Reference: ${nativeData.reference}`);
+      console.log(`[MVT Strategy Publisher] Metadata keys:`, Object.keys(nativeData.metadata || {}));
+      console.log(`[MVT Strategy Publisher] Has connection info:`, !!nativeData.metadata?.connection);
 
       const tilesetId = await this.generateTiles(nativeData, options);
       const metadata = this.getMetadata(tilesetId);

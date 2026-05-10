@@ -14,8 +14,7 @@
 import { z } from 'zod';
 import { SpatialOperator, type OperatorContext } from '../SpatialOperator';
 import type { PluginManifest } from '../plugins/CustomPluginLoader';
-import type { NativeData } from '../../core';
-import path from 'path';
+import { wrapError } from '../../core';
 import { pathToFileURL } from 'url';
 
 /**
@@ -140,7 +139,7 @@ export class CustomPluginAdapter extends SpatialOperator {
     } catch (error) {
       console.error(`[CustomPluginAdapter] Failed to load plugin ${this.operatorId}:`, error);
       const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to load plugin ${this.operatorId}: ${message}`);
+      throw wrapError(error, `Failed to load plugin ${this.operatorId}: ${message}`);
     }
   }
 

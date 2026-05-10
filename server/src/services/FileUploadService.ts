@@ -115,7 +115,7 @@ export class FileUploadService {
           success = true;
         }
       } catch (e) {
-        console.warn('[FileUploadService] Binary to UTF-8 conversion failed');
+        console.warn('[FileUploadService] Binary to UTF-8 conversion failed', e);
       }
     }
 

@@ -5,7 +5,7 @@
  * enabling LLM agents to discover and execute spatial operations.
  */
 
-import { DynamicStructuredTool } from '@langchain/core/tools';
+import type { DynamicStructuredTool } from '@langchain/core/tools';
 import type { SpatialOperator } from '../../spatial-operators/SpatialOperator';
 import { SpatialOperatorRegistryInstance } from '../../spatial-operators/SpatialOperatorRegistry';
 import { ToolAdapter } from '../../spatial-operators/core/ToolAdapter';

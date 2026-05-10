@@ -183,6 +183,30 @@ export class PostGISBackend implements DataBackend {
     }
   }
   
+  /**
+   * Test PostGIS database connection
+   */
+  async testConnection(): Promise<boolean> {
+    try {
+      const pool = await this.getPool();
+      // Execute a simple query to test the connection
+      const result = await pool.query('SELECT 1 as connected');
+      return result.rows.length > 0 && result.rows[0].connected === 1;
+    } catch (error) {
+      console.error('[PostGISBackend] Connection test failed:', error);
+      return false;
+    }
+  }
+  
+  /**
+   * Execute raw SQL query
+   */
+  async executeRaw(query: string, params?: any[]): Promise<any> {
+    const pool = await this.getPool();
+    const result = await pool.query(query, params);
+    return result;
+  }
+  
   async getSchema(tableName: string): Promise<any> {
     const pool = await this.getPool();
     

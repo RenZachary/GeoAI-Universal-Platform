@@ -13,6 +13,7 @@ import type { Pool } from 'pg';
 import type Database from 'better-sqlite3';
 import type { MVTTileOptions } from '../MVTPublisherTypes';
 import path from 'path';
+import { DataSourceRepository } from '../../../../data-access/repositories';
 export class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
     private tileIndexCache: Map<string, GeoJSONVT> = new Map();
     private postgisPools: Map<string, Pool> = new Map();
@@ -84,7 +85,7 @@ export class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
             createdAt: Date.now()
         });
 
-        // Create tileset metadata - save complete connection info for later restoration
+        // Create tileset metadata - save dataSourceId for secure password retrieval
         const metadata = {
             id: tilesetId,
             minZoom,
@@ -95,9 +96,12 @@ export class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
             strategy: 'postgis',  // Must match the registered strategy key
             sourceReference,
             layerName: forcedLayerName,  // Always 'default' to match StyleFactory
-            // Save complete connection metadata for getTile restoration
-            connectionMetadata: nativeData.metadata?.connection || null,
-            geometryColumn: nativeData.metadata?.geometryColumn || 'geom'
+            // Save dataSourceId to retrieve connection info securely (includes password)
+            dataSourceId: nativeData.metadata?.dataSourceId || null,
+            geometryColumn: nativeData.metadata?.geometryColumn || 'geom',
+            // Include styleConfig for frontend rendering
+            styleConfig: nativeData.metadata?.styleConfig || null,
+            geometryType: nativeData.metadata?.geometryType || null
         };
 
         const metadataPath = path.join(tilesetDir, 'metadata.json');
@@ -139,20 +143,46 @@ export class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
             console.log(`[PostGIS MVT Strategy] Reloading PostGIS connection for: ${sourceReference}`);
 
             try {
-                // Reconstruct metadata object from saved connectionMetadata
-                const reconstructedMetadata = {
-                    connection: fileMetadata.connectionMetadata,
-                    geometryColumn: fileMetadata.geometryColumn || 'geom'
-                };
-
-                // Parse connection info from file metadata (no database query!)
-                const connectionInfo = PostGISConnectionParser.parse(
-                    sourceReference,
-                    reconstructedMetadata
-                );
+                // Get complete connection info from DataSourceRepository (includes password)
+                let connectionInfo: any = null;
+                
+                if (fileMetadata.dataSourceId) {
+                    // Preferred method: use dataSourceId to get full connection info
+                    const dataSourceRepo = new DataSourceRepository(this.db);
+                    const dataSource = dataSourceRepo.getById(fileMetadata.dataSourceId);
+                    
+                    if (dataSource && dataSource.metadata?.connection) {
+                        console.log(`[PostGIS MVT Strategy] Retrieved connection from DataSourceRepository`);
+                        const conn = dataSource.metadata.connection;
+                        connectionInfo = {
+                            user: conn.user,
+                            password: conn.password,  // Safe: retrieved from secure SQLite DB
+                            host: conn.host,
+                            port: conn.port,
+                            database: conn.database,
+                            schema: fileMetadata.sourceReference.split('.')[0] || conn.schema || 'public',
+                            tableName: fileMetadata.sourceReference.split('.')[1],
+                            geometryColumn: fileMetadata.geometryColumn || 'geom'
+                        };
+                    }
+                }
+                
+                // Fallback: try to parse from metadata (without password - will fail)
+                if (!connectionInfo) {
+                    console.warn(`[PostGIS MVT Strategy] dataSourceId not found, attempting fallback...`);
+                    const reconstructedMetadata = {
+                        connection: fileMetadata.connectionMetadata,
+                        geometryColumn: fileMetadata.geometryColumn || 'geom'
+                    };
+                    
+                    connectionInfo = PostGISConnectionParser.parse(
+                        sourceReference,
+                        reconstructedMetadata
+                    );
+                }
 
                 if (!connectionInfo) {
-                    console.warn(`[PostGIS MVT Strategy] Failed to parse connection info from metadata file`);
+                    console.warn(`[PostGIS MVT Strategy] Failed to get connection info`);
                     return null;
                 }
 

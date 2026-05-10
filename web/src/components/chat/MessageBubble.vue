@@ -47,6 +47,10 @@
           </div>
         </div>
       </div>
+      <!-- Debug: Show when services exist but not rendered -->
+      <div v-else-if="message.services" class="debug-info" style="color: red; font-size: 12px; margin-top: 8px;">
+        Services array exists but length is 0
+      </div>
       
       <!-- Streaming indicator -->
       <div v-if="isStreaming" class="streaming-indicator">
@@ -78,7 +82,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { ChatMessage, VisualizationService } from '@/types'
 import { VisualizationServiceType } from '@/types'
 import { User, ChatDotRound, DocumentCopy, RefreshRight, Link, Document, MapLocation, Reading } from '@element-plus/icons-vue'
@@ -147,13 +151,21 @@ function formatTime(timestamp: string): string {
 
 function getServiceName(service: VisualizationService): string {
   const metadata = service.metadata
-  if (metadata?.pluginId) {
-    return metadata.pluginId.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
+  // Check for operatorId or pluginId (both are used in different contexts)
+  const operatorName = metadata?.operatorId || metadata?.pluginId
+  if (operatorName) {
+    return operatorName.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
   }
   return service.type.toUpperCase() + ' Service'
 }
 
 function getActionText(service: VisualizationService): string {
+  // If service has styleConfig, it's a visualization service that should be viewed on map
+  if (service.metadata?.styleConfig) {
+    return 'View on Map'
+  }
+  
+  // Otherwise, use type-based logic
   if (service.type === VisualizationServiceType.MVT || service.type === VisualizationServiceType.WMS || service.type === VisualizationServiceType.Image) {
     return 'View on Map'
   } else if (service.type === VisualizationServiceType.GeoJSON) {
@@ -167,8 +179,11 @@ function getActionText(service: VisualizationService): string {
 }
 
 function handleViewService(service: VisualizationService) {
-  // For MVT/WMS/Image (map services), navigate to map page with layer info
-  if (service.type === VisualizationServiceType.MVT || service.type === VisualizationServiceType.WMS || service.type === VisualizationServiceType.Image) {
+  // If service has styleConfig, treat it as a visualization service and add to map
+  if (service.metadata?.styleConfig || 
+      service.type === VisualizationServiceType.MVT || 
+      service.type === VisualizationServiceType.WMS || 
+      service.type === VisualizationServiceType.Image) {
     // Unidirectional flow: chat → map, no callback
     mapStore.addLayerFromService(service)
     

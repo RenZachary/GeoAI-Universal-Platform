@@ -68,8 +68,12 @@ export class InMemoryServiceRegistry implements ServiceRegistry {
   }
 
   private initializeDatabase(): void {
+    if (!this.db) {
+      console.warn('[ServiceRegistry] Database is not initialized');
+      return;
+    }
     try {
-      this.db!.exec(`
+      this.db.exec(`
         CREATE TABLE IF NOT EXISTS visualization_services (
           service_id TEXT PRIMARY KEY,
           service_type TEXT NOT NULL,
@@ -82,7 +86,7 @@ export class InMemoryServiceRegistry implements ServiceRegistry {
           metadata_json TEXT
         )
       `);
-      
+
       // Load existing services from database
       this.loadFromDatabase();
     } catch (error) {
@@ -92,7 +96,11 @@ export class InMemoryServiceRegistry implements ServiceRegistry {
 
   private loadFromDatabase(): void {
     try {
-      const rows = this.db!.prepare('SELECT * FROM visualization_services').all() as any[];
+      if (!this.db) {
+        console.warn('[ServiceRegistry] Database is not initialized');
+        return;
+      }
+      const rows = this.db.prepare('SELECT * FROM visualization_services').all() as any[];
       for (const row of rows) {
         const metadata: ServiceMetadata = {
           id: row.service_id,
@@ -119,7 +127,7 @@ export class InMemoryServiceRegistry implements ServiceRegistry {
       // Update access tracking
       service.lastAccessedAt = new Date();
       service.accessCount = (service.accessCount || 0) + 1;
-      
+
       // Persist to database if available
       if (this.db) {
         this.persistToDatabase(service);
@@ -135,7 +143,7 @@ export class InMemoryServiceRegistry implements ServiceRegistry {
 
   register(metadata: ServiceMetadata): void {
     this.services.set(metadata.id, metadata);
-    
+
     // Persist to database if available
     if (this.db) {
       this.persistToDatabase(metadata);
@@ -144,7 +152,7 @@ export class InMemoryServiceRegistry implements ServiceRegistry {
 
   unregister(serviceId: string): void {
     this.services.delete(serviceId);
-    
+
     // Remove from database if available
     if (this.db) {
       try {
@@ -160,7 +168,7 @@ export class InMemoryServiceRegistry implements ServiceRegistry {
     if (service) {
       service.lastAccessedAt = new Date();
       service.accessCount = (service.accessCount || 0) + 1;
-      
+
       if (this.db) {
         this.persistToDatabase(service);
       }
@@ -169,7 +177,11 @@ export class InMemoryServiceRegistry implements ServiceRegistry {
 
   private persistToDatabase(metadata: ServiceMetadata): void {
     try {
-      this.db!.prepare(`
+      if (!this.db) {
+        console.warn('[ServiceRegistry] Database is not initialized');
+        return;
+      }
+      this.db.prepare(`
         INSERT OR REPLACE INTO visualization_services 
         (service_id, service_type, url, created_at, expires_at, ttl, last_accessed_at, access_count, metadata_json)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -223,13 +235,13 @@ export class InMemoryServiceRegistry implements ServiceRegistry {
 
 export class VisualizationServicePublisher {
   private static instance: VisualizationServicePublisher | null = null;
-  
+
   private registry: InMemoryServiceRegistry;
   private mvtPublisher: MVTOnDemandPublisher;
   private wmsPublisher: WMSPublisher;
   private workspaceBase: string;
   private db?: Database.Database;
-  
+
   // Cleanup interval (check every 5 minutes)
   private cleanupInterval: NodeJS.Timeout | null = null;
   private readonly CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
@@ -238,14 +250,14 @@ export class VisualizationServicePublisher {
     this.workspaceBase = workspaceBase;
     this.db = db;
     this.registry = new InMemoryServiceRegistry(db);
-    
+
     // Initialize publishers
     this.mvtPublisher = MVTOnDemandPublisher.getInstance(workspaceBase, 10000);
     this.wmsPublisher = WMSPublisher.getInstance(workspaceBase, db);
-    
+
     // Start automatic cleanup
     this.startCleanupTimer();
-    
+
     console.log('[VisualizationServicePublisher] Initialized');
   }
 
@@ -283,7 +295,7 @@ export class VisualizationServicePublisher {
   ): Promise<ServicePublishResult> {
     try {
       const result = await this.mvtPublisher.publish(source, options, serviceId);
-      
+
       if (!result.success) {
         return {
           success: false,
@@ -294,7 +306,7 @@ export class VisualizationServicePublisher {
       const metadata: ServiceMetadata = {
         id: result.tilesetId,
         type: 'mvt',
-        url: `/api/mvt-dynamic/${result.tilesetId}/{z}/{x}/{y}.pbf`,
+        url: `/api/services/mvt/${result.tilesetId}/{z}/{x}/{y}.pbf`,
         createdAt: new Date(),
         ttl: 3600000, // Default 1 hour
         expiresAt: new Date(Date.now() + 3600000),
@@ -327,7 +339,7 @@ export class VisualizationServicePublisher {
   ): Promise<ServicePublishResult> {
     try {
       const generatedServiceId = await this.wmsPublisher.generateService(nativeData, options);
-      
+
       const metadata: ServiceMetadata = {
         id: generatedServiceId,
         type: 'wms',
@@ -373,7 +385,9 @@ export class VisualizationServicePublisher {
         url: `/api/results/${stepId}.geojson`,
         createdAt: new Date(),
         ttl,
-        expiresAt: new Date(Date.now() + ttl)
+        expiresAt: new Date(Date.now() + ttl),
+        // Include all metadata from the operator result (styleConfig, geometryType, etc.)
+        metadata: geojsonData?.metadata || {}
       };
 
       this.registry.register(metadata);
@@ -511,7 +525,7 @@ export class VisualizationServicePublisher {
    */
   private performCleanup(): void {
     const expiredServices = this.registry.getExpiredServices();
-    
+
     if (expiredServices.length === 0) {
       return;
     }
@@ -561,7 +575,7 @@ export class VisualizationServicePublisher {
   } {
     const allServices = this.registry.list();
     const expiredServices = this.registry.getExpiredServices();
-    
+
     const servicesByType: Record<ServiceType, number> = {
       mvt: 0,
       wms: 0,

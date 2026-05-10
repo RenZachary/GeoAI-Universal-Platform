@@ -310,22 +310,37 @@ export const useChatStore = defineStore('chat', () => {
         }
         
         // Store visualization services if provided
-        if (data?.services && data.services.length > 0) {
-          console.log('[Chat Store] Received visualization services:', data.services)
+        const servicesToStore = data?.services || services
+        
+        if (servicesToStore && servicesToStore.length > 0) {
+          console.log('[Chat Store] Received visualization services:', servicesToStore)
           
           // Attach services to the last assistant message
-          const lastAssistantMsg = [...currentMsgs].reverse().find((m: any) => m.role === 'assistant')
-          if (lastAssistantMsg) {
-            lastAssistantMsg.services = data.services
-            // Force Vue reactivity by creating a new Map
-            const completeMap2 = new Map(messages.value)
-            completeMap2.set(conversationId, [...currentMsgs])
-            messages.value = completeMap2
-            console.log('[Chat Store] Attached services to last assistant message')
+          const msgsArray = [...currentMsgs]
+          const lastAssistantIndex = msgsArray.map((m, i) => ({ m, i })).reverse().find(({ m }) => m.role === 'assistant')?.i
+          
+          if (lastAssistantIndex !== undefined) {
+            // Create a completely new array with updated message
+            const updatedMsgs = [...msgsArray]
+            updatedMsgs[lastAssistantIndex] = {
+              ...updatedMsgs[lastAssistantIndex],
+              services: servicesToStore
+            }
+            
+            console.log('[Chat Store] Attached services to message at index', lastAssistantIndex)
+            
+            // Force Vue reactivity by creating a new Map with new array
+            const completeMap = new Map(messages.value)
+            completeMap.set(conversationId, updatedMsgs)
+            messages.value = completeMap
+            
+            console.log('[Chat Store] Services attached successfully')
+          } else {
+            console.warn('[Chat Store] No assistant message found to attach services')
           }
           
           // Also add all services to partialServices for backward compatibility
-          data.services.forEach((service: any) => {
+          servicesToStore.forEach((service: any) => {
             // Avoid duplicates by checking if service already exists
             const exists = partialServices.value.some(s => s.id === service.id)
             if (!exists) {

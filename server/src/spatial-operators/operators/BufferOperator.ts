@@ -5,8 +5,7 @@
  */
 
 import { z } from 'zod';
-import { SpatialOperator, type OperatorContext, type OperatorResult } from '../SpatialOperator';
-import type { NativeData } from '../../core';
+import { SpatialOperator, type OperatorContext } from '../SpatialOperator';
 import { DataAccessFacade } from '../../data-access';
 import { DataSourceRepository } from '../../data-access/repositories';
 import { ResultPersistenceService } from '../../services/ResultPersistenceService';
