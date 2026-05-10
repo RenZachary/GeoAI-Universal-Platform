@@ -21,7 +21,6 @@ import { VirtualDataSourceManagerInstance } from '../../data-access/managers/Vir
 import { ToolRegistryInstance } from '../tools/ToolRegistry';
 import type { ParallelGroup } from '../analyzers/ParallelTaskAnalyzer';
 import { VisualizationServicePublisher } from '../../services/VisualizationServicePublisher';
-import { MVTStrategyPublisher } from '../../utils/publishers/MVTStrategyPublisher';
 import type {
   AnalysisGoal,
   ExecutionPlan as CoreExecutionPlan,
@@ -260,7 +259,7 @@ export function createGeoAIGraph(
               if (!shouldPublish) continue;
 
               const dataType = analysisResult.data.type || 'geojson';
-              let publishResult;
+              let publishResult: any = null;
               
               switch (dataType.toLowerCase()) {
                 case 'report':
@@ -277,8 +276,6 @@ export function createGeoAIGraph(
                   console.log(`[Plugin Executor] Publishing MVT for visualization step ${stepId}, data type: ${analysisResult.data.type}`);
                   console.log(`[Plugin Executor] Style config present:`, !!analysisResult.data?.metadata?.styleConfig);
                   
-                  const mvtStrategyPublisher = MVTStrategyPublisher.getInstance(workspaceBase, db || undefined);
-                  
                   const mvtOptions = {
                     minZoom: 0,
                     maxZoom: 18,
@@ -286,33 +283,20 @@ export function createGeoAIGraph(
                     layerName: 'default'
                   };
                   
-                  // Use MVTStrategyPublisher which handles different data types correctly
-                  const mvtResult = await mvtStrategyPublisher.publish(analysisResult.data, mvtOptions);
-                  console.log(`[Plugin Executor] MVT publish result:`, mvtResult);
+                  // Use unified VisualizationServicePublisher with NativeData (no conversion needed)
+                  publishResult = await unifiedPublisher.publishMVTFromNativeData(
+                    analysisResult.data,  // Pass NativeData directly
+                    mvtOptions,
+                    stepId,               // Use stepId as service ID
+                    3600000               // 1 hour TTL
+                  );
                   
-                  if (mvtResult.success) {
-                    // Convert MVTStrategyPublisher result to ServicePublishResult format
-                    publishResult = {
-                      success: true,
-                      serviceId: mvtResult.tilesetId,
-                      url: mvtResult.serviceUrl,
-                      metadata: {
-                        id: mvtResult.tilesetId,
-                        type: 'mvt',
-                        url: mvtResult.serviceUrl,
-                        createdAt: new Date(),
-                        ttl: 3600000,
-                        expiresAt: new Date(Date.now() + 3600000),
-                        metadata: mvtResult.metadata
-                      }
-                    };
+                  console.log(`[Plugin Executor] MVT publish result:`, publishResult);
+                  
+                  if (publishResult.success) {
                     console.log(`[Plugin Executor] MVT service created: ${publishResult.serviceId}`);
                   } else {
-                    console.error(`[Plugin Executor] MVT publish failed:`, mvtResult.error);
-                    publishResult = {
-                      success: false,
-                      error: mvtResult.error
-                    };
+                    console.error(`[Plugin Executor] MVT publish failed:`, publishResult.error);
                   }
                   break;
                 }

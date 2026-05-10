@@ -9,12 +9,11 @@ import { DataSourceController } from '../controllers/DataSourceController';
 import { FileUploadController, upload, handleMultipartEncoding } from '../controllers/FileUploadController';
 import { PromptTemplateController } from '../controllers/PromptTemplateController';
 import { PluginManagementController } from '../controllers/PluginManagementController';
-import { MVTServiceController } from '../controllers/MVTServiceController';
-import { MVTOnDemandController } from '../controllers/MVTDynamicController';
+import { MVTController } from '../controllers/MVTController';
 import { WMSServiceController } from '../controllers/WMSServiceController';
 import { ResultController } from '../controllers/ResultController';
 import { LLMConfigController } from '../controllers/LLMConfigController';
-import { DataSourceService, FileUploadService, PromptTemplateService, getMVTOnDemandPublisher, ConversationService } from '../../services';
+import { DataSourceService, FileUploadService, PromptTemplateService, ConversationService, VisualizationServicePublisher } from '../../services';
 import { DataSourceRepository } from '../../data-access/repositories';
 import type { LLMConfig } from '../../llm-interaction';
 import type { CustomPluginLoader } from '../../spatial-operators/plugins/CustomPluginLoader';
@@ -28,8 +27,7 @@ export class ApiRouter {
   private fileUploadController: FileUploadController;
   private promptTemplateController: PromptTemplateController;
   private pluginManagementController?: PluginManagementController;
-  private mvtServiceController: MVTServiceController;
-  private mvtOnDemandController: MVTOnDemandController;
+  private mvtController: MVTController;
   private wmsServiceController: WMSServiceController;
   private resultController: ResultController;
   private llmConfigController: LLMConfigController;
@@ -50,14 +48,13 @@ export class ApiRouter {
     this.spatialOperatorController = new SpatialOperatorController(workspaceBase);
     this.chatController = new ChatController(llmConfig, workspaceBase, conversationService);
     
-    // Initialize shared MVTOnDemandPublisher singleton
-    const mvtOnDemandPublisher = getMVTOnDemandPublisher(workspaceBase, 10000);
+    // Initialize VisualizationServicePublisher singleton (unified service layer)
+    const visualizationServicePublisher = VisualizationServicePublisher.getInstance(workspaceBase, db);
     
     this.dataSourceController = new DataSourceController(dataSourceService, db, workspaceBase); // ✅ Injected service
     this.fileUploadController = new FileUploadController(fileUploadService); // ✅ Injected service
     this.promptTemplateController = new PromptTemplateController(promptTemplateService); // ✅ Injected service
-    this.mvtServiceController = new MVTServiceController(workspaceBase, db);
-    this.mvtOnDemandController = new MVTOnDemandController(mvtOnDemandPublisher); // ✅ Use shared publisher
+    this.mvtController = new MVTController(visualizationServicePublisher); // ✅ Unified MVT controller
     this.wmsServiceController = new WMSServiceController(workspaceBase, db);
     this.resultController = new ResultController(workspaceBase);
     this.llmConfigController = new LLMConfigController();
@@ -140,29 +137,25 @@ export class ApiRouter {
       this.router.delete('/plugins/:id', (req, res) => this.pluginManagementController?.deletePlugin(req, res));
     }
 
-    // MVT service endpoints
-    // MVTStrategyPublisher routes (for PostGIS, GeoJSON file, Shapefile via strategy pattern)
+    // MVT service endpoints (unified controller)
+    this.router.post('/services/mvt/publish', (req, res) => {
+      void this.mvtController.publish(req, res);
+    });
+
     this.router.get('/services/mvt', (req, res) => {
-      // Try MVTServiceController first (strategy-based), fallback to MVTOnDemandController
-      void this.mvtServiceController.listTilesets(req, res);
+      void this.mvtController.listTilesets(req, res);
     });
+
     this.router.get('/services/mvt/:tilesetId/metadata', (req, res) => {
-      // Try MVTServiceController first, fallback to MVTOnDemandController
-      void this.mvtServiceController.getMetadata(req, res).catch(() => {
-        void this.mvtOnDemandController.getMetadata(req, res);
-      });
+      void this.mvtController.getMetadata(req, res);
     });
+
     this.router.get('/services/mvt/:tilesetId/:z/:x/:y.pbf', (req, res) => {
-      // Try MVTServiceController first (strategy-based tiles), fallback to MVTOnDemandController
-      void this.mvtServiceController.serveTile(req, res).catch(() => {
-        void this.mvtOnDemandController.getTile(req, res);
-      });
+      void this.mvtController.serveTile(req, res);
     });
+
     this.router.delete('/services/mvt/:tilesetId', (req, res) => {
-      // Try MVTServiceController first, fallback to MVTOnDemandController
-      void this.mvtServiceController.deleteTileset(req, res).catch(() => {
-        void this.mvtOnDemandController.deleteTileset(req, res);
-      });
+      void this.mvtController.deleteTileset(req, res);
     });
 
     // WMS service endpoints

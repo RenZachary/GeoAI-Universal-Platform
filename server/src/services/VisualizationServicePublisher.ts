@@ -292,15 +292,86 @@ export class VisualizationServicePublisher {
   // ============================================================================
 
   /**
-   * Publish MVT service from various data sources
+   * Publish MVT service from NativeData (unified data abstraction)
+   * This is the preferred method for workflow execution
+   */
+  async publishMVTFromNativeData(
+    nativeData: NativeData,
+    options: MVTTileOptions,
+    serviceId?: string,
+    ttl?: number
+  ): Promise<ServicePublishResult> {
+    try {
+      console.log(`[VisualizationServicePublisher] Publishing MVT from NativeData:`, {
+        id: nativeData.id,
+        type: nativeData.type,
+        reference: nativeData.reference
+      });
+
+      // Delegate to underlying publisher
+      const result = await this.mvtPublisher.publish(nativeData, options);
+
+      console.log(`[VisualizationServicePublisher] Publisher result:`, {
+        success: result.success,
+        tilesetId: result.tilesetId,
+        serviceUrl: result.serviceUrl
+      });
+
+      if (!result.success) {
+        return {
+          success: false,
+          error: result.error
+        };
+      }
+
+      // Use custom TTL or default to 1 hour
+      const effectiveTtl = ttl || 3600000;
+
+      const metadata: VisualizationServiceInfo = {
+        id: result.tilesetId,
+        type: 'mvt',
+        url: `/api/services/mvt/${result.tilesetId}/{z}/{x}/{y}.pbf`,
+        createdAt: new Date(),
+        ttl: effectiveTtl,
+        expiresAt: new Date(Date.now() + effectiveTtl),
+        metadata: result.metadata
+      };
+
+      console.log(`[VisualizationServicePublisher] Registering service:`, {
+        id: metadata.id,
+        type: metadata.type,
+        url: metadata.url
+      });
+
+      this.registry.register(metadata);
+
+      return {
+        success: true,
+        serviceId: result.tilesetId,
+        url: metadata.url,
+        metadata
+      };
+    } catch (error) {
+      console.error('[VisualizationServicePublisher] MVT publish from NativeData failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Publish MVT service from various data sources (legacy API)
+   * Converts MVTSource to NativeData internally
    */
   async publishMVT(
     source: MVTSource,
     options: MVTTileOptions,
-    serviceId?: string
+    serviceId?: string,
+    ttl?: number  // Optional custom TTL (default: 1 hour)
   ): Promise<ServicePublishResult> {
     try {
-      // Convert old MVTSource format to NativeData format for MVTStrategyPublisher
+      // Convert MVTSource format to NativeData format
       let nativeData: NativeData;
       
       if (source.type === 'postgis') {
@@ -328,33 +399,8 @@ export class VisualizationServicePublisher {
         throw new Error(`Unsupported MVT source type: ${(source as any).type}`);
       }
 
-      const result = await this.mvtPublisher.publish(nativeData, options);
-
-      if (!result.success) {
-        return {
-          success: false,
-          error: result.error
-        };
-      }
-
-      const metadata: VisualizationServiceInfo = {
-        id: result.tilesetId,
-        type: 'mvt',
-        url: `/api/services/mvt/${result.tilesetId}/{z}/{x}/{y}.pbf`,
-        createdAt: new Date(),
-        ttl: 3600000, // Default 1 hour
-        expiresAt: new Date(Date.now() + 3600000),
-        metadata: result.metadata
-      };
-
-      this.registry.register(metadata);
-
-      return {
-        success: true,
-        serviceId: result.tilesetId,
-        url: metadata.url,
-        metadata
-      };
+      // Delegate to the unified method
+      return this.publishMVTFromNativeData(nativeData, options, serviceId, ttl);
     } catch (error) {
       console.error('[VisualizationServicePublisher] MVT publish failed:', error);
       return {
@@ -592,6 +638,92 @@ export class VisualizationServicePublisher {
 
     console.log(`[VisualizationServicePublisher] Manual cleanup completed: ${count} services removed`);
     return count;
+  }
+
+  // ============================================================================
+  // MVT Service Methods (Delegate to Publisher)
+  // ============================================================================
+
+  /**
+   * Get MVT tile by delegating to underlying publisher
+   */
+  async getMVTTile(
+    tilesetId: string,
+    z: number,
+    x: number,
+    y: number
+  ): Promise<Buffer | null> {
+    console.log(`[VisualizationServicePublisher] getMVTTile called: ${tilesetId}/${z}/${x}/${y}`);
+    
+    // Update access tracking
+    const service = this.registry.get(tilesetId);
+    console.log(`[VisualizationServicePublisher] Registry lookup result:`, service ? `found (${service.type})` : 'NOT FOUND');
+    
+    if (!service || service.type !== 'mvt') {
+      console.warn(`[VisualizationServicePublisher] Service not found or wrong type: ${tilesetId}`);
+      return null;
+    }
+
+    // Delegate to MVT publisher
+    console.log(`[VisualizationServicePublisher] Delegating to MVT publisher...`);
+    const tileBuffer = await this.mvtPublisher.getTile(tilesetId, z, x, y);
+    console.log(`[VisualizationServicePublisher] Tile result:`, tileBuffer ? `${tileBuffer.length} bytes` : 'NULL');
+
+    return tileBuffer;
+  }
+
+  /**
+   * Get MVT metadata with enhanced service info
+   */
+  getMVTMetadata(tilesetId: string): any | null {
+    // First try registry (has TTL, access tracking)
+    const service = this.registry.get(tilesetId);
+
+    if (service && service.type === 'mvt') {
+      // Merge registry info with publisher metadata
+      const publisherMetadata = this.mvtPublisher.getMetadata(tilesetId);
+
+      return {
+        ...publisherMetadata,
+        // Enhanced with service lifecycle info
+        serviceId: service.id,
+        createdAt: service.createdAt,
+        expiresAt: service.expiresAt,
+        ttl: service.ttl,
+        lastAccessedAt: service.lastAccessedAt,
+        accessCount: service.accessCount
+      };
+    }
+
+    // Fallback to publisher only
+    return this.mvtPublisher.getMetadata(tilesetId);
+  }
+
+  /**
+   * List all MVT services with enhanced info
+   */
+  listMVTServices(): VisualizationServiceInfo[] {
+    return this.registry.list('mvt');
+  }
+
+  /**
+   * Delete MVT service and clean up resources
+   */
+  deleteMVTService(tilesetId: string): boolean {
+    const service = this.registry.get(tilesetId);
+
+    if (!service || service.type !== 'mvt') {
+      return false;
+    }
+
+    // Clean up underlying tileset
+    this.mvtPublisher.deleteTileset(tilesetId);
+
+    // Remove from registry
+    this.registry.unregister(tilesetId);
+
+    console.log(`[VisualizationServicePublisher] Deleted MVT service: ${tilesetId}`);
+    return true;
   }
 
   // ============================================================================

@@ -34,7 +34,6 @@ export type { ConversationSummary, ChatMessage } from './ConversationService';
 export { VisualizationServicePublisher } from './VisualizationServicePublisher';
 export type { 
   ServiceType,
-  ServiceMetadata,
   ServicePublishResult,
   ServiceRegistry
 } from './VisualizationServicePublisher';
