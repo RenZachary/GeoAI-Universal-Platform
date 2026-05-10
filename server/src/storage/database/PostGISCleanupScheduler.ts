@@ -101,17 +101,14 @@ export class PostGISCleanupScheduler {
     try {
       const cutoffTime = new Date(Date.now() - this.config.maxAge);
       
-      // Find tables older than maxAge using pg_class modification time
+      // Find tables older than maxAge using last vacuum/analyze time
+      // This is more reliable than file system checks
       const result = await this.pool.query(`
-        SELECT c.relname as tablename
-        FROM pg_class c
-        JOIN pg_namespace n ON n.oid = c.relnamespace
-        WHERE n.nspname = 'geoai_temp'
-        AND c.relkind = 'r'
-        AND pg_stat_file(
-          current_setting('data_directory') || '/' || 
-          pg_relation_filepath(c.oid)
-        ).modification < $1
+        SELECT relname as tablename
+        FROM pg_stat_user_tables
+        WHERE schemaname = 'geoai_temp'
+        AND (last_vacuum IS NULL OR last_vacuum < $1)
+        AND (last_autovacuum IS NULL OR last_autovacuum < $1)
       `, [cutoffTime.toISOString()]);
 
       let deletedCount = 0;

@@ -1,9 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import { DataSourceRepository } from '../../data-access/repositories';
+import { DataAccessFacade } from '../../data-access/facade/DataAccessFacade';
 import type { DataSourceType } from '../../core';
 import { SQLiteManagerInstance } from '..';
-import e from 'express';
 
 /**
  * Scan data directory and register unregistered files
@@ -44,6 +44,7 @@ export async function scanAndRegisterDataFiles(
   
   // Initialize services
   const dataSourceRepo = new DataSourceRepository(SQLiteManagerInstance.getDatabase());
+  const dataAccessFacade = DataAccessFacade.getInstance(workspaceBase);
   
   // Check which files are already registered
   const existingSources = dataSourceRepo.listAll();
@@ -68,35 +69,31 @@ export async function scanAndRegisterDataFiles(
       // Detect file type
       const type = detectFileType(file);
       
-      // Extract metadata using fs for basic info
+      // Extract basic file info
       const stats = fs.statSync(fullPath);
       const metadata: any = {
         name: path.basename(file),
         format: type,
-        fileSize: stats.size
+        fileSize: stats.size,
+        originalFileName: file,
+        uploadedAt: new Date().toISOString()
       };
       
-      // For GeoJSON, extract feature count
-      if (type === 'geojson') {
-        try {
-          const content = fs.readFileSync(fullPath, 'utf-8');
-          const geojson = JSON.parse(content);
-          
-          if (geojson.type === 'FeatureCollection' && Array.isArray(geojson.features)) {
-            metadata.featureCount = geojson.features.length;
-          } else if (geojson.type === 'Feature') {
-            metadata.featureCount = 1;
-          }
-          
-          if (geojson.bbox) {
-            metadata.bbox = geojson.bbox;
-          }
-        } catch (error) {
-          console.warn(`    Warning: Could not parse GeoJSON metadata for ${file}`,e);
+      // Use DataAccessFacade to extract comprehensive metadata
+      try {
+        console.log(`    Extracting metadata via DataAccessFacade for ${file}...`);
+        const backendMetadata = await dataAccessFacade.getMetadata(type, fullPath);
+        
+        // Merge backend metadata with basic info
+        Object.assign(metadata, backendMetadata);
+        
+        console.log(`    ✓ Metadata extracted: featureCount=${metadata.featureCount || 'N/A'}, geometryType=${metadata.geometryType || 'N/A'}`);
+      } catch (error) {
+        console.warn(`    Warning: Could not extract full metadata for ${file}, using basic info only`, error instanceof Error ? error.message : 'Unknown error');
+        // Set default values for missing metadata
+        if (type === 'geojson' || type === 'shapefile') {
           metadata.featureCount = 0;
         }
-      } else {
-        metadata.featureCount = 0;
       }
       
       // Register in database with the original path
@@ -104,12 +101,7 @@ export async function scanAndRegisterDataFiles(
         path.basename(file, path.extname(file)),
         type,
         fullPath, // Use original path, no renaming
-        {
-          ...metadata,
-          originalFileName: file,
-          fileSize: metadata.fileSize,
-          uploadedAt: new Date().toISOString()
-        }
+        metadata
       );
       
       registeredCount++;

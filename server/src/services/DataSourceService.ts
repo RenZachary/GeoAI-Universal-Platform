@@ -147,13 +147,13 @@ export class DataSourceService {
         try {
           console.log(`[DataSourceService] Restoring connection: ${config.host}:${config.port}/${config.database}`);
           this.dataAccess.configurePostGIS(config);
-          console.log(`[DataSourceService] ✓ Connection restored: ${key}`);
+          // console.log(`[DataSourceService] ✓ Connection restored: ${key}`);
         } catch (error) {
           console.error(`[DataSourceService] ✗ Failed to restore connection ${key}:`, error instanceof Error ? error.message : 'Unknown error');
         }
       }
       
-      console.log(`[DataSourceService] PostGIS connection restoration complete`);
+      // console.log(`[DataSourceService] PostGIS connection restoration complete`);
     } catch (error) {
       console.error('[DataSourceService] Error restoring PostGIS connections:', error);
       // Don't throw - allow server to start even if restoration fails
@@ -565,7 +565,7 @@ export class DataSourceService {
 
             // Get row count
             const countQuery = `SELECT COUNT(*) as count FROM "${schema}"."${tableName}"`;
-            console.log(`[DataSourceService] Executing count query for ${schema}.${tableName}`);
+            // console.log(`[DataSourceService] Executing count query for ${schema}.${tableName}`);
             const countResult = await (postGISBackend as any).executeRaw(countQuery);
             const rowCount = parseInt(countResult.rows[0].count, 10);
             console.log(`[DataSourceService] Row count for ${schema}.${tableName}: ${rowCount}`);
@@ -581,7 +581,7 @@ export class DataSourceService {
               WHERE table_schema = $1 AND table_name = $2
               ORDER BY ordinal_position
             `;
-            console.log(`[DataSourceService] Fetching schema for ${schema}.${tableName}`);
+            // console.log(`[DataSourceService] Fetching schema for ${schema}.${tableName}`);
             const schemaResult = await (postGISBackend as any).executeRaw(schemaQuery, [schema, tableName]);
             const fieldSchemas = schemaResult.rows || [];
             
@@ -697,7 +697,7 @@ export class DataSourceService {
     // Persist to metadata
     this.dataSourceRepo.updateMetadata(dataSourceId, { bbox });
     
-    console.log(`[DataSourceService] Bbox persisted for ${schema}.${tableName}:`, bbox);
+    // console.log(`[DataSourceService] Bbox persisted for ${schema}.${tableName}:`, bbox);
   }
 
   /**
