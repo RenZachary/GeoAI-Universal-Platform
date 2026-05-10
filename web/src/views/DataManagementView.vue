@@ -76,7 +76,7 @@
               </template>
             </el-popconfirm>
             <!-- Show tooltip for PostGIS tables -->
-            <el-tooltip v-else content="Cannot delete individual PostGIS tables. Remove the entire connection instead." placement="top">
+            <el-tooltip v-else :content="$t('data.postgis.messages.cannotDeleteTable')" placement="top">
               <el-button size="small" type="info" text disabled>
                 {{ $t('common.delete') }}
               </el-button>
@@ -515,7 +515,7 @@ async function handleDelete(id: string) {
     // Check if error is about PostGIS deletion restriction
     const errorMessage = error instanceof Error ? error.message : String(error)
     if (errorMessage.includes('PostGIS') || errorMessage.includes('connection')) {
-      ElMessage.warning('Cannot delete individual PostGIS tables. Please remove the entire connection instead.')
+      ElMessage.warning(t('data.postgis.messages.cannotDeleteTable'))
     } else {
       ElMessage.error(t('plugins.operationFailed'))
     }

@@ -229,7 +229,7 @@
   cursor: text;
   
   &:empty::before {
-    content: 'Type your message... Use @ for data sources, / for tools';
+    content: var(--chat-placeholder, 'Type your message... Use @ for data sources, / for tools');
     color: var(--el-text-color-placeholder);
     pointer-events: none;
   }

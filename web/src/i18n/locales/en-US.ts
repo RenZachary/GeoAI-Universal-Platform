@@ -18,7 +18,7 @@ export default {
     reset: 'Reset'
   },
   chat: {
-    placeholder: 'Type your message...',
+    placeholder: 'Type your message... Use {atSymbol} for data sources, / for tools',
     user: 'You',
     copy: 'Copy',
     regenerate: 'Regenerate',
@@ -40,7 +40,9 @@ export default {
     renameConversation: 'Rename Conversation',
     enterNewTitle: 'Enter new title',
     renameConfirm: 'Confirm Rename',
-    send: 'Send'
+    send: 'Send',
+    expandSidebar: 'Expand Sidebar',
+    collapseSidebar: 'Collapse Sidebar'
   },
   map: {
     title: 'Map',
@@ -148,7 +150,8 @@ export default {
         connected: 'Connected successfully! Registered {count} tables',
         connectionFailed: 'Failed to connect to PostGIS',
         connectionError: 'Failed to connect to PostGIS database',
-        removeConnection: 'Remove connection and all its tables'
+        removeConnection: 'Remove connection and all its tables',
+        cannotDeleteTable: 'Cannot delete individual PostGIS tables. Remove the entire connection instead.'
       }
     }
   },

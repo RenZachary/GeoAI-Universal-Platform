@@ -18,7 +18,7 @@ export default {
     reset: '重置'
   },
   chat: {
-    placeholder: '输入消息...',
+    placeholder: '输入消息... 使用 {atSymbol} 选择数据源，/ 选择工具',
     user: '您',
     copy: '复制',
     regenerate: '重新生成',
@@ -40,7 +40,9 @@ export default {
     renameConversation: '重命名对话',
     enterNewTitle: '输入新标题',
     renameConfirm: '确认重命名',
-    send: '发送'
+    send: '发送',
+    expandSidebar: '展开侧边栏',
+    collapseSidebar: '折叠侧边栏'
   },
   map: {
     title: '地图',
@@ -148,7 +150,8 @@ export default {
         connected: '连接成功！已注册 {count} 个表',
         connectionFailed: '连接 PostGIS 失败',
         connectionError: '无法连接到 PostGIS 数据库',
-        removeConnection: '移除连接及其所有表'
+        removeConnection: '移除连接及其所有表',
+        cannotDeleteTable: '无法删除单个 PostGIS 表。请移除整个连接。'
       }
     }
   },

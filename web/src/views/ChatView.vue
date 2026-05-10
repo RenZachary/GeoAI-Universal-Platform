@@ -3,7 +3,7 @@
     <!-- Conversation Sidebar -->
     <aside class="conversation-sidebar" :class="{ collapsed: sidebarCollapsed }">
       <div class="sidebar-header">
-        <el-tooltip content="New Chat" placement="right">
+        <el-tooltip :content="$t('chat.newChat')" placement="right">
           <el-button class="new-chat-btn" text circle @click="handleNewChat">
             <el-icon>
               <Plus />
@@ -33,7 +33,7 @@
       </div>
 
       <div class="sidebar-footer">
-        <el-tooltip :content="sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'" placement="right">
+        <el-tooltip :content="sidebarCollapsed ? $t('chat.expandSidebar') : $t('chat.collapseSidebar')" placement="right">
           <el-button class="sidebar-toggle-btn" text circle @click="sidebarCollapsed = !sidebarCollapsed">
             <el-icon v-if="sidebarCollapsed">
               <DArrowRight />
@@ -142,7 +142,7 @@ import MapWorkspace from '@/components/chat-map/MapWorkspace.vue'
 import { Plus, Delete, ChatDotRound, Promotion, DArrowRight, DArrowLeft, Edit, Tools } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const chatStore = useChatStore()
@@ -195,6 +195,21 @@ watch(() => chatStore.partialServices, (newVal) => {
   }
 }, { deep: true })
 
+// Computed: Placeholder text for the editor
+const placeholderText = computed(() => t('chat.placeholder', { atSymbol: '@' }))
+
+// Watch language changes and update CSS variable
+watch(locale, () => {
+  updatePlaceholderVariable()
+})
+
+// Function to update the CSS variable for placeholder
+function updatePlaceholderVariable() {
+  if (editorRef.value) {
+    editorRef.value.style.setProperty('--chat-placeholder', `"${placeholderText.value}"`)
+  }
+}
+
 // Watch sidebar collapsed state and save to localStorage
 watch(sidebarCollapsed, (newValue) => {
   localStorage.setItem(SIDERBAR_COLLAPSED_KEY, newValue.toString())
@@ -221,6 +236,9 @@ onMounted(async () => {
     console.log('[ChatView] Loading conversation from query parameter:', conversationId)
     await chatStore.loadConversation(conversationId)
   }
+
+  // Initialize placeholder CSS variable
+  updatePlaceholderVariable()
 })
 
 // Methods
