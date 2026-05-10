@@ -48,13 +48,7 @@ export interface GeoJSONFileSource {
   filePath: string;
 }
 
-export interface GeoJSONInMemorySource {
-  type: 'geojson-memory';
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  featureCollection: any;  // GeoJSON FeatureCollection
-}
-
-export type MVTSource = PostGISDataSource | GeoJSONFileSource | GeoJSONInMemorySource;
+export type MVTSource = PostGISDataSource | GeoJSONFileSource;
 
 // ============================================================================
 // Publish Result Types
@@ -69,7 +63,7 @@ export interface MVTPublishResult {
 }
 
 export interface MVTPublishMetadata {
-  sourceType?: 'postgis' | 'geojson-file' | 'geojson-memory';
+  sourceType?: 'postgis' | 'geojson-file';
   minZoom: number;
   maxZoom: number;
   extent: number;

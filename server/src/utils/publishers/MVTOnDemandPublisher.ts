@@ -201,23 +201,6 @@ export class MVTOnDemandPublisher extends BaseMVTPublisher {
 
       // Route to appropriate handler based on source type
       switch (source.type) {
-        case 'geojson-memory':
-          tilesetId = await this.publishGeoJSONInMemory(
-            source.featureCollection,
-            { minZoom, maxZoom, extent, tolerance, buffer, layerName },
-            options.tilesetId  // Use custom tileset ID from options if provided
-          );
-          metadata = {
-            sourceType: 'geojson-memory',
-            minZoom,
-            maxZoom,
-            extent,
-            generatedAt: new Date().toISOString(),
-            featureCount: source.featureCollection.features?.length || 0,
-            cacheEnabled: true
-          };
-          break;
-
         case 'geojson-file':
           tilesetId = await this.publishGeoJSONFile(
             source.filePath,
@@ -309,7 +292,6 @@ export class MVTOnDemandPublisher extends BaseMVTPublisher {
 
     // Route to appropriate handler
     switch (metadata.sourceType) {
-      case 'geojson-memory':
       case 'geojson-file':
         tileBuffer = this.getGeoJSONTile(tilesetId, z, x, y, metadata.extent);
         break;

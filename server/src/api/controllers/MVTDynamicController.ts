@@ -23,20 +23,7 @@ export class MVTOnDemandController {
    * 
    * Request body examples:
    * 
-   * 1. GeoJSON in-memory:
-   * {
-   *   "source": {
-   *     "type": "geojson-memory",
-   *     "featureCollection": { ... }
-   *   },
-   *   "options": {
-   *     "minZoom": 0,
-   *     "maxZoom": 10,
-   *     "layerName": "my_layer"
-   *   }
-   * }
-   * 
-   * 2. GeoJSON file:
+   * 1. GeoJSON file:
    * {
    *   "source": {
    *     "type": "geojson-file",
@@ -45,7 +32,7 @@ export class MVTOnDemandController {
    *   "options": { ... }
    * }
    * 
-   * 3. PostGIS table:
+   * 2. PostGIS table:
    * {
    *   "source": {
    *     "type": "postgis",
@@ -62,7 +49,7 @@ export class MVTOnDemandController {
    *   "options": { ... }
    * }
    * 
-   * 4. PostGIS custom SQL:
+   * 3. PostGIS custom SQL:
    * {
    *   "source": {
    *     "type": "postgis",
@@ -86,22 +73,15 @@ export class MVTOnDemandController {
       }
 
       // Validate source type
-      if (!['geojson-memory', 'geojson-file', 'postgis'].includes(source.type)) {
+      if (!['geojson-file', 'postgis'].includes(source.type)) {
         res.status(400).json({
           success: false,
-          error: `Invalid source type: ${source.type}. Must be one of: geojson-memory, geojson-file, postgis`
+          error: `Invalid source type: ${source.type}. Must be one of: geojson-file, postgis`
         });
         return;
       }
 
       // Additional validation based on source type
-      if (source.type === 'geojson-memory' && !source.featureCollection) {
-        res.status(400).json({
-          success: false,
-          error: 'geojson-memory source requires featureCollection field'
-        });
-        return;
-      }
 
       if (source.type === 'geojson-file' && !source.filePath) {
         res.status(400).json({
