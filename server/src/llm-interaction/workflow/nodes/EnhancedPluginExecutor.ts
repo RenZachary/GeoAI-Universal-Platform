@@ -51,10 +51,7 @@ export class EnhancedPluginExecutor {
     state: GeoAIStateType,
     streamWriter?: any
   ): Promise<Partial<GeoAIStateType>> {
-    console.log('[Enhanced Executor] Starting enhanced execution with parallel support...');
-
     if (!state.executionPlans || state.executionPlans.size === 0) {
-      console.warn('[Enhanced Executor] No execution plans found');
       return {
         executionResults: new Map(),
         currentStep: 'output'
@@ -70,10 +67,6 @@ export class EnhancedPluginExecutor {
       parallelGroups: state.parallelGroups?.length || 0,
       executionMode: state.executionMode || 'sequential'
     };
-
-    console.log(`[Enhanced Executor] Execution mode: ${this.metrics.executionMode}`);
-    console.log(`[Enhanced Executor] Total tasks: ${this.metrics.totalTasks}`);
-    console.log(`[Enhanced Executor] Parallel groups: ${this.metrics.parallelGroups}`);
 
     const executionResults = new Map<string, AnalysisResult>();
 
@@ -100,10 +93,6 @@ export class EnhancedPluginExecutor {
 
       // Finalize metrics
       this.metrics.endTime = Date.now();
-      const duration = (this.metrics.endTime - this.metrics.startTime) / 1000;
-
-      console.log(`[Enhanced Executor] Execution completed in ${duration.toFixed(2)}s`);
-      console.log(`[Enhanced Executor] Results: ${this.metrics.completedTasks} succeeded, ${this.metrics.failedTasks} failed`);
 
       return {
         executionResults,
@@ -111,8 +100,6 @@ export class EnhancedPluginExecutor {
       };
 
     } catch (error) {
-      console.error('[Enhanced Executor] Execution failed:', error);
-
       return {
         executionResults,
         currentStep: 'output',
@@ -134,12 +121,8 @@ export class EnhancedPluginExecutor {
     state: GeoAIStateType,
     streamWriter?: any
   ): Promise<void> {
-    console.log(`[Enhanced Executor] Executing ${parallelGroups.length} parallel groups...`);
-
     for (let groupIndex = 0; groupIndex < parallelGroups.length; groupIndex++) {
       const group = parallelGroups[groupIndex];
-      console.log(`\n[Enhanced Executor] === Group ${groupIndex + 1}/${parallelGroups.length}: ${group.groupId} ===`);
-      console.log(`[Enhanced Executor] Tasks in group: ${group.tasks.length}`);
 
       if (group.tasks.length === 1) {
         // Single task - execute sequentially
@@ -147,22 +130,13 @@ export class EnhancedPluginExecutor {
         await this.executeSingleTask(taskId, plans, results, state, streamWriter);
       } else {
         // Multiple tasks - execute in parallel
-        console.log(`[Enhanced Executor] Executing ${group.tasks.length} tasks in parallel...`);
-
         const taskPromises = group.tasks.map(async (taskId: string) => {
-          try {
-            await this.executeSingleTask(taskId, plans, results, state, streamWriter);
-          } catch (error) {
-            console.error(`[Enhanced Executor] Task ${taskId} failed in parallel group:`, error);
-            throw error;
-          }
+        await this.executeSingleTask(taskId, plans, results, state, streamWriter);
         });
 
         // Wait for all tasks in the group to complete
         await Promise.allSettled(taskPromises);
       }
-
-      console.log(`[Enhanced Executor] Group ${groupIndex + 1} completed\n`);
     }
   }
 
@@ -176,8 +150,6 @@ export class EnhancedPluginExecutor {
     state: GeoAIStateType,
     streamWriter?: any
   ): Promise<void> {
-    console.log(`[Enhanced Executor] Executing task: ${taskId}`);
-
     // Find which plan contains this task
     let targetPlan: ExecutionPlan | undefined;
     let stepIndex = -1;

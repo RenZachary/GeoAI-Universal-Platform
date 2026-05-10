@@ -30,7 +30,16 @@ export class ShapefileMVTTStrategy implements MVTTileGenerationStrategy {
         nativeData: NativeData,
         options: MVTTileOptions
     ): Promise<any> {
-        console.log('[Shapefile MVT Strategy] Converting Shapefile to GeoJSON...');
+        // Validate that sourceReference is actually a Shapefile
+        if (!sourceReference.endsWith('.shp') && !sourceReference.endsWith('.geojson')) {
+            console.warn('[Shapefile MVT Strategy] Warning: sourceReference does not look like a Shapefile or GeoJSON:', sourceReference);
+        }
+
+        // If sourceReference is already a GeoJSON file (from previous conversion), just read it
+        if (sourceReference.endsWith('.geojson')) {
+            const geojsonStrategy = new GeoJSONMVTTStrategy();
+            return geojsonStrategy.generateTiles(sourceReference, 'geojson', nativeData, options);
+        }
 
         // Use shapefile library directly with shared encoding utility
         const shapefilePath = sourceReference.replace('.shp', '');
@@ -59,12 +68,10 @@ export class ShapefileMVTTStrategy implements MVTTileGenerationStrategy {
             // Ensure temp directory exists
             if (!fs.existsSync(this.tempDir)) {
                 fs.mkdirSync(this.tempDir, { recursive: true });
-                console.log(`[Shapefile MVT Strategy] Created temp directory: ${this.tempDir}`);
             }
             
             convertedGeoJsonPath = path.join(this.tempDir, `temp_${Date.now()}.geojson`);
             fs.writeFileSync(convertedGeoJsonPath, JSON.stringify(geojson), 'utf-8');
-            console.log(`[Shapefile MVT Strategy] Saved converted GeoJSON to: ${convertedGeoJsonPath}`);
         }
 
         // Delegate to GeoJSON strategy
@@ -88,9 +95,17 @@ export class ShapefileMVTTStrategy implements MVTTileGenerationStrategy {
             // Clean up temporary file if created
             if (convertedGeoJsonPath && fs.existsSync(convertedGeoJsonPath)) {
                 fs.unlinkSync(convertedGeoJsonPath);
-                console.log('[Shapefile MVT Strategy] Cleaned up temporary GeoJSON file after error');
             }
             throw error;
         }
+    }
+
+    /**
+     * Get a specific tile by delegating to GeoJSON strategy
+     */
+    async getTile(config: any, z: number, x: number, y: number): Promise<Buffer | null> {
+        // Delegate to GeoJSON strategy since Shapefile was converted to GeoJSON
+        const geojsonStrategy = new GeoJSONMVTTStrategy();
+        return geojsonStrategy.getTile(config, z, x, y);
     }
 }

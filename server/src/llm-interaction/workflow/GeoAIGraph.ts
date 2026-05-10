@@ -186,8 +186,6 @@ export function createGeoAIGraph(
       return await taskPlanner.execute(state);
     })
     .addNode('pluginExecutor', async (state: GeoAIStateType) => {
-      console.log('[Plugin Executor] Starting enhanced execution with parallel support');
-      
       // Use EnhancedPluginExecutor for parallel execution
       const result = await EnhancedExecutorInstance.executeWithParallelSupport(state, streamWriter);
       
@@ -219,12 +217,11 @@ export function createGeoAIGraph(
                 stepId: stepId,
                 data: analysisResult.data as any
               });
-              console.log(`[Plugin Executor] Registered virtual data source for step ${stepId}: ${analysisResult.data.id}`);
               
               // Add to successful results for potential MVT publishing
               successfulResults.set(stepId, analysisResult);
             } else {
-              console.log(`[Plugin Executor] Step ${stepId} result is not NativeData, skipping virtual source registration`);
+              // Skip non-NativeData results
             }
           }
         }
@@ -244,9 +241,6 @@ export function createGeoAIGraph(
                 const operator = ToolRegistryInstance.getOperator(operatorId);
                 if (operator && operator.category === 'visualization') {
                   shouldPublish = true;
-                  console.log(`[Plugin Executor] Step ${stepId} is a visualization operator (${operatorId}), proceeding with publish`);
-                } else {
-                  console.log(`[Plugin Executor] Skipping publish for step ${stepId}: operator category is '${operator?.category}', not 'visualization'`);
                 }
               } else {
                 // Fallback: If no operatorId in metadata, check if it's a report
@@ -273,9 +267,6 @@ export function createGeoAIGraph(
                   
                 default: {
                   // All vector data from visualization operators should be published as MVT
-                  console.log(`[Plugin Executor] Publishing MVT for visualization step ${stepId}, data type: ${analysisResult.data.type}`);
-                  console.log(`[Plugin Executor] Style config present:`, !!analysisResult.data?.metadata?.styleConfig);
-                  
                   const mvtOptions = {
                     minZoom: 0,
                     maxZoom: 18,
@@ -291,13 +282,6 @@ export function createGeoAIGraph(
                     3600000               // 1 hour TTL
                   );
                   
-                  console.log(`[Plugin Executor] MVT publish result:`, publishResult);
-                  
-                  if (publishResult.success) {
-                    console.log(`[Plugin Executor] MVT service created: ${publishResult.serviceId}`);
-                  } else {
-                    console.error(`[Plugin Executor] MVT publish failed:`, publishResult.error);
-                  }
                   break;
                 }
               }
@@ -320,24 +304,14 @@ export function createGeoAIGraph(
                 
                 allServices.push(service);
                 
-                console.log(`[Plugin Executor] Published ${publishResult.metadata.type} service: ${publishResult.serviceId}`);
-                
                 // Stream partial results to frontend if callback provided
-                if (onPartialResult) {
-                  console.log(`[Plugin Executor] Streaming partial result: ${service.id}`);
-                  onPartialResult(service);
-                }
               }
             } catch (error) {
               console.error(`[Plugin Executor] Failed to publish service for ${stepId}:`, error);
             }
           }
-          
-          console.log(`[Plugin Executor] Published ${allServices.length} visualization services via unified publisher`);
         }
       }
-      
-      console.log(`[Plugin Executor] Execution complete. Results: ${result.executionResults?.size || 0}, Services: ${allServices.length}`);
       
       return {
         currentStep: 'execution',

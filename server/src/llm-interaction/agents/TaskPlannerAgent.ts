@@ -12,11 +12,12 @@ import { SpatialOperatorRegistryInstance } from '../../spatial-operators';
 import { DataSourceRepository } from '../../data-access';
 import { SQLiteManagerInstance } from '../../storage/';
 import { ParallelTaskAnalyzer } from '../analyzers/ParallelTaskAnalyzer';
+import { DataSourceService } from '../../services/DataSourceService';
 
 export class TaskPlannerAgent {
   private llmConfig: LLMConfig;
   private promptManager: PromptManager;
-  private dataSourceRepo: DataSourceRepository;
+  private dataSourceService: DataSourceService;
   private parallelAnalyzer: ParallelTaskAnalyzer;
 
   constructor(
@@ -26,7 +27,7 @@ export class TaskPlannerAgent {
     this.llmConfig = llmConfig;
     this.promptManager = promptManager;
     const db = SQLiteManagerInstance.getDatabase();
-    this.dataSourceRepo = new DataSourceRepository(db);
+    this.dataSourceService = new DataSourceService(new DataSourceRepository(db));
     this.parallelAnalyzer = new ParallelTaskAnalyzer();
   }
 
@@ -34,10 +35,7 @@ export class TaskPlannerAgent {
    * Execute task planning for all goals
    */
   async execute(state: GeoAIStateType): Promise<Partial<GeoAIStateType>> {
-    console.log('[Task Planner] Creating execution plans...');
-
     if (!state.goals || state.goals.length === 0) {
-      console.warn('[Task Planner] No goals to plan');
       return {
         executionPlans: new Map(),
         currentStep: 'execution'
@@ -55,8 +53,7 @@ export class TaskPlannerAgent {
       const allOperators = SpatialOperatorRegistryInstance.listOperatorsWithMetadata();
 
       // Get available data sources with metadata
-      const dataSources = this.dataSourceRepo.listAll();
-      const dataSourcesMetadata = this.formatDataSourcesForLLM(dataSources);
+      const dataSourcesMetadata = this.dataSourceService.formatDataSourcesForLLM();
 
       // Define output schema for structured output
       const stepSchema = z.object({
@@ -86,18 +83,13 @@ export class TaskPlannerAgent {
       const planPromises = state.goals.map(async (goal) => {
         try {
           // STAGE 1: Determine compatible plugins using capability-based filtering
-          console.log(`[Task Planner] Stage 1: Processing goal ${goal.id}`);
-          console.log(`[Task Planner] Goal description:`, goal.description);
-
           let compatiblePluginIds: string[] = [];
 
           // Use capability-based filtering to find candidate plugins
           compatiblePluginIds = this.filterPluginsByGoalDescription(goal);
-          console.log(`[Task Planner] Capability filtering found ${compatiblePluginIds.length} candidates:`, compatiblePluginIds);
 
           // If still no compatible plugins found, create fallback plan
           if (compatiblePluginIds.length === 0) {
-            console.warn(`[Task Planner] No compatible plugins found for goal ${goal.id}, creating empty plan`);
             const fallbackPlan: ExecutionPlan = {
               id: `plan_${goal.id}_${Date.now()}`,
               goalId: goal.id,
@@ -109,14 +101,10 @@ export class TaskPlannerAgent {
             return [goal.id, fallbackPlan] as const;
           }
 
-          console.log(`[Task Planner] Stage 1: Final candidate count: ${compatiblePluginIds.length}`);
-
           // Filter operators to only include compatible ones
           const compatibleOperators = allOperators.filter(op =>
             compatiblePluginIds.includes(op.operatorId)
           );
-
-          console.log(`[Task Planner] Stage 2: LLM selection from ${compatibleOperators.length} candidates`);
 
           // Prepare previous results context for multi-goal scenarios
           let previousResultsContext = '';
@@ -137,7 +125,6 @@ export class TaskPlannerAgent {
 
             if (previousGoalsResults.length > 0) {
               previousResultsContext = JSON.stringify(previousGoalsResults, null, 2);
-              console.log(`[Task Planner] Providing ${previousGoalsResults.length} previous results as context`);
             }
           }
 
@@ -177,34 +164,13 @@ export class TaskPlannerAgent {
             requiredPlugins: plan.requiredOperators || plan.requiredPlugins || []
           };
 
-          // Debug: Log raw plan from LLM
-          console.log(`[Task Planner] Raw plan from LLM for goal ${goal.id}:`, {
-            goalId: transformedPlan.goalId,
-            stepCount: transformedPlan.steps?.length || 0,
-            steps: transformedPlan.steps?.map(s => ({
-              stepId: s.stepId,
-              operatorId: s.operatorId,
-              paramCount: Object.keys(s.parameters || {}).length
-            }))
-          });
-
           // STAGE 2.5: Remove duplicate steps (defensive programming)
           const deduplicatedPlan = this.removeDuplicateSteps(transformedPlan);
-          if (deduplicatedPlan.steps.length !== transformedPlan.steps.length) {
-            console.warn(`[Task Planner] Removed ${transformedPlan.steps.length - deduplicatedPlan.steps.length} duplicate steps from plan`);
-            console.log(`[Task Planner] Original steps:`, transformedPlan.steps.map((s: any) => s.operatorId));
-            console.log(`[Task Planner] Deduplicated steps:`, deduplicatedPlan.steps.map((s: any) => s.operatorId));
-          }
 
           // STAGE 2.6: Ensure stepId global uniqueness by adding goalId prefix if missing
           const uniqueStepIdPlan = this.ensureUniqueStepIds(deduplicatedPlan);
-          if (uniqueStepIdPlan !== deduplicatedPlan) {
-            console.log(`[Task Planner] Fixed stepId uniqueness for goal ${goal.id}`);
-            console.log(`[Task Planner] Updated stepIds:`, uniqueStepIdPlan.steps.map(s => s.stepId));
-          }
 
           // STAGE 3: Validate terminal node constraints
-          console.log(`[Task Planner] Stage 3: Validating terminal node constraints for goal ${goal.id}`);
           const validatedPlan = this.validateTerminalNodeConstraints(uniqueStepIdPlan, compatiblePluginIds);
 
           if (!validatedPlan) {
@@ -288,96 +254,6 @@ export class TaskPlannerAgent {
         ]
       };
     }
-  }
-
-  /**
-   * Format data sources for LLM context injection
-   * Creates a human-readable summary of available data sources with schema information
-   */
-  private formatDataSourcesForLLM(dataSources: any[]): string {
-    if (!dataSources || dataSources.length === 0) {
-      return 'No data sources available. User must upload or register data sources first.';
-    }
-
-    const formatted = dataSources.map(ds => {
-      const lines = [
-        `- ID: ${ds.id}`,
-        `  Name: ${ds.name}`,
-        `  Type: ${ds.type}`,
-        `  Description: ${ds.metadata?.description || 'No description'}`
-      ];
-
-      // Add type-specific info
-      if (ds.type === 'postgis') {
-        const refParts = ds.reference?.split('/') || [];
-        const tableName = refParts[refParts.length - 1] || 'unknown';
-        lines.push(`  Table: ${tableName}`);
-
-        // Add geometry info if available
-        if (ds.metadata?.geometryType) {
-          lines.push(`  Geometry: ${ds.metadata.geometryType} (SRID: ${ds.metadata.srid || 'unknown'})`);
-        }
-
-        // Add row count if available
-        if (ds.metadata?.rowCount !== undefined) {
-          lines.push(`  Rows: ${ds.metadata.rowCount.toLocaleString()}`);
-        }
-
-        // Add field information if available in metadata
-        if (ds.metadata?.fields && Array.isArray(ds.metadata.fields)) {
-          const numericFields = ds.metadata.fields.filter((f: any) =>
-            ['integer', 'numeric', 'float', 'double precision', 'real'].includes(f.dataType?.toLowerCase())
-          );
-          const textFields = ds.metadata.fields.filter((f: any) =>
-            ['character varying', 'text', 'varchar', 'char'].includes(f.dataType?.toLowerCase())
-          );
-
-          if (numericFields.length > 0) {
-            lines.push(`  Numeric Fields: ${numericFields.map((f: any) => f.columnName).join(', ')}`);
-          }
-          if (textFields.length > 0) {
-            lines.push(`  Text Fields: ${textFields.map((f: any) => f.columnName).join(', ')}`);
-          }
-        }
-      } else if (ds.type === 'geojson' || ds.type === 'shapefile') {
-        lines.push(`  File: ${ds.reference?.split('/').pop() || 'unknown'}`);
-
-        // Add geometry type if available
-        if (ds.metadata?.geometryType) {
-          lines.push(`  Geometry: ${ds.metadata.geometryType}`);
-        }
-
-        // Add feature count if available
-        if (ds.metadata?.featureCount !== undefined) {
-          lines.push(`  Features: ${ds.metadata.featureCount.toLocaleString()}`);
-        }
-
-        // Add field information if available
-        if (ds.metadata?.fields && Array.isArray(ds.metadata.fields)) {
-          const sampleValues = ds.metadata.sampleValues || {};
-
-          // Support both formats: string[] or Array<{name: string; type: string}>
-          const fieldInfo = ds.metadata.fields.slice(0, 8).map((field: any) => {
-            // If field is an object with name and type
-            if (typeof field === 'object' && field.name) {
-              const fieldName = field.name;
-              const fieldType = field.type || 'unknown';
-              const info = sampleValues[fieldName];
-              if (info?.isNumeric || fieldType === 'number' || fieldType === 'integer') {
-                return `${fieldName} (${fieldType})`;
-              }
-              return `${fieldName} (${fieldType})`;
-            }
-            return String(field);
-          });
-          lines.push(`  Fields: ${fieldInfo.join(', ')}`);
-        }
-      }
-
-      return lines.join('\n');
-    }).join('\n\n');
-
-    return `Available Data Sources (${dataSources.length}):\n\n${formatted}`;
   }
 
   /**

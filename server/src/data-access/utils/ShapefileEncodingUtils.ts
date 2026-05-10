@@ -53,8 +53,9 @@ function detectMojibake(value: string): boolean {
   
   const totalChars = cjkCount + nonCjkCount;
   
-  // If more than 10% of non-ASCII chars are non-CJK, likely mojibake
-  if (totalChars > 0 && nonCjkCount / totalChars > 0.1) {
+  // If more than 30% of non-ASCII chars are non-CJK, likely mojibake
+  // Relaxed from 10% to avoid false positives for mixed Chinese/Latin text
+  if (totalChars > 0 && nonCjkCount / totalChars > 0.3) {
     return true;
   }
   
@@ -113,9 +114,10 @@ export function validateStringEncoding(features: FeatureWithProperties[]): boole
     });
   }
   
-  // If more than 20% of strings are suspicious, consider encoding invalid
+  // If more than 30% of strings are suspicious, consider encoding invalid
+  // Relaxed from 20% to avoid false positives for Shapefiles with mixed content
   const suspicionRate = totalStrings > 0 ? suspiciousStrings / totalStrings : 0;
-  const isValid = suspicionRate < 0.2;
+  const isValid = suspicionRate < 0.3;
   
   return isValid;
 }

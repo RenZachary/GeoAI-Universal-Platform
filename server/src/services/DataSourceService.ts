@@ -10,7 +10,7 @@
 
 import type { DataSourceRepository} from '../data-access/repositories';
 import { type DataSourceRecord } from '../data-access/repositories';
-import { DataAccessFacade } from '../data-access';
+import { DataAccessFacade, MetadataFormatter } from '../data-access';
 import { wrapError, type PostGISConnectionConfig } from '../core';
 import { PostGISCleanupScheduler } from '../storage';
 import type Database from 'better-sqlite3';
@@ -185,6 +185,26 @@ export class DataSourceService {
         fields: source.metadata?.fields
       }
     }));
+  }
+
+  /**
+   * Format data sources for LLM task planning context
+   * Returns human-readable text summary with type-specific details
+   * 
+   * This is the centralized method for metadata formatting - all LLM agents
+   * should use this instead of implementing their own formatting logic.
+   */
+  formatDataSourcesForLLM(): string {
+    const sources = this.dataSourceRepo.listAll();
+    return MetadataFormatter.formatForLLM(sources);
+  }
+
+  /**
+   * Get data sources as structured objects for programmatic use
+   */
+  getDataSourcesStructured() {
+    const sources = this.dataSourceRepo.listAll();
+    return MetadataFormatter.formatAsStructured(sources);
   }
 
   /**

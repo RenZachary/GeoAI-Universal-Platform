@@ -38,6 +38,8 @@ export type { DataSourceRecord } from './repositories/DataSourceRepository';
 
 // Utilities
 export { DataSourceDetector } from './utils/DataSourceDetector';
+export { MetadataFormatter } from './utils/MetadataFormatter';
+export type { FormattedDataSource } from './utils/MetadataFormatter';
 export { PostGISPoolManager } from './utils/PostGISPoolManager';
 export { PostGISConnectionParser } from './utils/PostGISConnectionParser';
 export { parseConnectionConfig, convertDistanceUnit } from './utils/PostGISUtils';
