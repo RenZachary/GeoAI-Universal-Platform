@@ -3,19 +3,10 @@
     <!-- Conversation Sidebar -->
     <aside class="conversation-sidebar" :class="{ collapsed: sidebarCollapsed }">
       <div class="sidebar-header">
-        <el-button v-if="!sidebarCollapsed" class="new-chat-btn" size="default" @click="handleNewChat">
-          <el-icon>
-            <Plus />
-          </el-icon>
-          <span>{{ $t('chat.newChat') }}</span>
-        </el-button>
-        <el-tooltip :content="sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'" placement="right">
-          <el-button class="sidebar-toggle-btn" text circle @click="sidebarCollapsed = !sidebarCollapsed">
-            <el-icon v-if="sidebarCollapsed">
-              <DArrowRight />
-            </el-icon>
-            <el-icon v-else>
-              <DArrowLeft />
+        <el-tooltip content="New Chat" placement="right">
+          <el-button class="new-chat-btn" text circle @click="handleNewChat">
+            <el-icon>
+              <Plus />
             </el-icon>
           </el-button>
         </el-tooltip>
@@ -39,6 +30,19 @@
         </div>
 
         <el-empty v-if="chatStore.conversations.length === 0" :description="$t('chat.noMessages')" :image-size="80" />
+      </div>
+
+      <div class="sidebar-footer">
+        <el-tooltip :content="sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'" placement="right">
+          <el-button class="sidebar-toggle-btn" text circle @click="sidebarCollapsed = !sidebarCollapsed">
+            <el-icon v-if="sidebarCollapsed">
+              <DArrowRight />
+            </el-icon>
+            <el-icon v-else>
+              <DArrowLeft />
+            </el-icon>
+          </el-button>
+        </el-tooltip>
       </div>
     </aside>
 
