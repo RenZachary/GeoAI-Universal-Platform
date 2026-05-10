@@ -3,9 +3,9 @@
  */
 
 import { z } from 'zod';
-import { SpatialOperator, type OperatorContext } from '../SpatialOperator';
-import { DataAccessFacade } from '../../data-access';
-import { DataSourceRepository } from '../../data-access/repositories';
+import { SpatialOperator, type OperatorContext } from '../../SpatialOperator';
+import { DataAccessFacade } from '../../../data-access';
+import { DataSourceRepository } from '../../../data-access/repositories';
 import type Database from 'better-sqlite3';
 
 const StatisticsInputSchema = z.object({

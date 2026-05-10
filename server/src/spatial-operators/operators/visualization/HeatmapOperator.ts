@@ -3,9 +3,9 @@
  */
 
 import { z } from 'zod';
-import { SpatialOperator, type OperatorContext } from '../SpatialOperator';
-import { DataSourceRepository } from '../../data-access/repositories';
-import { ResultPersistenceService } from '../../services/ResultPersistenceService';
+import { SpatialOperator, type OperatorContext } from '../../SpatialOperator';
+import { DataSourceRepository } from '../../../data-access/repositories';
+import { ResultPersistenceService } from '../../../services/ResultPersistenceService';
 import type Database from 'better-sqlite3';
 
 const HeatmapInputSchema = z.object({

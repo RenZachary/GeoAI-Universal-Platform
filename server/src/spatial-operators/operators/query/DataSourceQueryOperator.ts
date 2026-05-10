@@ -3,8 +3,8 @@
  */
 
 import { z } from 'zod';
-import { SpatialOperator, type OperatorContext } from '../SpatialOperator';
-import { DataSourceRepository } from '../../data-access/repositories';
+import { SpatialOperator, type OperatorContext } from '../../SpatialOperator';
+import { DataSourceRepository } from '../../../data-access/repositories';
 import type Database from 'better-sqlite3';
 
 const DataSourceQueryInputSchema = z.object({

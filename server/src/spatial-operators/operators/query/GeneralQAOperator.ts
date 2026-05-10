@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { SpatialOperator, type OperatorContext } from '../SpatialOperator';
+import { SpatialOperator, type OperatorContext } from '../../SpatialOperator';
 
 const GeneralQAInputSchema = z.object({
   question: z.string().describe('The user\'s question'),

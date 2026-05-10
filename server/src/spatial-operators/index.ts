@@ -19,35 +19,35 @@ export type { PluginManifest, PluginStatus } from './plugins/CustomPluginLoader'
 export { DataAccessFacade, type VisualizationOptions } from '../data-access/facade/DataAccessFacade';
 
 // Analysis Operators
-export { BufferOperator } from './operators/BufferOperator';
-export { OverlayOperator } from './operators/OverlayOperator';
-export { FilterOperator } from './operators/FilterOperator';
-export { AggregationOperator } from './operators/AggregationOperator';
-export { StatisticsCalculatorOperator } from './operators/StatisticsCalculatorOperator';
+export { BufferOperator } from './operators/analysis/BufferOperator';
+export { OverlayOperator } from './operators/analysis/OverlayOperator';
+export { FilterOperator } from './operators/analysis/FilterOperator';
+export { AggregationOperator } from './operators/analysis/AggregationOperator';
+export { StatisticsCalculatorOperator } from './operators/analysis/StatisticsCalculatorOperator';
 
 // Query Operators
-export { DataSourceQueryOperator } from './operators/DataSourceQueryOperator';
-export { GeneralQAOperator } from './operators/GeneralQAOperator';
+export { DataSourceQueryOperator } from './operators/query/DataSourceQueryOperator';
+export { GeneralQAOperator } from './operators/query/GeneralQAOperator';
 
 // Visualization Operators
-export { ChoroplethOperator } from './operators/ChoroplethOperator';
-export { HeatmapOperator } from './operators/HeatmapOperator';
-export { CategoricalOperator } from './operators/CategoricalOperator';
-export { UniformColorOperator } from './operators/UniformColorOperator';
+export { ChoroplethOperator } from './operators/visualization/ChoroplethOperator';
+export { HeatmapOperator } from './operators/visualization/HeatmapOperator';
+export { CategoricalOperator } from './operators/visualization/CategoricalOperator';
+export { UniformColorOperator } from './operators/visualization/UniformColorOperator';
 
 // Registration function
 import { SpatialOperatorRegistryInstance } from './SpatialOperatorRegistry';
-import { BufferOperator } from './operators/BufferOperator';
-import { OverlayOperator } from './operators/OverlayOperator';
-import { FilterOperator } from './operators/FilterOperator';
-import { AggregationOperator } from './operators/AggregationOperator';
-import { StatisticsCalculatorOperator } from './operators/StatisticsCalculatorOperator';
-import { DataSourceQueryOperator } from './operators/DataSourceQueryOperator';
-import { GeneralQAOperator } from './operators/GeneralQAOperator';
-import { ChoroplethOperator } from './operators/ChoroplethOperator';
-import { HeatmapOperator } from './operators/HeatmapOperator';
-import { CategoricalOperator } from './operators/CategoricalOperator';
-import { UniformColorOperator } from './operators/UniformColorOperator';
+import { BufferOperator } from './operators/analysis/BufferOperator';
+import { OverlayOperator } from './operators/analysis/OverlayOperator';
+import { FilterOperator } from './operators/analysis/FilterOperator';
+import { AggregationOperator } from './operators/analysis/AggregationOperator';
+import { StatisticsCalculatorOperator } from './operators/analysis/StatisticsCalculatorOperator';
+import { DataSourceQueryOperator } from './operators/query/DataSourceQueryOperator';
+import { GeneralQAOperator } from './operators/query/GeneralQAOperator';
+import { ChoroplethOperator } from './operators/visualization/ChoroplethOperator';
+import { HeatmapOperator } from './operators/visualization/HeatmapOperator';
+import { CategoricalOperator } from './operators/visualization/CategoricalOperator';
+import { UniformColorOperator } from './operators/visualization/UniformColorOperator';
 
 export function registerAllOperators(db?: any, workspaceBase?: string): void {
   console.log('[Spatial Operators] Registering all operators...');
