@@ -196,16 +196,18 @@ export class MVTOnDemandPublisher extends BaseMVTPublisher {
         layerName = 'default'
       } = options;
 
-      let tilesetId: string;
+      // Generate tilesetId using base class method
+      const tilesetId = options.tilesetId || this.generateTilesetId(source.type);
+
+      let config: any;
       let metadata: MVTPublishMetadata;
 
       // Route to appropriate handler based on source type
       switch (source.type) {
         case 'geojson-file':
-          tilesetId = await this.publishGeoJSONFile(
+          config = await this.prepareGeoJSONFile(
             source.filePath,
-            { minZoom, maxZoom, extent, tolerance, buffer, layerName },
-            options.tilesetId
+            { minZoom, maxZoom, extent, tolerance, buffer, layerName }
           );
           metadata = {
             sourceType: 'geojson-file',
@@ -218,10 +220,9 @@ export class MVTOnDemandPublisher extends BaseMVTPublisher {
           break;
 
         case 'postgis':
-          tilesetId = await this.publishPostGIS(
+          config = await this.preparePostGIS(
             source,
-            { minZoom, maxZoom, extent, tolerance, buffer, layerName },
-            options.tilesetId
+            { minZoom, maxZoom, extent, tolerance, buffer, layerName }
           );
           metadata = {
             sourceType: 'postgis',
@@ -231,9 +232,9 @@ export class MVTOnDemandPublisher extends BaseMVTPublisher {
             generatedAt: new Date().toISOString(),
             tableName: source.tableName,
             sqlQuery: source.sqlQuery,
-            schema: source.connection.schema || 'public',  // Save schema from connection
-            geometryColumn: source.geometryColumn || 'geom',  // Save geometry column name
-            layerName: layerName,  // Save layer name for ST_AsMVT
+            schema: source.connection.schema || 'public',
+            geometryColumn: source.geometryColumn || 'geom',
+            layerName: layerName,
             cacheEnabled: true
           };
           break;
@@ -242,9 +243,15 @@ export class MVTOnDemandPublisher extends BaseMVTPublisher {
           throw new Error(`Unsupported source type: ${(source as Record<string, unknown>).type}`);
       }
 
-      // Save metadata
-      this.tilesetMetadata.set(tilesetId, metadata);
+      // Save metadata using base class method (which also caches in memory)
       this.saveMetadata(tilesetId, metadata);
+
+      // Cache the configuration for on-demand tile generation
+      if (source.type === 'geojson-file' && config.tileIndex) {
+        this.geojsonTileIndexes.set(tilesetId, config.tileIndex);
+      } else if (source.type === 'postgis' && config.dataSource) {
+        this.postgisConfigs.set(tilesetId, config.dataSource);
+      }
 
       const serviceUrl = `/api/services/mvt/${tilesetId}/{z}/{x}/{y}.pbf`;
 
@@ -357,42 +364,14 @@ export class MVTOnDemandPublisher extends BaseMVTPublisher {
   // Private Methods - GeoJSON Handlers
   // ============================================================================
 
-  private async publishGeoJSONInMemory(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    featureCollection: any,
-    options: MVTTileOptions,
-    customTilesetId?: string
-  ): Promise<string> {
-    console.log('[MVT On-Demand Publisher] Creating tile index from in-memory GeoJSON');
-    
-    if (!featureCollection || featureCollection.type !== 'FeatureCollection') {
-      throw new Error('Input must be a valid GeoJSON FeatureCollection');
-    }
-
-    const tilesetId = customTilesetId || this.generateTilesetId('geojson');
-    
-    // Create tile index using geojson-vt
-    const tileIndex = geojsonvt(featureCollection, {
-      maxZoom: options.maxZoom,
-      extent: options.extent,
-      tolerance: options.tolerance,
-      buffer: options.buffer
-    });
-
-    // Cache the tile index
-    this.geojsonTileIndexes.set(tilesetId, tileIndex);
-
-    console.log(`[MVT On-Demand Publisher] GeoJSON tile index created: ${tilesetId}`);
-    console.log(`[MVT On-Demand Publisher] Features: ${featureCollection.features?.length || 0}`);
-
-    return tilesetId;
-  }
-
-  private async publishGeoJSONFile(
+  /**
+   * Prepare GeoJSON file for on-demand tile generation
+   * Returns configuration (tile index) instead of tilesetId
+   */
+  private async prepareGeoJSONFile(
     filePath: string,
-    options: MVTTileOptions,
-    customTilesetId?: string
-  ): Promise<string> {
+    options: MVTTileOptions
+  ): Promise<any> {
     console.log(`[MVT On-Demand Publisher] Loading GeoJSON file: ${filePath}`);
     
     if (!fs.existsSync(filePath)) {
@@ -402,7 +381,46 @@ export class MVTOnDemandPublisher extends BaseMVTPublisher {
     const fileContent = fs.readFileSync(filePath, 'utf-8');
     const featureCollection = JSON.parse(fileContent);
 
-    return this.publishGeoJSONInMemory(featureCollection, options, customTilesetId);
+    return this.prepareGeoJSONInMemory(featureCollection, options);
+  }
+
+  /**
+   * Prepare in-memory GeoJSON for on-demand tile generation
+   * Returns configuration (tile index) instead of tilesetId
+   */
+  private prepareGeoJSONInMemory(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    featureCollection: any,
+    options: MVTTileOptions
+  ): any {
+    console.log('[MVT On-Demand Publisher] Creating tile index from in-memory GeoJSON');
+    
+    if (!featureCollection || featureCollection.type !== 'FeatureCollection') {
+      throw new Error('Input must be a valid GeoJSON FeatureCollection');
+    }
+
+    // Create tile index using geojson-vt
+    const tileIndex = geojsonvt(featureCollection, {
+      maxZoom: options.maxZoom,
+      extent: options.extent,
+      tolerance: options.tolerance,
+      buffer: options.buffer
+    });
+
+    console.log(`[MVT On-Demand Publisher] GeoJSON tile index created`);
+    console.log(`[MVT On-Demand Publisher] Features: ${featureCollection.features?.length || 0}`);
+
+    // Return configuration (Publisher will handle caching)
+    return {
+      tileIndex,
+      options: {
+        minZoom: options.minZoom,
+        maxZoom: options.maxZoom,
+        extent: options.extent,
+        tolerance: options.tolerance,
+        buffer: options.buffer
+      }
+    };
   }
 
   private getGeoJSONTile(
@@ -444,19 +462,20 @@ export class MVTOnDemandPublisher extends BaseMVTPublisher {
   // Private Methods - PostGIS Handlers
   // ============================================================================
 
-  private async publishPostGIS(
+  /**
+   * Prepare PostGIS data source for on-demand tile generation
+   * Returns configuration (connection info) instead of tilesetId
+   */
+  private async preparePostGIS(
     source: PostGISDataSource,
-    options: MVTTileOptions,
-    customTilesetId?: string
-  ): Promise<string> {
+    _options: MVTTileOptions
+  ): Promise<any> {
     console.log('[MVT On-Demand Publisher] Setting up PostGIS MVT service');
     
     if (!source.tableName && !source.sqlQuery) {
       throw new Error('PostGIS source must provide either tableName or sqlQuery');
     }
 
-    const tilesetId = customTilesetId || this.generateTilesetId('postgis');
-    
     // Create connection pool using PostGISTileGenerator (delegates to PostGISPoolManager)
     try {
       await this.postgisGenerator.createPool(source.connection);
@@ -465,13 +484,13 @@ export class MVTOnDemandPublisher extends BaseMVTPublisher {
       throw wrapError(error, 'Failed to connect to PostGIS');
     }
 
-    // Store connection config for later tile generation
-    this.postgisConfigs.set(tilesetId, source);
-
-    console.log(`[MVT On-Demand Publisher] PostGIS tileset created: ${tilesetId}`);
+    console.log(`[MVT On-Demand Publisher] PostGIS tileset setup complete`);
     console.log(`[MVT On-Demand Publisher] Source: ${source.tableName || 'Custom SQL'}`);
 
-    return tilesetId;
+    // Return configuration (Publisher will handle caching)
+    return {
+      dataSource: source
+    };
   }
 
   private async getPostGISTile(
@@ -541,19 +560,14 @@ export class MVTOnDemandPublisher extends BaseMVTPublisher {
   // Private Methods - Utilities
   // ============================================================================
 
-  private generateTilesetId(prefix: string): string {
-    return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-  }
-
-  private saveMetadata(tilesetId: string, metadata: MVTPublishMetadata): void {
-    const tilesetDir = path.join(this.mvtOutputDir, tilesetId);
+  // Note: generateTilesetId() and saveMetadata() are now provided by BaseMVTPublisher
+  // Override saveMetadata to add memory caching
+  protected saveMetadata(tilesetId: string, metadata: MVTPublishMetadata): void {
+    // Call base class to save to disk
+    super.saveMetadata(tilesetId, metadata);
     
-    if (!fs.existsSync(tilesetDir)) {
-      fs.mkdirSync(tilesetDir, { recursive: true });
-    }
-
-    const metadataPath = path.join(tilesetDir, 'metadata.json');
-    fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+    // Also cache in memory for faster access
+    this.tilesetMetadata.set(tilesetId, metadata);
   }
 }
 

@@ -3,14 +3,16 @@
  * Supports multiple data source types with optimized generation methods
  * 
  * Ideal for plugin workflows and integration with NativeData/DataAccessor
+ * 
+ * Architecture:
+ * - Publisher: Handles persistence, caching, orchestration
+ * - Strategy: Handles tile generation logic only
  */
 
-import fs from 'fs';
-import path from 'path';
 import type { DataSourceType, NativeData } from '../../core/index';
 import type Database from 'better-sqlite3';
 import { BaseMVTPublisher, type MVTPublishResult } from './base/BaseMVTPublisher';
-import { type MVTTileOptions, type MVTPublishMetadata } from './base/MVTPublisherTypes';
+import { type MVTTileOptions } from './base/MVTPublisherTypes';
 import type { MVTTileGenerationStrategy } from './base/MVTTStrategies/MVTTileGenerationStrategy';
 import { GeoJSONMVTTStrategy } from './base/MVTTStrategies/GeoJSONMVTTStrategy';
 import { ShapefileMVTTStrategy } from './base/MVTTStrategies/ShapefileMVTTStrategy';
@@ -19,6 +21,9 @@ import { PostGISMVTTStrategy } from './base/MVTTStrategies/PostGISMVTTStrategy';
 export class MVTStrategyPublisher extends BaseMVTPublisher {
   private db?: Database.Database;
   private strategies: Map<DataSourceType, MVTTileGenerationStrategy>;
+  
+  // Cache strategy configurations (tilesetId -> config)
+  private strategyConfigs: Map<string, any> = new Map();
 
   // Singleton instance
   private static instance: MVTStrategyPublisher | null = null;
@@ -44,15 +49,14 @@ export class MVTStrategyPublisher extends BaseMVTPublisher {
   }
 
   constructor(workspaceBase: string, db?: Database.Database) {
-    super(workspaceBase, 'mvt');  // Call base class constructor
+    super(workspaceBase, 'mvt');
     this.db = db;
 
-    // Register default strategies
+    // Register default strategies (no longer need mvtOutputDir)
     this.strategies = new Map();
-    this.registerStrategy('geojson', new GeoJSONMVTTStrategy(this.mvtOutputDir));
-    this.registerStrategy('shapefile', new ShapefileMVTTStrategy(this.mvtOutputDir));
-    // Always register PostGIS strategy - connection info comes from NativeData metadata, not SQLite
-    this.registerStrategy('postgis', new PostGISMVTTStrategy(this.mvtOutputDir, db!));
+    this.registerStrategy('geojson', new GeoJSONMVTTStrategy());
+    this.registerStrategy('shapefile', new ShapefileMVTTStrategy(this.getTilesetDir('temp')));
+    this.registerStrategy('postgis', new PostGISMVTTStrategy(db!));
   }
 
   /**
@@ -60,7 +64,7 @@ export class MVTStrategyPublisher extends BaseMVTPublisher {
    */
   registerStrategy(type: DataSourceType, strategy: MVTTileGenerationStrategy): void {
     this.strategies.set(type, strategy);
-    console.log(`[MVT Publisher] Registered strategy for: ${type}`);
+    console.log(`[MVT Strategy Publisher] Registered strategy for: ${type}`);
   }
 
   /**
@@ -77,24 +81,48 @@ export class MVTStrategyPublisher extends BaseMVTPublisher {
   /**
    * Publish/generate MVT tiles from NativeData reference
    * Automatically selects the appropriate strategy based on data source type
-   * Implements BaseMVTPublisher.publish()
    */
   async publish(nativeData: NativeData, options: MVTTileOptions = {}): Promise<MVTPublishResult> {
     try {
-      console.log('[MVT Strategy Publisher] Publishing tiles from NativeData (on-demand generation)...');
+      console.log('[MVT Strategy Publisher] Publishing tiles from NativeData...');
       console.log(`[MVT Strategy Publisher] Data source type: ${nativeData.type}`);
       console.log(`[MVT Strategy Publisher] Reference: ${nativeData.reference}`);
-      console.log(`[MVT Strategy Publisher] Metadata keys:`, Object.keys(nativeData.metadata || {}));
-      console.log(`[MVT Strategy Publisher] Has connection info:`, !!nativeData.metadata?.connection);
 
-      const tilesetId = await this.generateTiles(nativeData, options);
-      const metadata = this.getMetadata(tilesetId);
+      // Generate tilesetId using base class method
+      const tilesetId = options.tilesetId || this.generateTilesetId('mvt');
+
+      // Get the appropriate strategy
+      const strategy = this.getStrategy(nativeData.type);
+
+      // Delegate to strategy for tile generation (returns config, not tilesetId)
+      const config = await strategy.generateTiles(
+        nativeData.reference,
+        nativeData.type,
+        nativeData,
+        options
+      );
+
+      // Build metadata from strategy result + base info
+      const metadata = {
+        id: tilesetId,
+        generatedAt: new Date().toISOString(),
+        format: 'pbf',
+        ...config.metadata
+      };
+
+      // Save metadata using base class method
+      this.saveMetadata(tilesetId, metadata);
+
+      // Cache the strategy configuration for on-demand tile generation
+      this.strategyConfigs.set(tilesetId, config);
+
+      console.log(`[MVT Strategy Publisher] Published successfully: ${tilesetId}`);
 
       return {
         success: true,
         tilesetId,
         serviceUrl: `/api/services/mvt/${tilesetId}/{z}/{x}/{y}.pbf`,
-        metadata: metadata || {}
+        metadata
       };
     } catch (error) {
       console.error('[MVT Strategy Publisher] Publication failed:', error);
@@ -109,147 +137,103 @@ export class MVTStrategyPublisher extends BaseMVTPublisher {
   }
 
   /**
-   * Generate MVT tiles from NativeData reference
-   * Automatically selects the appropriate strategy based on data source type
-   * All tiles are generated on-demand (no pre-generation)
-   * 
-   * @param nativeData - The native data to generate tiles from
-   * @param options - Tile generation options
-   * @returns tilesetId - Unique identifier for the generated tileset
-   */
-  async generateTiles(
-    nativeData: NativeData,
-    options: MVTTileOptions = {}
-  ): Promise<string> {
-    console.log('[MVT Strategy Publisher] Generating tiles from NativeData (on-demand)...');
-    console.log(`[MVT Strategy Publisher] Data source type: ${nativeData.type}`);
-    console.log(`[MVT Strategy Publisher] Reference: ${nativeData.reference}`);
-
-    // Get the appropriate strategy for this data type
-    const strategy = this.getStrategy(nativeData.type);
-
-    // Delegate to the strategy
-    return strategy.generateTiles(
-      nativeData.reference,
-      nativeData.type,
-      nativeData,
-      options
-    );
-  }
-
-  /**
    * Get tile from strategy (on-demand generation only)
    */
   async getTile(tilesetId: string, z: number, x: number, y: number): Promise<Buffer | null> {
     console.log(`[MVT Strategy Publisher] getTile called: ${tilesetId}/${z}/${x}/${y}`);
 
-    // Check metadata to get strategy type
-    const metadataPath = path.join(this.mvtOutputDir, tilesetId, 'metadata.json');
-    if (!fs.existsSync(metadataPath)) {
-      console.warn(`[MVT Strategy Publisher] Metadata not found: ${metadataPath}`);
-      return null;
-    }
+    // Try to get config from memory cache first
+    let config = this.strategyConfigs.get(tilesetId);
 
-    const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
-    console.log(`[MVT Strategy Publisher] Metadata loaded: strategy=${metadata.strategy}`);
+    // If not in cache, reload from metadata file
+    if (!config) {
+      console.log(`[MVT Strategy Publisher] Config not in cache, reloading from disk...`);
+      
+      const metadata = this.loadMetadata(tilesetId);
+      if (!metadata) {
+        console.warn(`[MVT Strategy Publisher] Metadata not found for: ${tilesetId}`);
+        return null;
+      }
 
-    // Delegate to strategy for on-demand generation
-    const strategy = this.strategies.get(metadata.strategy as DataSourceType);
-    console.log(`[MVT Strategy Publisher] Strategy found: ${strategy ? 'yes' : 'no'}`);
+      // Reload strategy configuration
+      const strategy = this.getStrategy(metadata.strategy as DataSourceType);
+      if (!strategy || !strategy.generateTiles) {
+        console.warn(`[MVT Strategy Publisher] Strategy not found or doesn't support reload: ${metadata.strategy}`);
+        return null;
+      }
 
-    if (strategy && strategy.getTile) {
-      console.log(`[MVT Strategy Publisher] Generating tile on-demand: ${tilesetId}/${z}/${x}/${y}`);
-      return strategy.getTile(tilesetId, z, x, y);
-    } else {
-      console.warn(`[MVT Strategy Publisher] Strategy not found or getTile not implemented for: ${metadata.strategy}`);
-    }
+      // Create minimal NativeData for reload
+      const nativeData: NativeData = {
+        id: tilesetId,
+        type: metadata.strategy as DataSourceType,
+        reference: metadata.sourceFile || metadata.sourceReference || '',
+        createdAt: new Date(),
+        metadata: {
+          connection: metadata.connectionInfo,
+          geometryColumn: metadata.geometryColumn,
+          styleConfig: metadata.styleConfig,
+          geometryType: metadata.geometryType
+        } as any  // Type assertion to avoid complex type issues during reload
+      };
 
-    console.warn(`[MVT Strategy Publisher] Tile generation failed`);
-    return null;
-  }
-
-  /**
-   * List all available tilesets
-   */
-  listTilesets(): Array<{ tilesetId: string; metadata: MVTPublishMetadata }> {
-    if (!fs.existsSync(this.mvtOutputDir)) {
-      return [];
-    }
-
-    const tilesets: Array<{ tilesetId: string; metadata: MVTPublishMetadata }> = [];
-    const entries = fs.readdirSync(this.mvtOutputDir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        const metadataPath = path.join(this.mvtOutputDir, entry.name, 'metadata.json');
-        if (fs.existsSync(metadataPath)) {
-          const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
-          tilesets.push({ tilesetId: entry.name, metadata });
-        }
+      try {
+        config = await strategy.generateTiles(
+          nativeData.reference,
+          nativeData.type,
+          nativeData,
+          {
+            minZoom: metadata.minZoom,
+            maxZoom: metadata.maxZoom,
+            extent: metadata.extent
+          }
+        );
+        
+        // Cache the reloaded config
+        this.strategyConfigs.set(tilesetId, config);
+        console.log(`[MVT Strategy Publisher] Config reloaded and cached for: ${tilesetId}`);
+      } catch (error) {
+        console.error('[MVT Strategy Publisher] Failed to reload config:', error);
+        return null;
       }
     }
 
-    return tilesets;
-  }
-
-  /**
-   * Get tileset metadata
-   */
-  getMetadata(tilesetId: string): MVTPublishMetadata | null {
-    const metadataPath = path.join(this.mvtOutputDir, tilesetId, 'metadata.json');
-
-    if (fs.existsSync(metadataPath)) {
-      const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
-      return metadata;
+    // Get strategy for tile generation
+    const metadata = this.loadMetadata(tilesetId);
+    if (!metadata) {
+      console.warn(`[MVT Strategy Publisher] Metadata not found: ${tilesetId}`);
+      return null;
     }
 
-    return null;
-  }
-
-  /**
-   * Delete a tileset
-   */
-  deleteTileset(tilesetId: string): boolean {
-    const tilesetDir = path.join(this.mvtOutputDir, tilesetId);
-
-    if (fs.existsSync(tilesetDir)) {
-      fs.rmSync(tilesetDir, { recursive: true, force: true });
-      console.log(`[MVT Publisher] Deleted tileset: ${tilesetId}`);
-      return true;
+    const strategy = this.strategies.get(metadata.strategy as DataSourceType);
+    if (!strategy || !strategy.getTile) {
+      console.warn(`[MVT Strategy Publisher] Strategy not found or getTile not implemented: ${metadata.strategy}`);
+      return null;
     }
 
-    return false;
+    // Generate tile using strategy
+    console.log(`[MVT Strategy Publisher] Generating tile on-demand: ${tilesetId}/${z}/${x}/${y}`);
+    return strategy.getTile(config, z, x, y);
   }
 
   /**
    * Clean up expired tilesets (older than specified days)
    */
   cleanupExpiredTilesets(daysOld: number = 7): number {
-    if (!fs.existsSync(this.mvtOutputDir)) {
-      return 0;
-    }
-
+    const tilesets = this.listTilesetsFromDisk();
     const cutoffTime = Date.now() - (daysOld * 24 * 60 * 60 * 1000);
     let deletedCount = 0;
 
-    const entries = fs.readdirSync(this.mvtOutputDir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        const metadataPath = path.join(this.mvtOutputDir, entry.name, 'metadata.json');
-        if (fs.existsSync(metadataPath)) {
-          const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
-          const generatedAt = new Date(metadata.generatedAt).getTime();
-
-          if (generatedAt < cutoffTime) {
-            this.deleteTileset(entry.name);
-            deletedCount++;
-          }
+    for (const { tilesetId, metadata } of tilesets) {
+      if (metadata.generatedAt) {
+        const generatedAt = new Date(metadata.generatedAt).getTime();
+        if (generatedAt < cutoffTime) {
+          this.deleteTileset(tilesetId);
+          deletedCount++;
         }
       }
     }
 
-    console.log(`[MVT Publisher] Cleaned up ${deletedCount} expired tilesets`);
+    console.log(`[MVT Strategy Publisher] Cleaned up ${deletedCount} expired tilesets`);
     return deletedCount;
   }
 }

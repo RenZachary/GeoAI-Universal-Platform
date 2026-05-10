@@ -557,14 +557,11 @@ export const useMapStore = defineStore('map', () => {
     
     console.log(`[Map Store] Clearing ${layersToRemove.length} service layers, keeping ${layersToKeep.length} data layers`)
     
-    // First, remove all service layers from the map
+    // STEP 1: Remove ALL layers first (before removing any sources)
     layersToRemove.forEach(layer => {
       try {
         if (map.getLayer(layer.id)) {
           map.removeLayer(layer.id)
-        }
-        if (map.getSource(layer.id)) {
-          map.removeSource(layer.id)
         }
       } catch (error) {
         console.warn(`Failed to remove layer ${layer.id}:`, error)
@@ -585,6 +582,17 @@ export const useMapStore = defineStore('map', () => {
         } catch (error) {
           // Ignore errors for layers we can't remove
         }
+      }
+    })
+    
+    // STEP 2: Now remove ALL sources (after all layers are removed)
+    layersToRemove.forEach(layer => {
+      try {
+        if (map.getSource(layer.id)) {
+          map.removeSource(layer.id)
+        }
+      } catch (error) {
+        console.warn(`Failed to remove source ${layer.id}:`, error)
       }
     })
     

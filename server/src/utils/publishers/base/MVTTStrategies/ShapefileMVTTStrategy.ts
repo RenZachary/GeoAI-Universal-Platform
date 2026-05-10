@@ -6,18 +6,30 @@ import type { MVTTileOptions } from '../MVTPublisherTypes';
 import path from 'path';
 import { tryMultipleEncodings } from '../../../../data-access';
 import { GeoJSONMVTTStrategy } from './GeoJSONMVTTStrategy';
+
 /**
- * Shapefile MVT Strategy - Converts to GeoJSON first, then uses geojson-vt
+ * Shapefile MVT Strategy - Converts to GeoJSON first, then delegates to GeoJSON strategy
+ * 
+ * Responsibility: ONLY conversion logic
+ * - Read Shapefile with encoding detection
+ * - Convert to GeoJSON
+ * - Save converted GeoJSON temporarily
+ * - Delegate to GeoJSON strategy
+ * 
+ * Does NOT handle:
+ * - Directory creation (Publisher provides temp dir)
+ * - Metadata persistence
+ * - Tile ID generation
  */
 export class ShapefileMVTTStrategy implements MVTTileGenerationStrategy {
-    constructor(private mvtOutputDir: string) { }
+    constructor(private tempDir?: string) { }
 
     async generateTiles(
         sourceReference: string,
         dataSourceType: DataSourceType,
         nativeData: NativeData,
         options: MVTTileOptions
-    ): Promise<string> {
+    ): Promise<any> {
         console.log('[Shapefile MVT Strategy] Converting Shapefile to GeoJSON...');
 
         // Use shapefile library directly with shared encoding utility
@@ -40,33 +52,39 @@ export class ShapefileMVTTStrategy implements MVTTileGenerationStrategy {
 
         console.log(`[Shapefile MVT Strategy] Converted to GeoJSON with ${geojson.features?.length || 0} features`);
 
-        // Generate tilesetId first so we can save the converted GeoJSON in its directory (use provided tilesetId if available)
-        const tilesetId = options.tilesetId || `mvt_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-        const tilesetDir = path.join(this.mvtOutputDir, tilesetId);
-
-        if (!fs.existsSync(tilesetDir)) {
-            fs.mkdirSync(tilesetDir, { recursive: true });
+        // Save the converted GeoJSON temporarily (Publisher will manage lifecycle)
+        let convertedGeoJsonPath: string | null = null;
+        
+        if (this.tempDir) {
+            convertedGeoJsonPath = path.join(this.tempDir, `temp_${Date.now()}.geojson`);
+            fs.writeFileSync(convertedGeoJsonPath, JSON.stringify(geojson), 'utf-8');
+            console.log(`[Shapefile MVT Strategy] Saved converted GeoJSON to: ${convertedGeoJsonPath}`);
         }
 
-        // Save the converted GeoJSON in the tileset directory (persistent, needed for on-demand generation)
-        const convertedGeoJsonPath = path.join(tilesetDir, 'source.geojson');
-        fs.writeFileSync(convertedGeoJsonPath, JSON.stringify(geojson), 'utf-8');
-        console.log(`[Shapefile MVT Strategy] Saved converted GeoJSON to: ${convertedGeoJsonPath}`);
-
         // Delegate to GeoJSON strategy
-        const geojsonStrategy = new GeoJSONMVTTStrategy(this.mvtOutputDir);
+        const geojsonStrategy = new GeoJSONMVTTStrategy();
 
         try {
             // Generate tiles from the converted GeoJSON file
-            return await geojsonStrategy.generateTiles(convertedGeoJsonPath, 'geojson', nativeData, options);
+            const config = await geojsonStrategy.generateTiles(
+                convertedGeoJsonPath || sourceReference, 
+                'geojson', 
+                nativeData, 
+                options
+            );
+            
+            // Add shapefile-specific metadata
+            config.metadata.strategy = 'shapefile';
+            config.metadata.convertedFrom = sourceReference;
+            
+            return config;
         } catch (error) {
-            // Only clean up if tile generation failed
-            if (fs.existsSync(convertedGeoJsonPath)) {
+            // Clean up temporary file if created
+            if (convertedGeoJsonPath && fs.existsSync(convertedGeoJsonPath)) {
                 fs.unlinkSync(convertedGeoJsonPath);
-                console.log('[Shapefile MVT Strategy] Cleaned up converted GeoJSON file after error');
+                console.log('[Shapefile MVT Strategy] Cleaned up temporary GeoJSON file after error');
             }
             throw error;
         }
-        // Note: Do NOT delete convertedGeoJsonPath on success - it's needed for on-demand tile generation
     }
 }
