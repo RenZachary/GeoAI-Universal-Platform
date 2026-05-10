@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
-import { DataSourceRepository } from '../data-access/repositories';
-import type { DataSourceType } from '../core';
-import { SQLiteManagerInstance } from '../storage';
+import { DataSourceRepository } from '../../data-access/repositories';
+import type { DataSourceType } from '../../core';
+import { SQLiteManagerInstance } from '..';
 import e from 'express';
 
 /**

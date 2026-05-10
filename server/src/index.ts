@@ -8,12 +8,12 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import fs from 'fs';
-import { WorkspaceManagerInstance, CleanupScheduler, PostGISCleanupScheduler } from './storage';
+import { WorkspaceManagerInstance, CleanupScheduler } from './storage';
 import { SQLiteManagerInstance } from './storage';
 import { ApiRouter } from './api/routes';
 import { CustomPluginLoader } from './spatial-operators/plugins/CustomPluginLoader';
 import { LLMConfigManagerInstance } from './services/LLMConfigService';
-import { scanAndRegisterDataFiles } from './utils/DataDirectoryScanner';
+import { scanAndRegisterDataFiles } from './storage';
 
 // Load environment variables
 const __filename = fileURLToPath(import.meta.url);
