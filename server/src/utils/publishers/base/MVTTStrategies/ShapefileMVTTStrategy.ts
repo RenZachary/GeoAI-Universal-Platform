@@ -56,6 +56,12 @@ export class ShapefileMVTTStrategy implements MVTTileGenerationStrategy {
         let convertedGeoJsonPath: string | null = null;
         
         if (this.tempDir) {
+            // Ensure temp directory exists
+            if (!fs.existsSync(this.tempDir)) {
+                fs.mkdirSync(this.tempDir, { recursive: true });
+                console.log(`[Shapefile MVT Strategy] Created temp directory: ${this.tempDir}`);
+            }
+            
             convertedGeoJsonPath = path.join(this.tempDir, `temp_${Date.now()}.geojson`);
             fs.writeFileSync(convertedGeoJsonPath, JSON.stringify(geojson), 'utf-8');
             console.log(`[Shapefile MVT Strategy] Saved converted GeoJSON to: ${convertedGeoJsonPath}`);

@@ -9,6 +9,7 @@ import type { FieldStatistics as BaseFieldStatistics } from '../../../interfaces
 export interface ExtendedFieldStatistics extends BaseFieldStatistics {
   variance: number;
   median: number;
+  // Note: 'values' is already included in BaseFieldStatistics
 }
 
 export class VectorStatisticalOperation {
@@ -59,7 +60,8 @@ export class VectorStatisticalOperation {
         variance: 0,
         median: 0,
         count: 0,
-        sum: 0
+        sum: 0,
+        values: []
       };
     }
     
@@ -90,7 +92,8 @@ export class VectorStatisticalOperation {
       variance,
       median,
       count,
-      sum
+      sum,
+      values
     };
   }
   

@@ -99,8 +99,11 @@ export class TaskPlannerAgent {
           if (compatiblePluginIds.length === 0) {
             console.warn(`[Task Planner] No compatible plugins found for goal ${goal.id}, creating empty plan`);
             const fallbackPlan: ExecutionPlan = {
+              id: `plan_${goal.id}_${Date.now()}`,
               goalId: goal.id,
               steps: [],
+              executionMode: 'sequential',
+              createdAt: new Date(),
               requiredPlugins: []
             };
             return [goal.id, fallbackPlan] as const;
@@ -156,13 +159,29 @@ export class TaskPlannerAgent {
             }), null, 2),
             previousResults: previousResultsContext,
             timestamp: new Date().toISOString()
-          }) as ExecutionPlan;
+          }) as any; // Cast as any first since LLM output doesn't match ExecutionPlan exactly
+
+          // Transform LLM output to match ExecutionPlan interface
+          // LLM returns: requiredOperators, dependsOn
+          // ExecutionPlan expects: requiredPlugins, dependencies (in steps)
+          const transformedPlan: ExecutionPlan = {
+            id: `plan_${goal.id}_${Date.now()}`,
+            goalId: plan.goalId,
+            steps: (plan.steps || []).map((step: any) => ({
+              ...step,
+              // Map dependsOn to dependencies for compatibility with ExecutionStep interface
+              dependencies: step.dependsOn || step.dependencies || []
+            })),
+            executionMode: 'sequential',
+            createdAt: new Date(),
+            requiredPlugins: plan.requiredOperators || plan.requiredPlugins || []
+          };
 
           // Debug: Log raw plan from LLM
           console.log(`[Task Planner] Raw plan from LLM for goal ${goal.id}:`, {
-            goalId: plan.goalId,
-            stepCount: plan.steps?.length || 0,
-            steps: plan.steps?.map(s => ({
+            goalId: transformedPlan.goalId,
+            stepCount: transformedPlan.steps?.length || 0,
+            steps: transformedPlan.steps?.map(s => ({
               stepId: s.stepId,
               operatorId: s.operatorId,
               paramCount: Object.keys(s.parameters || {}).length
@@ -170,11 +189,11 @@ export class TaskPlannerAgent {
           });
 
           // STAGE 2.5: Remove duplicate steps (defensive programming)
-          const deduplicatedPlan = this.removeDuplicateSteps(plan);
-          if (deduplicatedPlan.steps.length !== plan.steps.length) {
-            console.warn(`[Task Planner] Removed ${plan.steps.length - deduplicatedPlan.steps.length} duplicate steps from plan`);
-            console.log(`[Task Planner] Original steps:`, plan.steps.map(s => s.operatorId));
-            console.log(`[Task Planner] Deduplicated steps:`, deduplicatedPlan.steps.map(s => s.operatorId));
+          const deduplicatedPlan = this.removeDuplicateSteps(transformedPlan);
+          if (deduplicatedPlan.steps.length !== transformedPlan.steps.length) {
+            console.warn(`[Task Planner] Removed ${transformedPlan.steps.length - deduplicatedPlan.steps.length} duplicate steps from plan`);
+            console.log(`[Task Planner] Original steps:`, transformedPlan.steps.map((s: any) => s.operatorId));
+            console.log(`[Task Planner] Deduplicated steps:`, deduplicatedPlan.steps.map((s: any) => s.operatorId));
           }
 
           // STAGE 2.6: Ensure stepId global uniqueness by adding goalId prefix if missing
@@ -191,8 +210,11 @@ export class TaskPlannerAgent {
           if (!validatedPlan) {
             console.warn(`[Task Planner] Plan failed terminal node validation, creating fallback`);
             const fallbackPlan: ExecutionPlan = {
+              id: `plan_${goal.id}_${Date.now()}`,
               goalId: goal.id,
               steps: [],
+              executionMode: 'sequential',
+              createdAt: new Date(),
               requiredPlugins: []
             };
             return [goal.id, fallbackPlan] as const;
@@ -205,8 +227,11 @@ export class TaskPlannerAgent {
 
           // Create fallback plan
           const fallbackPlan: ExecutionPlan = {
+            id: `plan_${goal.id}_${Date.now()}`,
             goalId: goal.id,
             steps: [],
+            executionMode: 'sequential',
+            createdAt: new Date(),
             requiredPlugins: []
           };
 
@@ -242,8 +267,11 @@ export class TaskPlannerAgent {
       const fallbackPlans = new Map<string, ExecutionPlan>();
       state.goals.forEach(goal => {
         fallbackPlans.set(goal.id, {
+          id: `plan_${goal.id}_${Date.now()}`,
           goalId: goal.id,
           steps: [],
+          executionMode: 'sequential',
+          createdAt: new Date(),
           requiredPlugins: []
         });
       });
@@ -377,8 +405,8 @@ export class TaskPlannerAgent {
       
       console.log(`[Task Planner] Fixing stepId: "${step.stepId}" -> "${newStepId}"`);
 
-      // Also update dependsOn references if they exist
-      const fixedDependsOn = step.dependsOn?.map(depId => {
+      // Also update dependencies references if they exist
+      const fixedDependencies = step.dependencies?.map((depId: string) => {
         // If dependency already has a goal prefix, keep it
         if (depId.includes('_') && !depId.startsWith(goalId)) {
           return depId; // Assume it's from another goal, keep as is
@@ -390,7 +418,7 @@ export class TaskPlannerAgent {
       return {
         ...step,
         stepId: newStepId,
-        dependsOn: fixedDependsOn
+        dependencies: fixedDependencies
       };
     });
 

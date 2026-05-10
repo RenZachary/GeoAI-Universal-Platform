@@ -290,10 +290,14 @@ export class VectorBackend implements DataBackend {
       
       console.log(`[VectorBackend] Successfully loaded shapefile with ${features.length} features`);
       
+      // Cast features to proper GeoJSON Feature type
+      // The shapefile library returns complete GeoJSON features with geometry and properties
+      const geojsonFeatures = features as PlatformFeatureCollection['features'];
+      
       // Return as FeatureCollection
       return {
         type: 'FeatureCollection',
-        features: features
+        features: geojsonFeatures
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
