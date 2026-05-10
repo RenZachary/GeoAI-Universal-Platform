@@ -104,15 +104,38 @@ export class ParallelTaskAnalyzer {
   private extractInputs(step: ExecutionStep): string[] {
     const inputs: string[] = [];
     
-    // Check parameters for data source references
+    // Check parameters for placeholder references like {step_id.result} or {step_id.result.id}
     if (step.parameters) {
       for (const [key, value] of Object.entries(step.parameters)) {
-        if (typeof value === 'string' && this.isDataSourceReference(value)) {
-          inputs.push(value);
+        if (typeof value === 'string') {
+          // Extract step IDs from placeholder syntax: {step_id.result...}
+          const placeholderMatches = value.match(/\{([a-zA-Z0-9_-]+)\.result(?:\.[a-zA-Z0-9_.]+)?\}/g);
+          if (placeholderMatches) {
+            placeholderMatches.forEach(match => {
+              const stepIdMatch = match.match(/\{([a-zA-Z0-9_-]+)\.result/);
+              if (stepIdMatch) {
+                const dependencyStepId = stepIdMatch[1];
+                if (!inputs.includes(dependencyStepId)) {
+                  inputs.push(dependencyStepId);
+                }
+              }
+            });
+          }
         } else if (Array.isArray(value)) {
           for (const item of value) {
-            if (typeof item === 'string' && this.isDataSourceReference(item)) {
-              inputs.push(item);
+            if (typeof item === 'string') {
+              const placeholderMatches = item.match(/\{([a-zA-Z0-9_-]+)\.result(?:\.[a-zA-Z0-9_.]+)?\}/g);
+              if (placeholderMatches) {
+                placeholderMatches.forEach(match => {
+                  const stepIdMatch = match.match(/\{([a-zA-Z0-9_-]+)\.result/);
+                  if (stepIdMatch) {
+                    const dependencyStepId = stepIdMatch[1];
+                    if (!inputs.includes(dependencyStepId)) {
+                      inputs.push(dependencyStepId);
+                    }
+                  }
+                });
+              }
             }
           }
         }
@@ -126,20 +149,9 @@ export class ParallelTaskAnalyzer {
    * Extract output data sources from execution step
    */
   private extractOutputs(step: ExecutionStep): string[] {
-    // Each task produces one output with a predictable name based on stepId
-    // This matches the naming convention used in GeoAIGraph (result_{stepId})
-    return [`result_${step.stepId}`];
-  }
-
-  /**
-   * Check if a string is a data source reference
-   */
-  private isDataSourceReference(value: string): boolean {
-    // Data source references typically have patterns like:
-    // - dataSource://id
-    // - result_taskId
-    // - Or just match known data source ID patterns
-    return value.includes('://') || value.startsWith('result_') || /^[a-zA-Z0-9_-]+$/.test(value);
+    // Each task produces an output identified by its stepId
+    // This matches the placeholder resolution convention: {step_id.result}
+    return [step.stepId];
   }
 
   /**

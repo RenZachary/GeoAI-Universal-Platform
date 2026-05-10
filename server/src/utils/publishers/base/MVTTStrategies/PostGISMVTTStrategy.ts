@@ -13,7 +13,7 @@ import type { Pool } from 'pg';
 import type Database from 'better-sqlite3';
 import type { MVTTileOptions } from '../MVTPublisherTypes';
 import path from 'path';
-import { DataSourceRepository } from '../../../../data-access/repositories';
+import { VirtualDataSourceManagerInstance } from '../../../../data-access/managers/VirtualDataSourceManager';
 export class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
     private tileIndexCache: Map<string, GeoJSONVT> = new Map();
     private postgisPools: Map<string, Pool> = new Map();
@@ -85,7 +85,7 @@ export class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
             createdAt: Date.now()
         });
 
-        // Create tileset metadata - save dataSourceId for secure password retrieval
+        // Create tileset metadata - save complete connection info for persistence beyond conversation
         const metadata = {
             id: tilesetId,
             minZoom,
@@ -96,8 +96,8 @@ export class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
             strategy: 'postgis',  // Must match the registered strategy key
             sourceReference,
             layerName: forcedLayerName,  // Always 'default' to match StyleFactory
-            // Save dataSourceId to retrieve connection info securely (includes password)
-            dataSourceId: nativeData.metadata?.dataSourceId || null,
+            // Save complete connection info (includes password) for tile generation after conversation ends
+            connectionInfo: nativeData.metadata?.connection || null,
             geometryColumn: nativeData.metadata?.geometryColumn || 'geom',
             // Include styleConfig for frontend rendering
             styleConfig: nativeData.metadata?.styleConfig || null,
@@ -143,46 +143,48 @@ export class PostGISMVTTStrategy implements MVTTileGenerationStrategy {
             console.log(`[PostGIS MVT Strategy] Reloading PostGIS connection for: ${sourceReference}`);
 
             try {
-                // Get complete connection info from DataSourceRepository (includes password)
+                // Get connection info from metadata file (saved during tileset creation)
                 let connectionInfo: any = null;
                 
-                if (fileMetadata.dataSourceId) {
-                    // Preferred method: use dataSourceId to get full connection info
-                    const dataSourceRepo = new DataSourceRepository(this.db);
-                    const dataSource = dataSourceRepo.getById(fileMetadata.dataSourceId);
+                if (fileMetadata.connectionInfo) {
+                    // Use saved connection info directly (includes password)
+                    console.log(`[PostGIS MVT Strategy] Retrieved connection from metadata file`);
+                    const conn = fileMetadata.connectionInfo;
+                    connectionInfo = {
+                        user: conn.user,
+                        password: conn.password,
+                        host: conn.host,
+                        port: conn.port,
+                        database: conn.database,
+                        schema: fileMetadata.sourceReference.split('.')[0] || conn.schema || 'geoai_temp',
+                        tableName: fileMetadata.sourceReference.split('.')[1],
+                        geometryColumn: fileMetadata.geometryColumn || 'geom'
+                    };
+                }
+                
+                // Fallback: try VirtualDataSourceManager (for backward compatibility)
+                if (!connectionInfo && fileMetadata.nativeDataId) {
+                    console.log(`[PostGIS MVT Strategy] connectionInfo not in metadata, trying VirtualDataSourceManager...`);
+                    const virtualSource = VirtualDataSourceManagerInstance.getById(fileMetadata.nativeDataId);
                     
-                    if (dataSource && dataSource.metadata?.connection) {
-                        console.log(`[PostGIS MVT Strategy] Retrieved connection from DataSourceRepository`);
-                        const conn = dataSource.metadata.connection;
+                    if (virtualSource && virtualSource.nativeData?.metadata?.connection) {
+                        console.log(`[PostGIS MVT Strategy] Retrieved connection from VirtualDataSourceManager`);
+                        const conn = virtualSource.nativeData.metadata.connection;
                         connectionInfo = {
                             user: conn.user,
-                            password: conn.password,  // Safe: retrieved from secure SQLite DB
+                            password: conn.password,
                             host: conn.host,
                             port: conn.port,
                             database: conn.database,
-                            schema: fileMetadata.sourceReference.split('.')[0] || conn.schema || 'public',
+                            schema: fileMetadata.sourceReference.split('.')[0] || conn.schema || 'geoai_temp',
                             tableName: fileMetadata.sourceReference.split('.')[1],
                             geometryColumn: fileMetadata.geometryColumn || 'geom'
                         };
                     }
                 }
-                
-                // Fallback: try to parse from metadata (without password - will fail)
-                if (!connectionInfo) {
-                    console.warn(`[PostGIS MVT Strategy] dataSourceId not found, attempting fallback...`);
-                    const reconstructedMetadata = {
-                        connection: fileMetadata.connectionMetadata,
-                        geometryColumn: fileMetadata.geometryColumn || 'geom'
-                    };
-                    
-                    connectionInfo = PostGISConnectionParser.parse(
-                        sourceReference,
-                        reconstructedMetadata
-                    );
-                }
 
                 if (!connectionInfo) {
-                    console.warn(`[PostGIS MVT Strategy] Failed to get connection info`);
+                    console.warn(`[PostGIS MVT Strategy] Failed to get connection info from metadata or VirtualDataSourceManager`);
                     return null;
                 }
 

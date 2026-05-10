@@ -3,6 +3,7 @@
  */
 
 import type { Pool } from 'pg';
+import { TEMP_SCHEMA } from '../constants';
 
 export class PostGISAggregationOperation {
   private pool: Pool;
@@ -19,7 +20,20 @@ export class PostGISAggregationOperation {
     field: string,
     returnFeature?: boolean
   ): Promise<{ resultTable: string; value: any }> {
-    const resultTable = `agg_${tableName}_${Date.now()}`;
+    // Parse table reference
+    let sourceSchema: string;
+    let sourceTable: string;
+    
+    if (tableName.includes('.')) {
+      const parts = tableName.split('.');
+      sourceSchema = parts[0];
+      sourceTable = parts[1];
+    } else {
+      sourceSchema = this.schema;
+      sourceTable = tableName;
+    }
+    
+    const resultTable = `agg_${sourceTable}_${Date.now()}`;
     
     let sql: string;
     let resultValue: any;
@@ -29,25 +43,25 @@ export class PostGISAggregationOperation {
         if (returnFeature) {
           // Return the feature with maximum value
           sql = `
-            CREATE TABLE ${this.schema}.${resultTable} AS
+            CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
             SELECT *
-            FROM ${this.schema}.${tableName}
-            WHERE ${field} = (SELECT MAX(${field}) FROM ${this.schema}.${tableName})
+            FROM ${sourceSchema}.${sourceTable}
+            WHERE ${field} = (SELECT MAX(${field}) FROM ${sourceSchema}.${sourceTable})
             LIMIT 1
           `;
           const maxResult = await this.pool.query(
-            `SELECT MAX(${field}) as max_val FROM ${this.schema}.${tableName}`
+            `SELECT MAX(${field}) as max_val FROM ${sourceSchema}.${sourceTable}`
           );
           resultValue = maxResult.rows[0].max_val;
         } else {
           // Just return the max value
           sql = `
-            CREATE TABLE ${this.schema}.${resultTable} AS
+            CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
             SELECT MAX(${field}) as result_value
-            FROM ${this.schema}.${tableName}
+            FROM ${sourceSchema}.${sourceTable}
           `;
           const maxResult = await this.pool.query(
-            `SELECT MAX(${field}) as max_val FROM ${this.schema}.${tableName}`
+            `SELECT MAX(${field}) as max_val FROM ${sourceSchema}.${sourceTable}`
           );
           resultValue = maxResult.rows[0].max_val;
         }
@@ -56,24 +70,24 @@ export class PostGISAggregationOperation {
       case 'MIN':
         if (returnFeature) {
           sql = `
-            CREATE TABLE ${this.schema}.${resultTable} AS
+            CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
             SELECT *
-            FROM ${this.schema}.${tableName}
-            WHERE ${field} = (SELECT MIN(${field}) FROM ${this.schema}.${tableName})
+            FROM ${sourceSchema}.${sourceTable}
+            WHERE ${field} = (SELECT MIN(${field}) FROM ${sourceSchema}.${sourceTable})
             LIMIT 1
           `;
           const minResult = await this.pool.query(
-            `SELECT MIN(${field}) as min_val FROM ${this.schema}.${tableName}`
+            `SELECT MIN(${field}) as min_val FROM ${sourceSchema}.${sourceTable}`
           );
           resultValue = minResult.rows[0].min_val;
         } else {
           sql = `
-            CREATE TABLE ${this.schema}.${resultTable} AS
+            CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
             SELECT MIN(${field}) as result_value
-            FROM ${this.schema}.${tableName}
+            FROM ${sourceSchema}.${sourceTable}
           `;
           const minResult = await this.pool.query(
-            `SELECT MIN(${field}) as min_val FROM ${this.schema}.${tableName}`
+            `SELECT MIN(${field}) as min_val FROM ${sourceSchema}.${sourceTable}`
           );
           resultValue = minResult.rows[0].min_val;
         }
@@ -82,12 +96,12 @@ export class PostGISAggregationOperation {
       case 'AVG':
       case 'MEAN': {
         sql = `
-          CREATE TABLE ${this.schema}.${resultTable} AS
+          CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
           SELECT AVG(${field}) as result_value
-          FROM ${this.schema}.${tableName}
+          FROM ${sourceSchema}.${sourceTable}
         `;
         const avgResult = await this.pool.query(
-          `SELECT AVG(${field}) as avg_val FROM ${this.schema}.${tableName}`
+          `SELECT AVG(${field}) as avg_val FROM ${sourceSchema}.${sourceTable}`
         );
         resultValue = avgResult.rows[0].avg_val;
         break;
@@ -95,12 +109,12 @@ export class PostGISAggregationOperation {
         
       case 'SUM': {
         sql = `
-          CREATE TABLE ${this.schema}.${resultTable} AS
+          CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
           SELECT SUM(${field}) as result_value
-          FROM ${this.schema}.${tableName}
+          FROM ${sourceSchema}.${sourceTable}
         `;
         const sumResult = await this.pool.query(
-          `SELECT SUM(${field}) as sum_val FROM ${this.schema}.${tableName}`
+          `SELECT SUM(${field}) as sum_val FROM ${sourceSchema}.${sourceTable}`
         );
         resultValue = sumResult.rows[0].sum_val;
         break;
@@ -108,12 +122,12 @@ export class PostGISAggregationOperation {
         
       case 'COUNT': {
         sql = `
-          CREATE TABLE ${this.schema}.${resultTable} AS
+          CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
           SELECT COUNT(*) as result_value
-          FROM ${this.schema}.${tableName}
+          FROM ${sourceSchema}.${sourceTable}
         `;
         const countResult = await this.pool.query(
-          `SELECT COUNT(*) as count_val FROM ${this.schema}.${tableName}`
+          `SELECT COUNT(*) as count_val FROM ${sourceSchema}.${sourceTable}`
         );
         resultValue = parseInt(countResult.rows[0].count_val);
         break;

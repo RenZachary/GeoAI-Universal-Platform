@@ -416,7 +416,10 @@ export class TaskPlannerAgent {
     const allOperators = SpatialOperatorRegistryInstance.listOperators();
     const matchingOperators: string[] = [];
     
-    // Simple keyword-based filtering (v2.0 - will be enhanced with LLM in v2.1)
+    // Detect if goal implies visualization/display requirement
+    const needsVisualization = this.detectVisualizationIntent(description);
+    
+    // Simple keyword-based filtering for analysis operations
     if (description.includes('buffer') || description.includes('缓冲区')) {
       matchingOperators.push('buffer_analysis');
     }
@@ -439,6 +442,21 @@ export class TaskPlannerAgent {
       matchingOperators.push('data_source_query');
     }
     
+    // If visualization is needed, include all visualization operators
+    if (needsVisualization) {
+      console.log(`[Task Planner] Visualization intent detected, adding visualization operators`);
+      const visualizationOperators = allOperators
+        .filter(op => op.category === 'visualization')
+        .map(op => op.operatorId);
+      
+      // Add visualization operators that aren't already in the list
+      visualizationOperators.forEach(opId => {
+        if (!matchingOperators.includes(opId)) {
+          matchingOperators.push(opId);
+        }
+      });
+    }
+    
     // If no specific match, include all operators as fallback
     if (matchingOperators.length === 0) {
       console.log(`[Task Planner] No specific keywords matched, using all operators`);
@@ -447,6 +465,30 @@ export class TaskPlannerAgent {
     
     console.log(`[Task Planner] Filtered to ${matchingOperators.length} operators:`, matchingOperators);
     return matchingOperators;
+  }
+  
+  /**
+   * Detect if goal description implies visualization/display intent
+   * Uses abstract pattern matching rather than hardcoded keywords
+   */
+  private detectVisualizationIntent(description: string): boolean {
+    // Display/presentation verbs (English and Chinese)
+    const displayVerbs = [
+      'display', 'show', 'visualize', 'render', 'present', 'map',
+      '展示', '显示', '可视化', '渲染', '呈现', '制图'
+    ];
+    
+    // Visual styling terms
+    const visualTerms = [
+      'color', 'colour', 'style', 'theme', 'symbol',
+      '颜色', '样式', '主题', '符号', '红色', '蓝色', '绿色'
+    ];
+    
+    // Check if description contains any of these patterns
+    const hasDisplayVerb = displayVerbs.some(verb => description.includes(verb));
+    const hasVisualTerm = visualTerms.some(term => description.includes(term));
+    
+    return hasDisplayVerb || hasVisualTerm;
   }
 
   /**

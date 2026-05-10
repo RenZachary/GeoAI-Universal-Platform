@@ -268,9 +268,15 @@ export class EnhancedPluginExecutor {
 
       if (operatorId) {
         const operator = ToolRegistryInstance.getOperator(operatorId);
+        
+        // Check operator category OR if result is spatial NativeData
         if (operator && operator.category === 'visualization') {
           needsVisualization = true;
           console.log(`[Enhanced Executor] Task ${taskId} - operator ${operatorId} is visualization category, will publish MVT`);
+        } else if (parsedResult.data?.type && ['postgis', 'geojson', 'shapefile'].includes(parsedResult.data.type)) {
+          // Spatial data types should be visualized regardless of operator category
+          needsVisualization = true;
+          console.log(`[Enhanced Executor] Task ${taskId} - result has spatial type ${parsedResult.data.type}, will register as virtual data source`);
         }
       }
 

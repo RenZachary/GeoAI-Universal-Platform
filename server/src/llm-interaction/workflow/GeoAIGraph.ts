@@ -193,25 +193,30 @@ export function createGeoAIGraph(
       const allServices: VisualizationService[] = [];
       
       if (result.executionResults) {
-        // Filter successful results that need visualization
+        // Register ALL successful results with NativeData structure as virtual data sources
+        // This enables cross-step reference via placeholders like {step_id.result.id}
         const successfulResults = new Map<string, AnalysisResult>();
         for (const [stepId, analysisResult] of result.executionResults.entries()) {
           if (analysisResult.status === 'success' && analysisResult.data) {
-            // Check if this result needs visualization (marked by EnhancedPluginExecutor)
-            const needsVisualization = analysisResult.metadata?.needsVisualization;
+            // Check if result has NativeData structure (has id, type, reference)
+            const hasNativeDataStructure = analysisResult.data.id && 
+                                           analysisResult.data.type && 
+                                           analysisResult.data.reference;
             
-            if (needsVisualization) {
-              successfulResults.set(stepId, analysisResult);
-              
-              // Register virtual data source for cross-step reference
+            if (hasNativeDataStructure) {
+              // Register as virtual data source for cross-step reference
               VirtualDataSourceManagerInstance.register({
                 id: analysisResult.data.id,
                 conversationId: state.conversationId,
                 stepId: stepId,
                 data: analysisResult.data as any
               });
+              console.log(`[Plugin Executor] Registered virtual data source for step ${stepId}: ${analysisResult.data.id}`);
+              
+              // Add to successful results for potential MVT publishing
+              successfulResults.set(stepId, analysisResult);
             } else {
-              console.log(`[Plugin Executor] Skipping non-visualization result for step ${stepId} (operator category: ${analysisResult.metadata?.operatorId})`);
+              console.log(`[Plugin Executor] Step ${stepId} result is not NativeData, skipping virtual source registration`);
             }
           }
         }

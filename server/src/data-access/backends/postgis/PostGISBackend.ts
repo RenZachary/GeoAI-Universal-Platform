@@ -14,6 +14,7 @@ import { PostGISFilterOperation } from './operations/PostGISFilterOperation';
 import { PostGISAggregationOperation } from './operations/PostGISAggregationOperation';
 import { PostGISSpatialJoinOperation } from './operations/PostGISSpatialJoinOperation';
 import { PostGISStatisticalOperation } from './operations/PostGISStatisticalOperation';
+import { TEMP_SCHEMA } from './constants';
 
 export class PostGISBackend implements DataBackend {
   readonly backendType = 'postgis' as const;
@@ -37,6 +38,53 @@ export class PostGISBackend implements DataBackend {
     return dataSourceType === 'postgis';
   }
   
+  /**
+   * Helper to build common metadata for PostGIS operations
+   * Ensures consistent metadata structure with connection info for MVT publishing
+   */
+  private buildMetadata(
+    resultTable: string,
+    description: string,
+    additionalMetadata?: Record<string, any>
+  ): any {
+    const fullReference = `${TEMP_SCHEMA}.${resultTable}`;
+    
+    return {
+      result: fullReference,
+      schema: TEMP_SCHEMA,
+      description,
+      featureCount: 0,
+      // Include connection info for MVT publishing
+      connection: {
+        host: this.config.host,
+        port: this.config.port,
+        database: this.config.database,
+        user: this.config.user,
+        password: this.config.password,
+        schema: TEMP_SCHEMA
+      },
+      geometryColumn: 'geom',
+      ...additionalMetadata
+    };
+  }
+  
+  /**
+   * Helper to build NativeData response with standard structure
+   */
+  private buildNativeData(
+    resultTable: string,
+    description: string,
+    additionalMetadata?: Record<string, any>
+  ): NativeData {
+    return {
+      id: generateId(),
+      type: 'postgis',
+      reference: `${TEMP_SCHEMA}.${resultTable}`,
+      metadata: this.buildMetadata(resultTable, description, additionalMetadata),
+      createdAt: new Date()
+    };
+  }
+  
   private async getPool(): Promise<Pool> {
     if (!this.pool) {
       this.pool = await PostGISPoolManager.getInstance().getPool(this.config);
@@ -54,14 +102,7 @@ export class PostGISBackend implements DataBackend {
   async buffer(reference: string, distance: number, options?: BufferOptions): Promise<NativeData> {
     await this.getPool();
     const resultTable = await this.bufferOp!.execute(reference, distance, options);
-    
-    return {
-      id: generateId(),
-      type: 'postgis',
-      reference: resultTable,
-      metadata: { result: resultTable, description: `Buffer on ${reference}`, featureCount: 0 },
-      createdAt: new Date()
-    };
+    return this.buildNativeData(resultTable, `Buffer on ${reference}`);
   }
   
   async overlay(
@@ -71,27 +112,15 @@ export class PostGISBackend implements DataBackend {
   ): Promise<NativeData> {
     await this.getPool();
     const resultTable = await this.overlayOp!.execute(reference1, reference2, operation);
-    
-    return {
-      id: generateId(),
-      type: 'postgis',
-      reference: resultTable,
-      metadata: { result: resultTable, description: `Overlay ${operation}` },
-      createdAt: new Date()
-    };
+    return this.buildNativeData(resultTable, `Overlay ${operation}`);
   }
+  
   async filter(reference: string, filterCondition: FilterCondition): Promise<NativeData> {
     await this.getPool();
     const resultTable = await this.filterOp!.execute(reference, filterCondition);
-    
-    return {
-      id: generateId(),
-      type: 'postgis',
-      reference: resultTable,
-      metadata: { result: resultTable, description: `Filter applied` },
-      createdAt: new Date()
-    };
+    return this.buildNativeData(resultTable, `Filter applied`);
   }
+  
   async aggregate(
     reference: string,
     aggFunc: string,
@@ -100,15 +129,9 @@ export class PostGISBackend implements DataBackend {
   ): Promise<NativeData> {
     await this.getPool();
     const { resultTable, value } = await this.aggOp!.execute(reference, aggFunc, field, returnFeature);
-    
-    return {
-      id: generateId(),
-      type: 'postgis',
-      reference: resultTable,
-      metadata: { result: resultTable, description: `Aggregation ${aggFunc} on ${field}: ${value}` },
-      createdAt: new Date()
-    };
+    return this.buildNativeData(resultTable, `Aggregation ${aggFunc} on ${field}: ${value}`);
   }
+  
   async spatialJoin(
     targetReference: string,
     joinReference: string,
@@ -117,14 +140,7 @@ export class PostGISBackend implements DataBackend {
   ): Promise<NativeData> {
     await this.getPool();
     const resultTable = await this.joinOp!.execute(targetReference, joinReference, operation, joinType);
-    
-    return {
-      id: generateId(),
-      type: 'postgis',
-      reference: resultTable,
-      metadata: { result: resultTable, description: `Spatial join (${operation})` },
-      createdAt: new Date()
-    };
+    return this.buildNativeData(resultTable, `Spatial join (${operation})`);
   }
   async choropleth(): Promise<NativeData> { throw new Error('Choropleth is visualization concern'); }
   async heatmap(): Promise<NativeData> { throw new Error('Heatmap is visualization concern'); }
@@ -133,7 +149,21 @@ export class PostGISBackend implements DataBackend {
   
   async read(reference: string): Promise<NativeData> {
     const pool = await this.getPool();
-    const countResult = await pool.query(`SELECT COUNT(*) as count FROM ${this.schema}.${reference}`);
+    
+    // Parse reference
+    let sourceSchema: string;
+    let sourceTable: string;
+    
+    if (reference.includes('.')) {
+      const parts = reference.split('.');
+      sourceSchema = parts[0];
+      sourceTable = parts[1];
+    } else {
+      sourceSchema = this.schema;
+      sourceTable = reference;
+    }
+    
+    const countResult = await pool.query(`SELECT COUNT(*) as count FROM ${sourceSchema}.${sourceTable}`);
     const featureCount = parseInt(countResult.rows[0].count);
     
     return {
@@ -149,7 +179,21 @@ export class PostGISBackend implements DataBackend {
   
   async delete(reference: string): Promise<void> {
     const pool = await this.getPool();
-    await pool.query(`DROP TABLE IF EXISTS ${this.schema}.${reference}`);
+    
+    // Parse reference
+    let sourceSchema: string;
+    let sourceTable: string;
+    
+    if (reference.includes('.')) {
+      const parts = reference.split('.');
+      sourceSchema = parts[0];
+      sourceTable = parts[1];
+    } else {
+      sourceSchema = this.schema;
+      sourceTable = reference;
+    }
+    
+    await pool.query(`DROP TABLE IF EXISTS ${sourceSchema}.${sourceTable}`);
   }
   
   async getMetadata(reference: string): Promise<any> {

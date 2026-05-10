@@ -4,6 +4,8 @@
 
 import type { Pool } from 'pg';
 import type { FilterCondition } from '../../../interfaces';
+import { TEMP_SCHEMA } from '../constants';
+import { parseTableReference } from '../utils/SqlUtils';
 
 export class PostGISFilterOperation {
   private pool: Pool;
@@ -18,14 +20,17 @@ export class PostGISFilterOperation {
     tableName: string,
     filterCondition: FilterCondition
   ): Promise<string> {
-    const resultTable = `filter_${tableName}_${Date.now()}`;
+    // Parse table reference to extract schema and table
+    const { schema: sourceSchema, tableName: sourceTable } = parseTableReference(tableName, this.schema);
     
-    const whereClause = this.buildWhereClause(filterCondition);
+    const resultTable = `filter_${sourceTable}_${Date.now()}`;
+    
+    const whereClause = this.buildWhereClause(filterCondition, sourceSchema);
     
     const sql = `
-      CREATE TABLE ${this.schema}.${resultTable} AS
+      CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
       SELECT *
-      FROM ${this.schema}.${tableName}
+      FROM ${sourceSchema}.${sourceTable}
       WHERE ${whereClause}
     `;
     
@@ -34,7 +39,7 @@ export class PostGISFilterOperation {
       
       // Add spatial index
       await this.pool.query(`
-        CREATE INDEX idx_${resultTable}_geom ON ${this.schema}.${resultTable} USING GIST (geom)
+        CREATE INDEX idx_${resultTable}_geom ON ${TEMP_SCHEMA}.${resultTable} USING GIST (geom)
       `);
       
       console.log(`[PostGISFilterOperation] Filter created: ${resultTable}`);
@@ -45,7 +50,7 @@ export class PostGISFilterOperation {
     }
   }
   
-  private buildWhereClause(condition: FilterCondition): string {
+  private buildWhereClause(condition: FilterCondition, sourceSchema: string): string {
     if ('field' in condition) {
       // Attribute filter
       const field = condition.field;
@@ -76,20 +81,31 @@ export class PostGISFilterOperation {
     } else if (condition.type === 'spatial') {
       // Spatial filter
       if (condition.referenceDataSourceId) {
-        // Reference to another table
-        const refTable = condition.referenceDataSourceId;
+        // Reference to another table - parse it
+        let refSchema: string;
+        let refTable: string;
+        const refTableName = condition.referenceDataSourceId;
+        
+        if (refTableName.includes('.')) {
+          const parts = refTableName.split('.');
+          refSchema = parts[0];
+          refTable = parts[1];
+        } else {
+          refSchema = sourceSchema;
+          refTable = refTableName;
+        }
         
         switch (condition.operation) {
           case 'intersects':
-            return `ST_Intersects(geom, (SELECT ST_Union(geom) FROM ${this.schema}.${refTable}))`;
+            return `ST_Intersects(geom, (SELECT ST_Union(geom) FROM ${refSchema}.${refTable}))`;
           case 'within':
-            return `ST_Within(geom, (SELECT ST_Union(geom) FROM ${this.schema}.${refTable}))`;
+            return `ST_Within(geom, (SELECT ST_Union(geom) FROM ${refSchema}.${refTable}))`;
           case 'contains':
-            return `ST_Contains(geom, (SELECT ST_Union(geom) FROM ${this.schema}.${refTable}))`;
+            return `ST_Contains(geom, (SELECT ST_Union(geom) FROM ${refSchema}.${refTable}))`;
           case 'touches':
-            return `ST_Touches(geom, (SELECT ST_Union(geom) FROM ${this.schema}.${refTable}))`;
+            return `ST_Touches(geom, (SELECT ST_Union(geom) FROM ${refSchema}.${refTable}))`;
           case 'distance_less_than':
-            return `ST_Distance(geom::geography, (SELECT ST_Union(geom)::geography FROM ${this.schema}.${refTable})) < ${condition.distance || 0}`;
+            return `ST_Distance(geom::geography, (SELECT ST_Union(geom)::geography FROM ${refSchema}.${refTable})) < ${condition.distance || 0}`;
           default:
             throw new Error(`Unsupported spatial operation: ${condition.operation}`);
         }

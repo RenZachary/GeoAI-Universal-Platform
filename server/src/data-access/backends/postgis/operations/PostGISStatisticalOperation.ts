@@ -23,10 +23,23 @@ export class PostGISStatisticalOperation {
   }
   
   async getUniqueValues(tableName: string, fieldName: string): Promise<string[]> {
+    // Parse table reference
+    let sourceSchema: string;
+    let sourceTable: string;
+    
+    if (tableName.includes('.')) {
+      const parts = tableName.split('.');
+      sourceSchema = parts[0];
+      sourceTable = parts[1];
+    } else {
+      sourceSchema = this.schema;
+      sourceTable = tableName;
+    }
+    
     try {
       const result = await this.pool.query(`
         SELECT DISTINCT ${fieldName}
-        FROM ${this.schema}.${tableName}
+        FROM ${sourceSchema}.${sourceTable}
         WHERE ${fieldName} IS NOT NULL
         ORDER BY ${fieldName}
       `);
@@ -39,6 +52,19 @@ export class PostGISStatisticalOperation {
   }
   
   async getFieldStatistics(tableName: string, fieldName: string): Promise<FieldStatistics> {
+    // Parse table reference
+    let sourceSchema: string;
+    let sourceTable: string;
+    
+    if (tableName.includes('.')) {
+      const parts = tableName.split('.');
+      sourceSchema = parts[0];
+      sourceTable = parts[1];
+    } else {
+      sourceSchema = this.schema;
+      sourceTable = tableName;
+    }
+    
     try {
       const result = await this.pool.query(`
         SELECT 
@@ -47,7 +73,7 @@ export class PostGISStatisticalOperation {
           AVG(${fieldName}) as mean,
           STDDEV(${fieldName}) as stddev,
           COUNT(${fieldName}) as count
-        FROM ${this.schema}.${tableName}
+        FROM ${sourceSchema}.${sourceTable}
         WHERE ${fieldName} IS NOT NULL
       `);
       
@@ -73,6 +99,19 @@ export class PostGISStatisticalOperation {
     method: 'quantile' | 'equal_interval' | 'jenks' | 'standard_deviation',
     numClasses: number = 5
   ): Promise<number[]> {
+    // Parse table reference
+    let sourceSchema: string;
+    let sourceTable: string;
+    
+    if (tableName.includes('.')) {
+      const parts = tableName.split('.');
+      sourceSchema = parts[0];
+      sourceTable = parts[1];
+    } else {
+      sourceSchema = this.schema;
+      sourceTable = tableName;
+    }
+    
     const stats = await this.getFieldStatistics(tableName, fieldName);
     const breaks: number[] = [];
     
@@ -93,7 +132,7 @@ export class PostGISStatisticalOperation {
           const percentile = (i / numClasses) * 100;
           const result = await this.pool.query(`
             SELECT PERCENTILE_CONT($1) WITHIN GROUP (ORDER BY ${fieldName}) as value
-            FROM ${this.schema}.${tableName}
+            FROM ${sourceSchema}.${sourceTable}
             WHERE ${fieldName} IS NOT NULL
           `, [percentile / 100]);
           breaks.push(parseFloat(result.rows[0].value));
@@ -120,7 +159,7 @@ export class PostGISStatisticalOperation {
           const percentile = (i / numClasses) * 100;
           const result = await this.pool.query(`
             SELECT PERCENTILE_CONT($1) WITHIN GROUP (ORDER BY ${fieldName}) as value
-            FROM ${this.schema}.${tableName}
+            FROM ${sourceSchema}.${sourceTable}
             WHERE ${fieldName} IS NOT NULL
           `, [percentile / 100]);
           breaks.push(parseFloat(result.rows[0].value));

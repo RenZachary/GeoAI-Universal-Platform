@@ -96,11 +96,69 @@ export class DataSourceService {
     this.dataSourceRepo = dataSourceRepo;
     this.dataAccess = DataAccessFacade.getInstance(workspaceBase);
     this.db = db;
+    
+    // Restore PostGIS connections from registered data sources on startup
+    this.restorePostGISConnections();
   }
 
   // ==========================================================================
   // Public API - Data Source Operations
   // ==========================================================================
+
+  /**
+   * Restore PostGIS connections from registered data sources on startup
+   * This ensures that after server restart, PostGIS backends are reconfigured
+   */
+  private restorePostGISConnections(): void {
+    try {
+      const allSources = this.dataSourceRepo.listAll();
+      const postgisSources = allSources.filter(ds => ds.type === 'postgis');
+      
+      if (postgisSources.length === 0) {
+        console.log('[DataSourceService] No PostGIS data sources to restore');
+        return;
+      }
+      
+      // Extract unique connection configs from PostGIS data sources
+      const connectionConfigs = new Map<string, PostGISConnectionConfig>();
+      
+      for (const source of postgisSources) {
+        const connection = source.metadata?.connection;
+        if (connection && connection.host && connection.database && connection.user && connection.password) {
+          const connectionKey = `${connection.host}:${connection.port || 5432}:${connection.database}`;
+          
+          if (!connectionConfigs.has(connectionKey)) {
+            connectionConfigs.set(connectionKey, {
+              host: connection.host,
+              port: connection.port || 5432,
+              database: connection.database,
+              user: connection.user,
+              password: connection.password,
+              schema: connection.schema || 'public',
+              name: source.name.split('.')[0] // Extract connection name
+            });
+          }
+        }
+      }
+      
+      // Configure each unique connection
+      console.log(`[DataSourceService] Restoring ${connectionConfigs.size} PostGIS connection(s)...`);
+      for (const [key, config] of connectionConfigs.entries()) {
+        try {
+          console.log(`[DataSourceService] Restoring connection: ${config.host}:${config.port}/${config.database}`);
+          this.dataAccess.configurePostGIS(config);
+          console.log(`[DataSourceService] ✓ Connection restored: ${key}`);
+        } catch (error) {
+          console.error(`[DataSourceService] ✗ Failed to restore connection ${key}:`, error instanceof Error ? error.message : 'Unknown error');
+        }
+      }
+      
+      console.log(`[DataSourceService] PostGIS connection restoration complete`);
+    } catch (error) {
+      console.error('[DataSourceService] Error restoring PostGIS connections:', error);
+      // Don't throw - allow server to start even if restoration fails
+    }
+  }
 
   /**
    * List all registered data sources

@@ -4,6 +4,8 @@
 
 import type { Pool } from 'pg';
 import type { BufferOptions } from '../../../interfaces';
+import { TEMP_SCHEMA } from '../constants';
+import { parseTableReference, getColumnList } from '../utils/SqlUtils';
 
 export class PostGISBufferOperation {
   private pool: Pool;
@@ -22,6 +24,9 @@ export class PostGISBufferOperation {
     const unit = options?.unit || 'meters';
     const dissolve = options?.dissolve || false;
     
+    // Parse table reference to extract schema and table
+    const { schema: sourceSchema, tableName: sourceTable } = parseTableReference(tableName, this.schema);
+    
     // Convert distance to appropriate units for PostGIS
     let distanceSQL: string;
     if (unit === 'meters' || unit === 'kilometers') {
@@ -36,32 +41,35 @@ export class PostGISBufferOperation {
       distanceSQL = `${distance}`;
     }
     
-    const resultTable = `buffer_${tableName}_${Date.now()}`;
+    // Result table always goes to geoai_temp schema
+    const resultTable = `buffer_${sourceTable}_${Date.now()}`;
     
     try {
       if (dissolve) {
         // Dissolve overlapping buffers
         await this.pool.query(`
-          CREATE TABLE ${this.schema}.${resultTable} AS
+          CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
           SELECT 
             ST_Union(ST_Buffer(geom::geography, ${distanceSQL})::geometry) as geom,
             COUNT(*) as feature_count
-          FROM ${this.schema}.${tableName}
+          FROM ${sourceSchema}.${sourceTable}
         `);
       } else {
-        // Individual buffers
+        // Individual buffers - get column list excluding geom
+        const columnList = await getColumnList(this.pool, sourceSchema, sourceTable);
+        
         await this.pool.query(`
-          CREATE TABLE ${this.schema}.${resultTable} AS
+          CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
           SELECT 
             ST_Buffer(geom::geography, ${distanceSQL})::geometry as geom,
-            *
-          FROM ${this.schema}.${tableName}
+            ${columnList}
+          FROM ${sourceSchema}.${sourceTable}
         `);
       }
       
       // Add spatial index
       await this.pool.query(`
-        CREATE INDEX idx_${resultTable}_geom ON ${this.schema}.${resultTable} USING GIST (geom)
+        CREATE INDEX idx_${resultTable}_geom ON ${TEMP_SCHEMA}.${resultTable} USING GIST (geom)
       `);
       
       console.log(`[PostGISBufferOperation] Buffer created: ${resultTable}`);

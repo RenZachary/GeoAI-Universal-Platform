@@ -3,6 +3,8 @@
  */
 
 import type { Pool } from 'pg';
+import { TEMP_SCHEMA } from '../constants';
+import { parseTableReference, getColumnList } from '../utils/SqlUtils';
 
 export class PostGISSpatialJoinOperation {
   private pool: Pool;
@@ -19,7 +21,11 @@ export class PostGISSpatialJoinOperation {
     operation: string,
     joinType: string = 'inner'
   ): Promise<string> {
-    const resultTable = `spatialjoin_${targetTable}_${Date.now()}`;
+    // Parse table references
+    const { schema: targetSchema, tableName: targetName } = parseTableReference(targetTable, this.schema);
+    const { schema: joinSchema, tableName: joinName } = parseTableReference(joinTable, this.schema);
+    
+    const resultTable = `spatialjoin_${targetName}_${Date.now()}`;
     
     let spatialCondition: string;
     
@@ -50,33 +56,39 @@ export class PostGISSpatialJoinOperation {
     
     if (joinType === 'left') {
       // LEFT JOIN - keep all target features
+      const jColumns = await getColumnList(this.pool, joinSchema, joinName, ['geom'], 'j');
+      
       sql = `
-        CREATE TABLE ${this.schema}.${resultTable} AS
+        CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
         SELECT 
           t.*,
-          j.*
-        FROM ${this.schema}.${targetTable} t
-        LEFT JOIN ${this.schema}.${joinTable} j ON ${spatialCondition}
+          ${jColumns}
+        FROM ${targetSchema}.${targetName} t
+        LEFT JOIN ${joinSchema}.${joinName} j ON ${spatialCondition}
       `;
     } else if (joinType === 'right') {
       // RIGHT JOIN - keep all join features
+      const tColumns = await getColumnList(this.pool, targetSchema, targetName, ['geom'], 't');
+      
       sql = `
-        CREATE TABLE ${this.schema}.${resultTable} AS
+        CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
         SELECT 
-          t.*,
+          ${tColumns},
           j.*
-        FROM ${this.schema}.${targetTable} t
-        RIGHT JOIN ${this.schema}.${joinTable} j ON ${spatialCondition}
+        FROM ${targetSchema}.${targetName} t
+        RIGHT JOIN ${joinSchema}.${joinName} j ON ${spatialCondition}
       `;
     } else {
       // INNER JOIN (default) - only matching features
+      const jColumns = await getColumnList(this.pool, joinSchema, joinName, ['geom'], 'j');
+      
       sql = `
-        CREATE TABLE ${this.schema}.${resultTable} AS
+        CREATE TABLE ${TEMP_SCHEMA}.${resultTable} AS
         SELECT 
           t.*,
-          j.*
-        FROM ${this.schema}.${targetTable} t
-        INNER JOIN ${this.schema}.${joinTable} j ON ${spatialCondition}
+          ${jColumns}
+        FROM ${targetSchema}.${targetName} t
+        INNER JOIN ${joinSchema}.${joinName} j ON ${spatialCondition}
       `;
     }
     
@@ -85,7 +97,7 @@ export class PostGISSpatialJoinOperation {
       
       // Add spatial index
       await this.pool.query(`
-        CREATE INDEX idx_${resultTable}_geom ON ${this.schema}.${resultTable} USING GIST (geom)
+        CREATE INDEX idx_${resultTable}_geom ON ${TEMP_SCHEMA}.${resultTable} USING GIST (geom)
       `);
       
       console.log(`[PostGISSpatialJoinOperation] ${operation} join created: ${resultTable}`);

@@ -19,10 +19,12 @@ const BufferInputSchema = z.object({
   dissolve: z.boolean().default(false).describe('Whether to dissolve overlapping buffers')
 });
 
-// Output schema using Zod
+// Output schema using Zod - returns complete NativeData structure
 const BufferOutputSchema = z.object({
-  result: z.string().describe('File path or URL to the buffered geometry'),
-  featureCount: z.number().describe('Number of buffered features')
+  id: z.string().describe('Unique identifier for the result'),
+  type: z.string().describe('Data source type (postgis, geojson, etc.)'),
+  reference: z.string().describe('Reference to the buffered data'),
+  metadata: z.record(z.any()).optional().describe('Metadata including connection info for MVT publishing')
 });
 
 export class BufferOperator extends SpatialOperator {
@@ -94,14 +96,20 @@ export class BufferOperator extends SpatialOperator {
       { distance: params.distance, unit: params.unit }
     );
     
-    // Ensure standardized output field exists
-    if (persistedResult.metadata && persistedResult.metadata.result === undefined) {
-      persistedResult.metadata.result = persistedResult.reference;
-    }
+    console.log('[BufferOperator] Persisted result:', {
+      id: persistedResult.id,
+      type: persistedResult.type,
+      reference: persistedResult.reference,
+      hasMetadata: !!persistedResult.metadata,
+      metadataKeys: persistedResult.metadata ? Object.keys(persistedResult.metadata) : []
+    });
     
+    // Return complete NativeData structure so metadata (including connection info) is preserved for MVT publishing
     return {
-      result: persistedResult.metadata?.result || persistedResult.reference,
-      featureCount: persistedResult.metadata?.featureCount || 0
+      id: persistedResult.id,
+      type: persistedResult.type,
+      reference: persistedResult.reference,
+      metadata: persistedResult.metadata
     };
   }
 }

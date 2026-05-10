@@ -140,11 +140,30 @@ export class ApiRouter {
       this.router.delete('/plugins/:id', (req, res) => this.pluginManagementController?.deletePlugin(req, res));
     }
 
-    // MVT service endpoints (on-demand tile generation via MVTOnDemandPublisher)
-    this.router.get('/services/mvt', (req, res) => this.mvtOnDemandController.listTilesets(req, res));
-    this.router.get('/services/mvt/:tilesetId/metadata', (req, res) => this.mvtOnDemandController.getMetadata(req, res));
-    this.router.get('/services/mvt/:tilesetId/:z/:x/:y.pbf', (req, res) => this.mvtOnDemandController.getTile(req, res));
-    this.router.delete('/services/mvt/:tilesetId', (req, res) => this.mvtOnDemandController.deleteTileset(req, res));
+    // MVT service endpoints
+    // MVTStrategyPublisher routes (for PostGIS, GeoJSON file, Shapefile via strategy pattern)
+    this.router.get('/services/mvt', (req, res) => {
+      // Try MVTServiceController first (strategy-based), fallback to MVTOnDemandController
+      void this.mvtServiceController.listTilesets(req, res);
+    });
+    this.router.get('/services/mvt/:tilesetId/metadata', (req, res) => {
+      // Try MVTServiceController first, fallback to MVTOnDemandController
+      void this.mvtServiceController.getMetadata(req, res).catch(() => {
+        void this.mvtOnDemandController.getMetadata(req, res);
+      });
+    });
+    this.router.get('/services/mvt/:tilesetId/:z/:x/:y.pbf', (req, res) => {
+      // Try MVTServiceController first (strategy-based tiles), fallback to MVTOnDemandController
+      void this.mvtServiceController.serveTile(req, res).catch(() => {
+        void this.mvtOnDemandController.getTile(req, res);
+      });
+    });
+    this.router.delete('/services/mvt/:tilesetId', (req, res) => {
+      // Try MVTServiceController first, fallback to MVTOnDemandController
+      void this.mvtServiceController.deleteTileset(req, res).catch(() => {
+        void this.mvtOnDemandController.deleteTileset(req, res);
+      });
+    });
 
     // WMS service endpoints
     this.router.get('/services/wms', (req, res) => this.wmsServiceController.listServices(req, res));
