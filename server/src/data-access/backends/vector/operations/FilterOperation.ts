@@ -4,17 +4,13 @@
 
 import * as turf from '@turf/turf';
 import type { FilterCondition } from '../../../interfaces';
-
-interface GeoJSONFeatureCollection {
-  type: 'FeatureCollection';
-  features: any[];
-}
+import type { PlatformFeatureCollection } from '../../../../core';
 
 export class FilterOperation {
   async execute(
-    geojson: GeoJSONFeatureCollection,
+    geojson: PlatformFeatureCollection,
     filterCondition: FilterCondition
-  ): Promise<GeoJSONFeatureCollection> {
+  ): Promise<PlatformFeatureCollection> {
     const filteredFeatures = geojson.features.filter(feature => {
       return this.evaluateFilter(feature, filterCondition);
     });

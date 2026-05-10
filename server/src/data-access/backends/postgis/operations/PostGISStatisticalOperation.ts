@@ -3,15 +3,7 @@
  */
 
 import type { Pool } from 'pg';
-
-export interface FieldStatistics {
-  min: number;
-  max: number;
-  mean: number;
-  stdDev: number;
-  count: number;
-  values: number[];
-}
+import type { FieldStatistics } from '../../../interfaces';
 
 export class PostGISStatisticalOperation {
   private pool: Pool;
@@ -72,7 +64,8 @@ export class PostGISStatisticalOperation {
           MAX(${fieldName}) as max,
           AVG(${fieldName}) as mean,
           STDDEV(${fieldName}) as stddev,
-          COUNT(${fieldName}) as count
+          COUNT(${fieldName}) as count,
+          SUM(${fieldName}) as sum
         FROM ${sourceSchema}.${sourceTable}
         WHERE ${fieldName} IS NOT NULL
       `);
@@ -85,6 +78,7 @@ export class PostGISStatisticalOperation {
         mean: parseFloat(row.mean) || 0,
         stdDev: parseFloat(row.stddev) || 0,
         count: parseInt(row.count) || 0,
+        sum: parseFloat(row.sum) || 0,
         values: [] // Full values not retrieved for performance
       };
     } catch (error) {

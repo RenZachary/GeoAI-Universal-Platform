@@ -12,7 +12,7 @@
  */
 
 import type Database from 'better-sqlite3';
-import { MVTOnDemandPublisher } from '../utils/publishers/MVTOnDemandPublisher';
+import { MVTStrategyPublisher } from '../utils/publishers/MVTStrategyPublisher';
 import { WMSPublisher } from '../utils/publishers/WMSPublisher';
 import type { MVTSource, MVTTileOptions } from '../utils/publishers/base/MVTPublisherTypes';
 import type { NativeData } from '../core';
@@ -24,7 +24,13 @@ import type { WMSLayerOptions } from '../utils/publishers/base/WMSStategies/WMSP
 
 export type ServiceType = 'mvt' | 'wms' | 'geojson' | 'report';
 
-export interface ServiceMetadata {
+/**
+ * Visualization Service Info - Platform service lifecycle metadata
+ * 
+ * Tracks service registration, access patterns, and expiration.
+ * NOT to be confused with core ServiceMetadata which is for rendering configuration.
+ */
+export interface VisualizationServiceInfo {
   id: string;
   type: ServiceType;
   url: string;
@@ -41,13 +47,13 @@ export interface ServicePublishResult {
   serviceId?: string;
   url?: string;
   error?: string;
-  metadata?: ServiceMetadata;
+  metadata?: VisualizationServiceInfo;
 }
 
 export interface ServiceRegistry {
-  get(serviceId: string): ServiceMetadata | null;
-  list(type?: ServiceType): ServiceMetadata[];
-  register(metadata: ServiceMetadata): void;
+  get(serviceId: string): VisualizationServiceInfo | null;
+  list(type?: ServiceType): VisualizationServiceInfo[];
+  register(metadata: VisualizationServiceInfo): void;
   unregister(serviceId: string): void;
   updateLastAccessed(serviceId: string): void;
 }
@@ -57,7 +63,7 @@ export interface ServiceRegistry {
 // ============================================================================
 
 export class InMemoryServiceRegistry implements ServiceRegistry {
-  private services: Map<string, ServiceMetadata> = new Map();
+  private services: Map<string, VisualizationServiceInfo> = new Map();
   private db?: Database.Database;
 
   constructor(db?: Database.Database) {
@@ -102,7 +108,7 @@ export class InMemoryServiceRegistry implements ServiceRegistry {
       }
       const rows = this.db.prepare('SELECT * FROM visualization_services').all() as any[];
       for (const row of rows) {
-        const metadata: ServiceMetadata = {
+        const metadata: VisualizationServiceInfo = {
           id: row.service_id,
           type: row.service_type,
           url: row.url,
@@ -121,7 +127,7 @@ export class InMemoryServiceRegistry implements ServiceRegistry {
     }
   }
 
-  get(serviceId: string): ServiceMetadata | null {
+  get(serviceId: string): VisualizationServiceInfo | null {
     const service = this.services.get(serviceId);
     if (service) {
       // Update access tracking
@@ -136,12 +142,12 @@ export class InMemoryServiceRegistry implements ServiceRegistry {
     return service || null;
   }
 
-  list(type?: ServiceType): ServiceMetadata[] {
+  list(type?: ServiceType): VisualizationServiceInfo[] {
     const services = Array.from(this.services.values());
     return type ? services.filter(s => s.type === type) : services;
   }
 
-  register(metadata: ServiceMetadata): void {
+  register(metadata: VisualizationServiceInfo): void {
     this.services.set(metadata.id, metadata);
 
     // Persist to database if available
@@ -175,7 +181,7 @@ export class InMemoryServiceRegistry implements ServiceRegistry {
     }
   }
 
-  private persistToDatabase(metadata: ServiceMetadata): void {
+  private persistToDatabase(metadata: VisualizationServiceInfo): void {
     try {
       if (!this.db) {
         console.warn('[ServiceRegistry] Database is not initialized');
@@ -204,7 +210,7 @@ export class InMemoryServiceRegistry implements ServiceRegistry {
   /**
    * Get expired services for cleanup
    */
-  getExpiredServices(): ServiceMetadata[] {
+  getExpiredServices(): VisualizationServiceInfo[] {
     const now = new Date();
     return Array.from(this.services.values()).filter(service => {
       if (service.expiresAt && service.expiresAt < now) {
@@ -237,7 +243,7 @@ export class VisualizationServicePublisher {
   private static instance: VisualizationServicePublisher | null = null;
 
   private registry: InMemoryServiceRegistry;
-  private mvtPublisher: MVTOnDemandPublisher;
+  private mvtPublisher: MVTStrategyPublisher;  // Changed to use new strategy-based publisher
   private wmsPublisher: WMSPublisher;
   private workspaceBase: string;
   private db?: Database.Database;
@@ -252,7 +258,7 @@ export class VisualizationServicePublisher {
     this.registry = new InMemoryServiceRegistry(db);
 
     // Initialize publishers
-    this.mvtPublisher = MVTOnDemandPublisher.getInstance(workspaceBase, 10000);
+    this.mvtPublisher = MVTStrategyPublisher.getInstance(workspaceBase, db);
     this.wmsPublisher = WMSPublisher.getInstance(workspaceBase, db);
 
     // Start automatic cleanup
@@ -294,7 +300,35 @@ export class VisualizationServicePublisher {
     serviceId?: string
   ): Promise<ServicePublishResult> {
     try {
-      const result = await this.mvtPublisher.publish(source, options, serviceId);
+      // Convert old MVTSource format to NativeData format for MVTStrategyPublisher
+      let nativeData: NativeData;
+      
+      if (source.type === 'postgis') {
+        nativeData = {
+          id: serviceId || 'temp-postgis',
+          type: 'postgis',
+          reference: source.tableName || '',
+          metadata: {
+            connection: source.connection,
+            tableName: source.tableName,
+            sqlQuery: source.sqlQuery,
+            geometryColumn: source.geometryColumn || 'geom'
+          } as any,
+          createdAt: new Date()
+        };
+      } else if (source.type === 'geojson-file') {
+        nativeData = {
+          id: serviceId || 'temp-geojson',
+          type: 'geojson',
+          reference: source.filePath,
+          metadata: {} as any,
+          createdAt: new Date()
+        };
+      } else {
+        throw new Error(`Unsupported MVT source type: ${(source as any).type}`);
+      }
+
+      const result = await this.mvtPublisher.publish(nativeData, options);
 
       if (!result.success) {
         return {
@@ -303,7 +337,7 @@ export class VisualizationServicePublisher {
         };
       }
 
-      const metadata: ServiceMetadata = {
+      const metadata: VisualizationServiceInfo = {
         id: result.tilesetId,
         type: 'mvt',
         url: `/api/services/mvt/${result.tilesetId}/{z}/{x}/{y}.pbf`,
@@ -340,7 +374,7 @@ export class VisualizationServicePublisher {
     try {
       const generatedServiceId = await this.wmsPublisher.generateService(nativeData, options);
 
-      const metadata: ServiceMetadata = {
+      const metadata: VisualizationServiceInfo = {
         id: generatedServiceId,
         type: 'wms',
         url: `/api/services/wms/${generatedServiceId}`,
@@ -379,7 +413,7 @@ export class VisualizationServicePublisher {
     ttl: number = 3600000
   ): ServicePublishResult {
     try {
-      const metadata: ServiceMetadata = {
+      const metadata: VisualizationServiceInfo = {
         id: stepId,
         type: 'geojson',
         url: `/api/results/${stepId}.geojson`,
@@ -416,7 +450,7 @@ export class VisualizationServicePublisher {
     ttl: number = 86400000 // Default 24 hours for reports
   ): ServicePublishResult {
     try {
-      const metadata: ServiceMetadata = {
+      const metadata: VisualizationServiceInfo = {
         id: stepId,
         type: 'report',
         url: `/api/results/reports/${stepId}.md`,
@@ -449,14 +483,14 @@ export class VisualizationServicePublisher {
   /**
    * Get service metadata by ID
    */
-  getService(serviceId: string): ServiceMetadata | null {
+  getService(serviceId: string): VisualizationServiceInfo | null {
     return this.registry.get(serviceId);
   }
 
   /**
    * List all services or filter by type
    */
-  listServices(type?: ServiceType): ServiceMetadata[] {
+  listServices(type?: ServiceType): VisualizationServiceInfo[] {
     return this.registry.list(type);
   }
 

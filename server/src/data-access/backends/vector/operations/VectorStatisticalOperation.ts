@@ -2,29 +2,20 @@
  * VectorStatisticalOperation - JavaScript-based field statistics for GeoJSON data
  */
 
-interface GeoJSONFeatureCollection {
-  type: 'FeatureCollection';
-  features: Array<{
-    properties?: Record<string, any>;
-  }>;
-}
+import type { PlatformFeatureCollection } from '../../../../core';
+import type { FieldStatistics as BaseFieldStatistics } from '../../../interfaces';
 
-export interface FieldStatistics {
-  min: number;
-  max: number;
-  mean: number;
-  stdDev: number;
+// Extend base FieldStatistics with additional computed fields
+export interface ExtendedFieldStatistics extends BaseFieldStatistics {
   variance: number;
   median: number;
-  count: number;
-  sum: number;
 }
 
 export class VectorStatisticalOperation {
   /**
    * Extract numeric values from GeoJSON features
    */
-  private extractValues(geojson: GeoJSONFeatureCollection, fieldName: string): number[] {
+  private extractValues(geojson: PlatformFeatureCollection, fieldName: string): number[] {
     const values: number[] = [];
     
     for (const feature of geojson.features) {
@@ -40,7 +31,7 @@ export class VectorStatisticalOperation {
   /**
    * Get unique string values from a field
    */
-  getUniqueValues(geojson: GeoJSONFeatureCollection, fieldName: string): string[] {
+  getUniqueValues(geojson: PlatformFeatureCollection, fieldName: string): string[] {
     const values = new Set<string>();
     
     for (const feature of geojson.features) {
@@ -56,7 +47,7 @@ export class VectorStatisticalOperation {
   /**
    * Calculate comprehensive field statistics
    */
-  getFieldStatistics(geojson: GeoJSONFeatureCollection, fieldName: string): FieldStatistics {
+  getFieldStatistics(geojson: PlatformFeatureCollection, fieldName: string): ExtendedFieldStatistics {
     const values = this.extractValues(geojson, fieldName);
     
     if (values.length === 0) {
@@ -107,7 +98,7 @@ export class VectorStatisticalOperation {
    * Calculate classification breaks for choropleth maps
    */
   getClassificationBreaks(
-    geojson: GeoJSONFeatureCollection,
+    geojson: PlatformFeatureCollection,
     fieldName: string,
     method: 'quantile' | 'equal_interval' | 'jenks' | 'standard_deviation',
     numClasses: number = 5

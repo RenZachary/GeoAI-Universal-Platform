@@ -3,20 +3,16 @@
  */
 
 import * as turf from '@turf/turf';
-
-interface GeoJSONFeatureCollection {
-  type: 'FeatureCollection';
-  features: any[];
-}
+import type { PlatformFeatureCollection } from '../../../../core';
 
 type OverlayType = 'intersect' | 'union' | 'difference' | 'symmetric_difference';
 
 export class OverlayOperation {
   async execute(
-    geojson1: GeoJSONFeatureCollection,
-    geojson2: GeoJSONFeatureCollection,
+    geojson1: PlatformFeatureCollection,
+    geojson2: PlatformFeatureCollection,
     operation: OverlayType
-  ): Promise<GeoJSONFeatureCollection> {
+  ): Promise<PlatformFeatureCollection> {
     const resultFeatures: any[] = [];
     
     for (const feature1 of geojson1.features) {

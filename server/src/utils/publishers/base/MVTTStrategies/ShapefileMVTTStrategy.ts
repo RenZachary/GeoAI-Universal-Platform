@@ -40,8 +40,8 @@ export class ShapefileMVTTStrategy implements MVTTileGenerationStrategy {
 
         console.log(`[Shapefile MVT Strategy] Converted to GeoJSON with ${geojson.features?.length || 0} features`);
 
-        // Generate tilesetId first so we can save the converted GeoJSON in its directory
-        const tilesetId = `mvt_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        // Generate tilesetId first so we can save the converted GeoJSON in its directory (use provided tilesetId if available)
+        const tilesetId = options.tilesetId || `mvt_${Date.now()}_${Math.random().toString(36).substring(7)}`;
         const tilesetDir = path.join(this.mvtOutputDir, tilesetId);
 
         if (!fs.existsSync(tilesetDir)) {

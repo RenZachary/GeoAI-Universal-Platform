@@ -56,8 +56,8 @@ export class GeoJSONMVTTStrategy implements MVTTileGenerationStrategy {
             buffer
         });
 
-        // Generate a unique ID for this tile set
-        const tilesetId = `mvt_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        // Generate a unique ID for this tile set (use provided tilesetId if available)
+        const tilesetId = options.tilesetId || `mvt_${Date.now()}_${Math.random().toString(36).substring(7)}`;
         const tilesetDir = path.join(this.mvtOutputDir, tilesetId);
 
         if (!fs.existsSync(tilesetDir)) {

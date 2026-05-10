@@ -341,7 +341,8 @@ export interface FieldStatistics {
   mean: number;
   stdDev: number;
   count: number;
-  values: number[];
+  sum: number;        // REQUIRED: Essential for all statistical operations
+  values: number[];   // Raw values for advanced calculations
 }
 
 export type ClassificationMethod = 

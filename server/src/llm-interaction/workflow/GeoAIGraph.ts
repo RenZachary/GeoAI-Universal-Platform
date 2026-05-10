@@ -22,6 +22,12 @@ import { ToolRegistryInstance } from '../tools/ToolRegistry';
 import type { ParallelGroup } from '../analyzers/ParallelTaskAnalyzer';
 import { VisualizationServicePublisher } from '../../services/VisualizationServicePublisher';
 import { MVTStrategyPublisher } from '../../utils/publishers/MVTStrategyPublisher';
+import type {
+  AnalysisGoal,
+  ExecutionPlan as CoreExecutionPlan,
+  ExecutionStep as CoreExecutionStep,
+  AnalysisResult as CoreAnalysisResult
+} from '../../core';
 
 // State interface for the GeoAI workflow
 export interface GeoAIState {
@@ -39,37 +45,39 @@ export interface GeoAIState {
   errors?: Array<{ goalId: string; error: string }>;
 }
 
-// Supporting types
-export interface AnalysisGoal {
-  id: string;
-  description: string;
-  priority?: number;
-  parameters?: Record<string, any>; // Optional extracted parameters (e.g., colorRamp, valueField)
-}
+// Re-export types for external use (with workflow extensions)
+export {
+  AnalysisGoal,
+  ParallelGroup
+};
 
-export interface ExecutionPlan {
+/**
+ * Workflow-specific ExecutionPlan extending core with operator tracking
+ */
+export interface ExecutionPlan extends Omit<CoreExecutionPlan, 'steps'> {
   goalId: string;
   steps: ExecutionStep[];
   requiredPlugins: string[];
 }
 
-// Re-export ParallelGroup for external use
-export type { ParallelGroup } from '../analyzers/ParallelTaskAnalyzer';
-
-export interface ExecutionStep {
+/**
+ * Workflow-specific ExecutionStep with operator ID mapping
+ */
+export interface ExecutionStep extends CoreExecutionStep {
   stepId: string;
   operatorId: string; // SpatialOperator ID (matches TaskPlanner output)
-  parameters: Record<string, any>;
-  dependsOn?: string[];
 }
 
-export interface AnalysisResult {
+/**
+ * Workflow-specific AnalysisResult with execution metadata
+ */
+export interface AnalysisResult extends Omit<CoreAnalysisResult, 'completedAt'> {
   id: string;
   goalId: string;
   status: 'success' | 'failed';
   data?: any;
   error?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, any>; // Operator execution metadata (operatorId, executedAt, etc.)
 }
 
 export interface VisualizationService {

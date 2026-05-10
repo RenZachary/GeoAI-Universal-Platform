@@ -8,7 +8,7 @@
 import fs from 'fs';
 import path from 'path';
 import * as turf from '@turf/turf';
-import type { NativeData, DataMetadata } from '../../../core';
+import type { NativeData, DataMetadata, PlatformFeatureCollection } from '../../../core';
 import { generateId, wrapError } from '../../../core';
 import type { FilterCondition, BufferOptions } from '../../interfaces';
 import type { DataBackend } from '../DataBackend';
@@ -19,12 +19,6 @@ import { AggregateOperation } from './operations/AggregateOperation';
 import { SpatialJoinOperation } from './operations/SpatialJoinOperation';
 import { VectorStatisticalOperation } from './operations/VectorStatisticalOperation';
 import { tryMultipleEncodings } from '../../utils/ShapefileEncodingUtils';
-
-interface GeoJSONFeatureCollection {
-  type: 'FeatureCollection';
-  features: any[];
-  crs?: any;
-}
 
 export class VectorBackend implements DataBackend {
   readonly backendType = 'vector' as const;
@@ -245,7 +239,7 @@ export class VectorBackend implements DataBackend {
   
   // ========== Private Helper Methods ==========
   
-  private async loadGeoJSON(reference: string): Promise<GeoJSONFeatureCollection> {
+  private async loadGeoJSON(reference: string): Promise<PlatformFeatureCollection> {
     const ext = path.extname(reference).toLowerCase();
     
     // Handle Shapefile - convert to GeoJSON first
@@ -275,7 +269,7 @@ export class VectorBackend implements DataBackend {
    * Load a shapefile and convert to GeoJSON using the 'shapefile' library
    * Uses shared ShapefileEncodingUtils for intelligent encoding detection
    */
-  private async loadShapefileAsGeoJSON(shpPath: string): Promise<GeoJSONFeatureCollection> {
+  private async loadShapefileAsGeoJSON(shpPath: string): Promise<PlatformFeatureCollection> {
     try {
       // Import shapefile library dynamically
       const shapefileModule = await import('shapefile');
@@ -307,7 +301,7 @@ export class VectorBackend implements DataBackend {
     }
   }
   
-  private async saveGeoJSON(geojson: GeoJSONFeatureCollection): Promise<string> {
+  private async saveGeoJSON(geojson: PlatformFeatureCollection): Promise<string> {
     const workspaceDir = process.env.WORKSPACE_DIR || './workspace';
     const resultsDir = path.join(workspaceDir, 'results', 'geojson');
     
@@ -323,7 +317,7 @@ export class VectorBackend implements DataBackend {
     return filepath;
   }
   
-  private extractMetadata(geojson: GeoJSONFeatureCollection, reference: string): DataMetadata {
+  private extractMetadata(geojson: PlatformFeatureCollection, reference: string): DataMetadata {
     const stats = fs.statSync(reference);
     const featureCount = geojson.features?.length || 0;
     const geometryTypes = new Set(
@@ -341,11 +335,11 @@ export class VectorBackend implements DataBackend {
     };
   }
   
-  private extractCRS(_geojson: GeoJSONFeatureCollection): string {
+  private extractCRS(_geojson: PlatformFeatureCollection): string {
     return 'EPSG:4326';
   }
   
-  private calculateBbox(geojson: GeoJSONFeatureCollection): [number, number, number, number] | null {
+  private calculateBbox(geojson: PlatformFeatureCollection): [number, number, number, number] | null {
     try {
       const bbox = (turf as any).bbox(geojson);
       return bbox ? [bbox[0], bbox[1], bbox[2], bbox[3]] : null;
@@ -354,7 +348,7 @@ export class VectorBackend implements DataBackend {
     }
   }
   
-  private extractFields(geojson: GeoJSONFeatureCollection): any[] {
+  private extractFields(geojson: PlatformFeatureCollection): any[] {
     if (geojson.features.length === 0) return [];
     
     const firstFeature = geojson.features[0];
@@ -366,7 +360,7 @@ export class VectorBackend implements DataBackend {
     }));
   }
   
-  private extractSampleValues(geojson: GeoJSONFeatureCollection): Record<string, any[]> {
+  private extractSampleValues(geojson: PlatformFeatureCollection): Record<string, any[]> {
     const samples: Record<string, any[]> = {};
     const maxSamples = 5;
     

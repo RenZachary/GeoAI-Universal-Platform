@@ -2,18 +2,15 @@
  * AggregateOperation - Statistical aggregation (MAX, MIN, AVG, SUM, COUNT, MEDIAN, STD_DEV, VARIANCE)
  */
 
-interface GeoJSONFeatureCollection {
-  type: 'FeatureCollection';
-  features: any[];
-}
+import type { PlatformFeatureCollection } from '../../../../core';
 
 export class AggregateOperation {
   async execute(
-    geojson: GeoJSONFeatureCollection,
+    geojson: PlatformFeatureCollection,
     aggFunc: string,
     field: string,
     returnFeature?: boolean
-  ): Promise<GeoJSONFeatureCollection> {
+  ): Promise<PlatformFeatureCollection> {
     const values: number[] = [];
     let targetFeature: any = null;
     

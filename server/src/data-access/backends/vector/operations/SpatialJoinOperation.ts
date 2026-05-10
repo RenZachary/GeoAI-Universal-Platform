@@ -3,19 +3,15 @@
  */
 
 import * as turf from '@turf/turf';
-
-interface GeoJSONFeatureCollection {
-  type: 'FeatureCollection';
-  features: any[];
-}
+import type { PlatformFeatureCollection } from '../../../../core';
 
 export class SpatialJoinOperation {
   async execute(
-    targetGeoJSON: GeoJSONFeatureCollection,
-    joinGeoJSON: GeoJSONFeatureCollection,
+    targetGeoJSON: PlatformFeatureCollection,
+    joinGeoJSON: PlatformFeatureCollection,
     operation: string,
     joinType: string = 'inner'
-  ): Promise<GeoJSONFeatureCollection> {
+  ): Promise<PlatformFeatureCollection> {
     const joinedFeatures: any[] = [];
     
     for (const targetFeature of targetGeoJSON.features) {

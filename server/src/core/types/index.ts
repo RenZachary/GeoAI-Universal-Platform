@@ -5,6 +5,26 @@
  */
 
 // ============================================================================
+// GeoJSON Types (Centralized)
+// ============================================================================
+
+export type {
+  PlatformFeatureCollection,
+  FeatureCollection,
+  Feature,
+  Geometry,
+  Point,
+  LineString,
+  Polygon,
+  MultiPoint,
+  MultiLineString,
+  MultiPolygon,
+  GeometryCollection,
+  Position,
+  BBox
+} from './geojson';
+
+// ============================================================================
 // Goal and Execution Types
 // ============================================================================
 

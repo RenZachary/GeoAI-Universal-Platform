@@ -4,18 +4,14 @@
 
 import * as turf from '@turf/turf';
 import type { BufferOptions } from '../../../interfaces';
-
-interface GeoJSONFeatureCollection {
-  type: 'FeatureCollection';
-  features: any[];
-}
+import type { PlatformFeatureCollection } from '../../../../core';
 
 export class BufferOperation {
   async execute(
-    geojson: GeoJSONFeatureCollection,
+    geojson: PlatformFeatureCollection,
     distance: number,
     options?: BufferOptions
-  ): Promise<GeoJSONFeatureCollection> {
+  ): Promise<PlatformFeatureCollection> {
     const unit = options?.unit || 'meters';
     const dissolve = options?.dissolve || false;
     
@@ -32,7 +28,7 @@ export class BufferOperation {
       }
     }
     
-    let result: GeoJSONFeatureCollection = {
+    let result: PlatformFeatureCollection = {
       type: 'FeatureCollection',
       features: bufferedFeatures
     };
