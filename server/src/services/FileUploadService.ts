@@ -458,73 +458,12 @@ export class FileUploadService {
    */
   private async extractMetadata(filePath: string, type: DataSourceType): Promise<NativeData> {
     try {
-      // Use DataAccessFacade to read and extract metadata
-      const dataAccess = this.dataAccess;
-      let nativeData: NativeData;
-
-      if (type === 'geojson') {
-        // Read GeoJSON using VectorBackend
-        const content = fs.readFileSync(filePath, 'utf-8');
-        const geojson = JSON.parse(content);
-        
-        // Count features
-        let featureCount = 0;
-        if (geojson.type === 'FeatureCollection' && Array.isArray(geojson.features)) {
-          featureCount = geojson.features.length;
-        } else if (geojson.type === 'Feature') {
-          featureCount = 1;
-        }
-        
-        // Extract bounding box if available
-        const bbox = geojson.bbox || null;
-        
-        nativeData = {
-          id: `upload_${Date.now()}`,
-          type,
-          reference: filePath,
-          createdAt: new Date(),
-          metadata: {
-            name: path.basename(filePath),
-            format: type,
-            featureCount,
-            bbox,
-            result: filePath
-          }
-        };
-      } else if (type === 'tif') {
-        // For GeoTIFF, get basic file info
-        const stats = fs.statSync(filePath);
-        
-        nativeData = {
-          id: `upload_${Date.now()}`,
-          type,
-          reference: filePath,
-          createdAt: new Date(),
-          metadata: {
-            name: path.basename(filePath),
-            format: type,
-            fileSize: stats.size,
-            result: filePath
-          }
-        };
-      } else {
-        // Default metadata for other types
-        const stats = fs.statSync(filePath);
-        
-        nativeData = {
-          id: `upload_${Date.now()}`,
-          type,
-          reference: filePath,
-          createdAt: new Date(),
-          metadata: {
-            name: path.basename(filePath),
-            format: type,
-            fileSize: stats.size,
-            result: filePath
-          }
-        };
-      }
-
+      // Use DataAccessFacade to read and extract metadata via Accessor layer
+      const nativeData = await this.dataAccess.read(type, filePath);
+      
+      // Ensure the reference points to the uploaded file path
+      nativeData.reference = filePath;
+      
       console.log(`[FileUploadService] Metadata extracted: ${JSON.stringify(nativeData.metadata)}`);
       return nativeData;
     } catch (error) {
