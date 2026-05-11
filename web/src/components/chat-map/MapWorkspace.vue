@@ -7,7 +7,7 @@
         <el-dropdown @command="handleBasemapChange" trigger="click">
           <el-button class="toolbar-btn basemap-btn" size="default">
             <el-icon><MapLocation /></el-icon>
-            <span class="btn-text">{{ basemapLabels[mapStore.basemap] }}</span>
+            <span class="btn-text">{{ basemapLabels[mapStore.basemap || 'cartoDark'] || 'Carto Dark' }}</span>
             <el-icon class="arrow-icon"><ArrowDown /></el-icon>
           </el-button>
           <template #dropdown>
@@ -41,7 +41,7 @@
             type="danger"
             plain
             @click="handleClearAllLayers" 
-            :disabled="mapStore.layers.length === 0"
+            :disabled="mapStore.layers?.length === 0"
           >
             <el-icon><Delete /></el-icon>
           </el-button>
@@ -76,11 +76,11 @@
       <div class="layer-panel">
         <!-- Summary Stats -->
         <div class="layer-stats">
-          <el-statistic :title="t('map.totalLayers')" :value="mapStore.layers.length" />
+          <el-statistic :title="t('map.totalLayers')" :value="mapStore.layers?.length || 0" />
           <el-statistic :title="t('map.visible')" :value="mapStore.visibleLayers.length" style="margin-left: 20px" />
         </div>
 
-        <el-empty v-if="mapStore.layers.length === 0" :description="t('map.noLayers')" :image-size="80" />
+        <el-empty v-if="mapStore.layers?.length === 0" :description="t('map.noLayers')" :image-size="80" />
 
         <!-- Layers List -->
         <div v-else class="layers-list">
@@ -159,6 +159,7 @@ onMounted(async () => {
       const layerId = `layer-${ds.id}`
 
       // Check if layer already exists to prevent duplicates
+      if (!mapStore.layers) continue // Skip if layers array is not initialized
       const existingLayer = mapStore.layers.find(l => l.id === layerId)
       if (existingLayer) {
         // console.log(`Layer ${layerId} already exists, skipping...`)
@@ -244,6 +245,7 @@ function handleFullscreenChange() {
 // Feature popup handlers
 function handleMapClick(event: any) {
   // Only query features if there are visible MVT or GeoJSON layers
+  if (!mapStore.layers) return
   const hasQueryableLayers = mapStore.layers.some(
     layer => layer.visible && (layer.type === LayerType.MVT || layer.type === LayerType.GeoJSON)
   )
