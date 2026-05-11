@@ -21,6 +21,8 @@
 
 ![首页](https://foruda.gitee.com/images/1778104634845045889/691faa01_790454.png "首页")
 
+> ⚠️ **Project Status**: GeoAI-UP is currently under **active development**. While core features are functional, you may encounter incomplete implementations or bugs as we continue to refine the architecture and expand capabilities. We welcome your feedback and contributions via [Issues](https://gitee.com/rzcgis/geo-ai-universal-platform/issues).
+
 For any issues, please submit an [Issue](https://gitee.com/rzcgis/geo-ai-universal-platform/issues). We will respond uniformly there. No responses will be provided elsewhere. Thank you for your understanding.
 
 ### Core Advantages
@@ -66,8 +68,6 @@ GeoAI-UP:
 ---
 
 ## 🚀 Features
-
-> ⚠️ **Note**: This project is under active development. Some features may be incomplete or have known issues. Feel free to report problems and suggestions via [Issues](https://gitee.com/rzcgis/geo-ai-universal-platform/issues).
 
 ### Intelligent AI Assistant
 - **Goal Splitting**: Breaks complex requests into manageable sub-tasks

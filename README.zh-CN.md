@@ -20,6 +20,7 @@
 
 ![首页](https://foruda.gitee.com/images/1778104634845045889/691faa01_790454.png "首页")
 
+> ⚠️ **项目状态**：GeoAI-UP 目前处于**积极开发阶段**。虽然核心功能已可运行，但在架构优化和功能扩展过程中，您可能会遇到不完善之处或已知问题。我们非常欢迎您通过 [Issues](https://gitee.com/rzcgis/geo-ai-universal-platform/issues) 提供反馈和贡献。
 
 任何问题请提[Issue](https://gitee.com/rzcgis/geo-ai-universal-platform/issues)，统一回复，其他地方概不回复，请谅解。
 
@@ -31,9 +32,6 @@
 🤖 **AI 驱动工作流** - 基于 LangGraph 的智能任务编排  
 🔌 **可扩展插件** - 支持自定义插件开发  
 📊 **多格式支持** - Shapefile、GeoJSON、PostGIS、GeoTIFF  
-
-
-> ⚠️ **注意**：本项目仍在积极开发中，部分功能可能不够完善或存在已知问题。欢迎通过 [Issue](https://gitee.com/rzcgis/geo-ai-universal-platform/issues) 反馈问题和建议。
 
 ---
 

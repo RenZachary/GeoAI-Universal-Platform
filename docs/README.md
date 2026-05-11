@@ -1,5 +1,7 @@
 # GeoAI-UP Documentation
 
+> ⚠️ **Note**: This project is under active development. Documentation may lag behind the latest code changes as we prioritize feature implementation and architectural refinement.
+
 This directory contains all project documentation, organized by category.
 
 ## Directory Structure
