@@ -79,6 +79,14 @@ export class ChatController {
             },
             timestamp: Date.now()
           })}\n\n`);
+        },
+        // Token streaming callback - send LLM tokens directly to frontend
+        (token: string) => {
+          res.write(`data: ${JSON.stringify({
+            type: 'token',
+            data: { token },
+            timestamp: Date.now()
+          })}\n\n`);
         }
       );
 

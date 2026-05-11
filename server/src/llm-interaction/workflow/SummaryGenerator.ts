@@ -16,6 +16,7 @@ export interface SummaryOptions {
   includeServices?: boolean;
   includeErrors?: boolean;
   includeNextSteps?: boolean;
+  onToken?: (token: string) => void; // Callback for real-time token streaming
 }
 
 export class SummaryGenerator {
@@ -39,14 +40,15 @@ export class SummaryGenerator {
       includeResults = true,
       includeServices = true,
       includeErrors = true,
-      includeNextSteps = true
+      includeNextSteps = true,
+      onToken
     } = options;
 
     try {
       // Try LLM-based generation first (if API keys configured)
       if (this.llmConfig) {
         console.log('[Summary Generator] Using LLM for natural language summary');
-        return await this.generateWithLLM(state, language);
+        return await this.generateWithLLM(state, language, onToken);
       }
       
       // Fallback to template-based generation
@@ -163,7 +165,11 @@ export class SummaryGenerator {
   /**
    * Generate summary using LLM for natural language output
    */
-  private async generateWithLLM(state: GeoAIStateType, language: string): Promise<string> {
+  private async generateWithLLM(
+    state: GeoAIStateType, 
+    language: string,
+    onToken?: (token: string) => void
+  ): Promise<string> {
     try {
       // Prepare context for LLM
       const context = this.prepareLLMContext(state);
@@ -198,7 +204,11 @@ export class SummaryGenerator {
         }
         
         summary += tokenText;
-        // Tokens are automatically sent via GeoAIStreamingHandler.handleLLMNewToken
+        
+        // Send token via callback if provided
+        if (onToken) {
+          onToken(tokenText);
+        }
       }
       
       console.log('[Summary Generator] LLM generated summary successfully');

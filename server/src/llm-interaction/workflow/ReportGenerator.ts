@@ -15,6 +15,7 @@ export interface ReportGenerationParams {
   services?: any[];
   author?: string;
   organization?: string;
+  onToken?: (token: string) => void; // Callback for real-time token streaming
 }
 
 export class ReportGenerator {
@@ -70,20 +71,33 @@ export class ReportGenerator {
       const llm = LLMAdapterFactory.createAdapter(this.llmConfig);
       const chain = promptTemplate.pipe(llm);
 
-      // 4. Invoke LLM
-      console.log('[ReportGenerator] Invoking LLM for content synthesis...');
-      const response = await chain.invoke(context);
+      // 4. Invoke LLM with streaming
+      console.log('[ReportGenerator] Streaming LLM response...');
+      const stream = await chain.stream(context);
       
-      // Ensure we return a string (handle different LangChain output types)
-      const content = typeof response === 'string' ? response : (response as any).content || String(response);
-      
-      console.log(`[ReportGenerator] LLM response type: ${typeof response}`);
-      console.log(`[ReportGenerator] Content length: ${content.length} characters`);
-      if (content.length < 100) {
-        console.log(`[ReportGenerator] Content preview: ${content}`);
+      let content = '';
+      for await (const chunk of stream) {
+        // Extract text content from chunk
+        let tokenText: string;
+        if (typeof chunk === 'string') {
+          tokenText = chunk;
+        } else if (chunk && typeof chunk === 'object' && 'content' in chunk) {
+          tokenText = String(chunk.content);
+        } else {
+          tokenText = String(chunk);
+        }
+        
+        content += tokenText;
+        
+        // Send token via callback if provided
+        if (params.onToken) {
+          params.onToken(tokenText);
+        }
       }
       
+      console.log(`[ReportGenerator] Content length: ${content.length} characters`);
       console.log('[ReportGenerator] Report content generated successfully.');
+      
       return content;
 
     } catch (error) {

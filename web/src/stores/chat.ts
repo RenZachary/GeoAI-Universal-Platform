@@ -117,31 +117,12 @@ export const useChatStore = defineStore('chat', () => {
     
     switch (type) {
       case 'step_start':
-        // Show workflow progress with detailed step descriptions
-        const stepName = step || 'Processing'
-        
-        console.log('[Chat Store] DEBUG: step_start received with stepName:', stepName)
-        
-        // Map step names to user-friendly descriptions
-        const stepDescriptions: Record<string, string> = {
-          'memoryLoader': '💡 Loading conversation history...',
-          'goalSplitter': '🎯 Analyzing your request...',
-          'taskPlanner': '📋 Planning analysis tasks...',
-          'pluginExecutor': '⚙️ Executing analysis...',
-          'reportDecision': '📊 Evaluating report needs...',
-          'outputGenerator': '📤 Preparing results...',
-          'summaryGenerator': '📝 Creating summary...'
-        }
-        
-        const description = stepDescriptions[stepName] || `Working on: ${stepName}...`
-        workflowStatus.value = description
-        console.log('[Chat Store] Workflow status set to:', description)
+        // Intentionally ignored - workflow status is now controlled via __STATUS__ tokens
+        // See GeoAIGraph.ts where each node sends status updates via onToken callback
         break
         
       case 'step_complete':
-        // Clear workflow status immediately when step completes
-        workflowStatus.value = ''
-        console.log('[Chat Store] Workflow step complete')
+        // Intentionally ignored - workflow status persistence is managed by token flow
         break
         
       case 'tool_start':
@@ -241,7 +222,17 @@ export const useChatStore = defineStore('chat', () => {
           break
         }
         
-        // Create new messages array to ensure Vue reactivity
+        // Check if this is a status update token
+        if (tokenText.startsWith('__STATUS__:')) {
+          // Extract the status message and update workflow status
+          const statusMessage = tokenText.replace('__STATUS__:', '')
+          workflowStatus.value = statusMessage
+          console.log('[Chat Store] Status updated:', statusMessage)
+          // IMPORTANT: Return early to prevent appending to message content
+          return
+        }
+        
+        // Normal token - append to assistant message
         let updatedMsgs = [...currentMsgs]
         
         if (updatedMsgs.length === 0 || updatedMsgs[updatedMsgs.length - 1].role !== 'assistant') {

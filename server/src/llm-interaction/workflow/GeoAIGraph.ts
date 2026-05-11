@@ -114,7 +114,8 @@ export type GeoAIStateType = typeof GeoAIStateAnnotation.State;
 export function createGeoAIGraph(
   llmConfig: LLMConfig, 
   workspaceBase: string, 
-  onPartialResult?: (service: VisualizationService) => void
+  onPartialResult?: (service: VisualizationService) => void,
+  onToken?: (token: string) => void // Callback for real-time token streaming
 ) {
   // Initialize managers and agents
   const promptManager = new PromptManager(workspaceBase);
@@ -177,14 +178,29 @@ export function createGeoAIGraph(
       }
     })
     .addNode('goalSplitter', async (state: GeoAIStateType) => {
+      // Send status update via onToken callback
+      if (onToken) {
+        onToken('__STATUS__:🎯 Analyzing your request...');
+      }
+      
       console.log('[Goal Splitter Node] Processing user input:', state.userInput);
       return await goalSplitter.execute(state);
     })
     .addNode('taskPlanner', async (state: GeoAIStateType) => {
+      // Send status update via onToken callback
+      if (onToken) {
+        onToken('__STATUS__:📋 Planning analysis tasks...');
+      }
+      
       console.log('[Task Planner Node] Planning execution');
       return await taskPlanner.execute(state);
     })
     .addNode('pluginExecutor', async (state: GeoAIStateType) => {
+      // Send status update via onToken callback
+      if (onToken) {
+        onToken('__STATUS__:⚙️ Executing analysis...');
+      }
+      
       // Use EnhancedPluginExecutor for parallel execution
       const result = await EnhancedExecutorInstance.executeWithParallelSupport(state);
       
@@ -334,13 +350,25 @@ export function createGeoAIGraph(
       };
     })
     .addNode('reportDecision', async (state: GeoAIStateType) => {
+      // Send status update via onToken callback
+      if (onToken) {
+        onToken('__STATUS__:📊 Evaluating report needs...');
+      }
+      
       return await reportDecisionNode(state, { 
         llmConfig, 
         workspaceBase,
-        onPartialResult // Pass the streaming callback
+        onPartialResult // Pass the streaming callback for partial results
+        // Note: onToken is intentionally NOT passed to avoid sending report tokens to frontend
+        // Report content should be accessed via the service link, not streamed in chat
       });
     })
     .addNode('summaryGenerator', async (state: GeoAIStateType) => {
+      // Send status update via onToken callback
+      if (onToken) {
+        onToken('__STATUS__:📝 Creating summary...');
+      }
+      
       console.log('[Summary Generator] Creating analysis summary');
       
       // Generate summary using template-based approach
@@ -349,7 +377,8 @@ export function createGeoAIGraph(
         includeResults: true,
         includeServices: true,
         includeErrors: true,
-        includeNextSteps: true
+        includeNextSteps: true,
+        onToken // Pass the token callback for summary generation
       });
       
       console.log('[Summary Generator] Summary generated');
@@ -397,8 +426,9 @@ export function createGeoAIGraph(
 export function compileGeoAIGraph(
   llmConfig: LLMConfig, 
   workspaceBase: string, 
-  onPartialResult?: (service: VisualizationService) => void
+  onPartialResult?: (service: VisualizationService) => void,
+  onToken?: (token: string) => void // Callback for real-time token streaming
 ) {
-  const graph = createGeoAIGraph(llmConfig, workspaceBase, onPartialResult);
+  const graph = createGeoAIGraph(llmConfig, workspaceBase, onPartialResult, onToken);
   return graph.compile();
 }

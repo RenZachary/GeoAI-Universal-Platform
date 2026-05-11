@@ -17,63 +17,27 @@ export class GeoAIStreamingHandler extends BaseCallbackHandler {
   }
 
   /**
-   * Called when LLM generates a new token
-   * Streams all tokens - filtering is done at the application level if needed
+   * NOTE: handleLLMNewToken is intentionally NOT implemented here.
+   * LLM token streaming is handled at the business logic level (SummaryGenerator, ReportGenerator)
+   * to provide fine-grained control over which tokens are sent to the frontend.
    */
-  async handleLLMNewToken(token: string): Promise<void> {
-    this.writeSSE({
-      type: 'token',
-      data: { token },
-      timestamp: Date.now(),
-    });
-  }
 
   /**
    * Called when a chain/workflow node starts
-   * Captures step_start events for all workflow nodes
+   * NOTE: Disabled - step_start events are now sent via __STATUS__ tokens in GeoAIGraph nodes
+   * This avoids the issue of LangGraph not providing reliable node names in callbacks
    */
   async handleChainStart(chain: any, inputs: any): Promise<void> {
-    // Try multiple ways to get the chain/node name
-    let chainName: string | undefined;
-    
-    // Method 1: Direct name property
-    if (chain.name && typeof chain.name === 'string' && !chain.name.startsWith('Runnable')) {
-      chainName = chain.name;
-    }
-    // Method 2: From constructor
-    else if (chain.constructor?.name && chain.constructor.name !== 'Object') {
-      chainName = chain.constructor.name;
-    }
-    // Method 3: From run metadata (LangGraph specific)
-    else if (chain.run_metadata?.langgraph_node) {
-      chainName = chain.run_metadata.langgraph_node;
-    }
-    // Method 4: From config
-    else if (chain.config?.run_name) {
-      chainName = chain.config.run_name;
-    }
-    
-    // Skip if we can't get a meaningful name or it's an internal Runnable
-    if (!chainName || chainName.startsWith('Runnable') || chainName === 'Object') {
-      return;
-    }
-    
-    this.writeSSE({
-      type: 'step_start',
-      step: chainName,
-      timestamp: Date.now(),
-    });
+    // Intentionally empty - step tracking is handled at the application level
+    // See GeoAIGraph.ts where each node sends __STATUS__ tokens via onToken callback
   }
 
   /**
    * Called when a chain/workflow node ends
-   * Captures step_complete events
+   * NOTE: Disabled - step tracking is now handled via __STATUS__ tokens in GeoAIGraph nodes
    */
   async handleChainEnd(outputs: any, runId?: string): Promise<void> {
-    this.writeSSE({
-      type: 'step_complete',
-      timestamp: Date.now(),
-    });
+    // Intentionally empty - step completion is not tracked at callback level
   }
 
   /**
