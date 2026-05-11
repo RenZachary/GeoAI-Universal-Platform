@@ -14,6 +14,7 @@ import { PostGISFilterOperation } from './operations/PostGISFilterOperation';
 import { PostGISAggregationOperation } from './operations/PostGISAggregationOperation';
 import { PostGISSpatialJoinOperation } from './operations/PostGISSpatialJoinOperation';
 import { PostGISStatisticalOperation } from './operations/PostGISStatisticalOperation';
+import { PostGISProximityOperation } from './operations/PostGISProximityOperation';
 import { TEMP_SCHEMA } from './constants';
 
 export class PostGISBackend implements DataBackend {
@@ -28,6 +29,7 @@ export class PostGISBackend implements DataBackend {
   private aggOp: PostGISAggregationOperation | null = null;
   private joinOp: PostGISSpatialJoinOperation | null = null;
   private statOp: PostGISStatisticalOperation | null = null;
+  private proximityOp: PostGISProximityOperation | null = null;
   
   constructor(config: PostGISConnectionConfig) {
     this.config = config;
@@ -133,6 +135,7 @@ export class PostGISBackend implements DataBackend {
       this.aggOp = new PostGISAggregationOperation(this.pool!, this.schema);
       this.joinOp = new PostGISSpatialJoinOperation(this.pool!, this.schema);
       this.statOp = new PostGISStatisticalOperation(this.pool!, this.schema);
+      this.proximityOp = new PostGISProximityOperation(this.pool!, this.schema);
     }
     return this.pool!;
   }
@@ -391,5 +394,60 @@ export class PostGISBackend implements DataBackend {
       throw new Error('PostGIS backend not initialized');
     }
     return this.statOp.getClassificationBreaks(reference, fieldName, method, numClasses);
+  }
+  
+  // ========== Proximity Operations ==========
+  
+  async calculateDistance(
+    reference1: string,
+    reference2: string,
+    options?: {
+      unit?: 'meters' | 'kilometers' | 'feet' | 'miles' | 'degrees';
+      maxPairs?: number;
+    }
+  ): Promise<Array<{ sourceId: string | number; targetId: string | number; distance: number; unit: string }>> {
+    await this.getPool();
+    if (!this.proximityOp) {
+      throw new Error('PostGIS backend not initialized');
+    }
+    return this.proximityOp.calculateDistance(reference1, reference2, options);
+  }
+  
+  async findNearestNeighbors(
+    sourceReference: string,
+    targetReference: string,
+    limit: number,
+    options?: {
+      unit?: 'meters' | 'kilometers' | 'feet' | 'miles' | 'degrees';
+    }
+  ): Promise<Array<{
+    sourceId: string | number;
+    nearestTargetId: string | number;
+    distance: number;
+    unit: string;
+    rank: number;
+  }>> {
+    await this.getPool();
+    if (!this.proximityOp) {
+      throw new Error('PostGIS backend not initialized');
+    }
+    return this.proximityOp.findNearestNeighbors(sourceReference, targetReference, limit, options);
+  }
+  
+  async filterByDistance(
+    reference: string,
+    centerReference: string,
+    distance: number,
+    options?: {
+      unit?: 'meters' | 'kilometers' | 'feet' | 'miles' | 'degrees';
+    }
+  ): Promise<NativeData> {
+    await this.getPool();
+    if (!this.proximityOp) {
+      throw new Error('PostGIS backend not initialized');
+    }
+    
+    const resultTable = await this.proximityOp.filterByDistance(reference, centerReference, distance, options);
+    return this.buildNativeData(resultTable, `Features within ${distance} ${options?.unit || 'meters'}`);
   }
 }

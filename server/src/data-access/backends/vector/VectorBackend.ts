@@ -18,6 +18,7 @@ import { FilterOperation } from './operations/FilterOperation';
 import { AggregateOperation } from './operations/AggregateOperation';
 import { SpatialJoinOperation } from './operations/SpatialJoinOperation';
 import { VectorStatisticalOperation } from './operations/VectorStatisticalOperation';
+import { ProximityOperation } from './operations/ProximityOperation';
 import { tryMultipleEncodings } from '../../utils/ShapefileEncodingUtils';
 
 export class VectorBackend implements DataBackend {
@@ -30,6 +31,7 @@ export class VectorBackend implements DataBackend {
   private aggregateOp: AggregateOperation;
   private spatialJoinOp: SpatialJoinOperation;
   private statisticalOp: VectorStatisticalOperation;
+  private proximityOp: ProximityOperation;
   
   constructor(workspaceBase?: string) {
     this.workspaceBase = workspaceBase || process.cwd();
@@ -39,6 +41,7 @@ export class VectorBackend implements DataBackend {
     this.aggregateOp = new AggregateOperation();
     this.spatialJoinOp = new SpatialJoinOperation();
     this.statisticalOp = new VectorStatisticalOperation();
+    this.proximityOp = new ProximityOperation();
   }
   
   canHandle(dataSourceType: string, _reference: string): boolean {
@@ -409,5 +412,80 @@ export class VectorBackend implements DataBackend {
   ): Promise<number[]> {
     const geojson = await this.loadGeoJSON(reference);
     return this.statisticalOp.getClassificationBreaks(geojson, fieldName, method, numClasses);
+  }
+  
+  // ========== Proximity Operations ==========
+  
+  async calculateDistance(
+    reference1: string,
+    reference2: string,
+    options?: {
+      unit?: 'meters' | 'kilometers' | 'feet' | 'miles' | 'degrees';
+      maxPairs?: number;
+    }
+  ): Promise<Array<{ sourceId: string | number; targetId: string | number; distance: number; unit: string }>> {
+    const geojson1 = await this.loadGeoJSON(reference1);
+    const geojson2 = await this.loadGeoJSON(reference2);
+    
+    return this.proximityOp.calculateDistance(geojson1, geojson2, options);
+  }
+  
+  async findNearestNeighbors(
+    sourceReference: string,
+    targetReference: string,
+    limit: number,
+    options?: {
+      unit?: 'meters' | 'kilometers' | 'feet' | 'miles' | 'degrees';
+    }
+  ): Promise<Array<{
+    sourceId: string | number;
+    nearestTargetId: string | number;
+    distance: number;
+    unit: string;
+    rank: number;
+  }>> {
+    const sourceGeoJSON = await this.loadGeoJSON(sourceReference);
+    const targetGeoJSON = await this.loadGeoJSON(targetReference);
+    
+    return this.proximityOp.findNearestNeighbors(sourceGeoJSON, targetGeoJSON, limit, options);
+  }
+  
+  async filterByDistance(
+    reference: string,
+    centerReference: string,
+    distance: number,
+    options?: {
+      unit?: 'meters' | 'kilometers' | 'feet' | 'miles' | 'degrees';
+    }
+  ): Promise<NativeData> {
+    const geojson = await this.loadGeoJSON(reference);
+    const centerGeoJSON = await this.loadGeoJSON(centerReference);
+    
+    // Get the first feature from center as reference point
+    const centerFeature = centerGeoJSON.features[0];
+    if (!centerFeature) {
+      throw new Error('Center reference must contain at least one feature');
+    }
+    
+    // Filter using ProximityOperation
+    const result = this.proximityOp.filterByDistance(geojson, centerFeature, distance, options);
+    
+    // Save result
+    const outputPath = await this.saveGeoJSON(result);
+    const metadata = this.extractMetadata(result, outputPath);
+    
+    return {
+      id: generateId(),
+      type: 'geojson',
+      reference: outputPath,
+      metadata: {
+        ...metadata,
+        result: outputPath,
+        description: `Filtered features within ${distance} ${options?.unit || 'meters'} of center`,
+        originalCount: geojson.features.length,
+        filteredCount: result.features.length
+      },
+      createdAt: new Date()
+    };
   }
 }

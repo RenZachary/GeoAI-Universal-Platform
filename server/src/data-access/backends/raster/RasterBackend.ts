@@ -118,4 +118,17 @@ export class RasterBackend implements DataBackend {
   ): Promise<number[]> {
     throw new Error('getClassificationBreaks not applicable for raster data');
   }
+  
+  // Proximity operations not supported for raster data
+  async calculateDistance(): Promise<any> {
+    throw new Error('calculateDistance not supported for raster data');
+  }
+  
+  async findNearestNeighbors(): Promise<any> {
+    throw new Error('findNearestNeighbors not supported for raster data');
+  }
+  
+  async filterByDistance(): Promise<any> {
+    throw new Error('filterByDistance not supported for raster data');
+  }
 }

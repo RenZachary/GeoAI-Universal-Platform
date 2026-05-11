@@ -10,6 +10,24 @@ import type { NativeData } from '../../core';
 import type { FilterCondition, BufferOptions } from '../interfaces';
 
 /**
+ * Shared types for proximity operations
+ */
+export interface DistanceResult {
+  sourceId: string | number;
+  targetId: string | number;
+  distance: number;
+  unit: string;
+}
+
+export interface NearestNeighborResult {
+  sourceId: string | number;
+  nearestTargetId: string | number;
+  distance: number;
+  unit: string;
+  rank: number;
+}
+
+/**
  * Base interface for all data backends
  */
 export interface DataBackend {
@@ -165,6 +183,45 @@ export interface DataBackend {
     method: 'quantile' | 'equal_interval' | 'jenks' | 'standard_deviation',
     numClasses?: number
   ): Promise<number[]>;
+  
+  // ========== Proximity Operations ==========
+  
+  /**
+   * Calculate distance between features in two datasets
+   * Returns distance matrix or pairwise distances
+   */
+  calculateDistance(
+    reference1: string,
+    reference2: string,
+    options?: {
+      unit?: 'meters' | 'kilometers' | 'feet' | 'miles' | 'degrees';
+      maxPairs?: number; // Limit for large datasets
+    }
+  ): Promise<DistanceResult[]>;
+  
+  /**
+   * Find nearest neighbors using KNN or brute force
+   */
+  findNearestNeighbors(
+    sourceReference: string,
+    targetReference: string,
+    limit: number,
+    options?: {
+      unit?: 'meters' | 'kilometers' | 'feet' | 'miles' | 'degrees';
+    }
+  ): Promise<NearestNeighborResult[]>;
+  
+  /**
+   * Filter features within a distance threshold from a reference geometry
+   */
+  filterByDistance(
+    reference: string,
+    centerReference: string,
+    distance: number,
+    options?: {
+      unit?: 'meters' | 'kilometers' | 'feet' | 'miles' | 'degrees';
+    }
+  ): Promise<NativeData>;
 }
 
 /**
@@ -269,5 +326,32 @@ export abstract class BaseBackend implements DataBackend {
     _numClasses?: number
   ): Promise<number[]> {
     throw new Error(`getClassificationBreaks not supported by ${this.backendType} backend`);
+  }
+  
+  // Default implementations for proximity operations
+  async calculateDistance(
+    _reference1: string,
+    _reference2: string,
+    _options?: any
+  ): Promise<DistanceResult[]> {
+    throw new Error(`calculateDistance not supported by ${this.backendType} backend`);
+  }
+  
+  async findNearestNeighbors(
+    _sourceReference: string,
+    _targetReference: string,
+    _limit: number,
+    _options?: any
+  ): Promise<NearestNeighborResult[]> {
+    throw new Error(`findNearestNeighbors not supported by ${this.backendType} backend`);
+  }
+  
+  async filterByDistance(
+    _reference: string,
+    _centerReference: string,
+    _distance: number,
+    _options?: any
+  ): Promise<NativeData> {
+    throw new Error(`filterByDistance not supported by ${this.backendType} backend`);
   }
 }

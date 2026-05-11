@@ -7,7 +7,7 @@
 
 import type { NativeData } from '../../core';
 import type { FilterCondition, BufferOptions } from '../interfaces';
-import type { DataBackend } from '../backends/DataBackend';
+import type { DataBackend, DistanceResult, NearestNeighborResult } from '../backends/DataBackend';
 import { VectorBackend } from '../backends/vector';
 import { RasterBackend } from '../backends/raster';
 import { PostGISBackend } from '../backends/postgis';
@@ -275,5 +275,55 @@ export class DataAccessFacade {
   ): Promise<number[]> {
     const backend = this.getBackend(dataSourceType, reference);
     return backend.getClassificationBreaks(reference, fieldName, method, numClasses);
+  }
+  
+  // ========== Proximity Operations ==========
+  
+  /**
+   * Calculate distance between features in two datasets
+   */
+  async calculateDistance(
+    dataSourceType: string,
+    reference1: string,
+    reference2: string,
+    options?: {
+      unit?: 'meters' | 'kilometers' | 'feet' | 'miles' | 'degrees';
+      maxPairs?: number;
+    }
+  ): Promise<DistanceResult[]> {
+    const backend = this.getBackend(dataSourceType, reference1);
+    return backend.calculateDistance(reference1, reference2, options);
+  }
+  
+  /**
+   * Find nearest neighbors using KNN or brute force
+   */
+  async findNearestNeighbors(
+    dataSourceType: string,
+    sourceReference: string,
+    targetReference: string,
+    limit: number,
+    options?: {
+      unit?: 'meters' | 'kilometers' | 'feet' | 'miles' | 'degrees';
+    }
+  ): Promise<NearestNeighborResult[]> {
+    const backend = this.getBackend(dataSourceType, sourceReference);
+    return backend.findNearestNeighbors(sourceReference, targetReference, limit, options);
+  }
+  
+  /**
+   * Filter features within a distance threshold
+   */
+  async filterByDistance(
+    dataSourceType: string,
+    reference: string,
+    centerReference: string,
+    distance: number,
+    options?: {
+      unit?: 'meters' | 'kilometers' | 'feet' | 'miles' | 'degrees';
+    }
+  ): Promise<NativeData> {
+    const backend = this.getBackend(dataSourceType, reference);
+    return backend.filterByDistance(reference, centerReference, distance, options);
   }
 }
