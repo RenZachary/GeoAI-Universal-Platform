@@ -10,6 +10,8 @@ export class GeoAIStreamingHandler extends BaseCallbackHandler {
   private streamWriter: Writable;
   private lastErrorTimestamp: number = 0;
   private errorDeduplicationWindow: number = 100; // ms - prevent duplicate errors within 100ms
+  private currentChainName: string | null = null; // Track current workflow node
+  private shouldStreamTokens: boolean = false; // Only stream tokens during summary generation
 
   constructor(streamWriter: Writable) {
     super();
@@ -18,9 +20,14 @@ export class GeoAIStreamingHandler extends BaseCallbackHandler {
 
   /**
    * Called when LLM generates a new token
-   * Streams real-time tokens for summary generation
+   * Only streams tokens during summary generation (not goal splitting or task planning)
    */
   async handleLLMNewToken(token: string): Promise<void> {
+    // Only stream tokens if we're in the summary generation phase
+    if (!this.shouldStreamTokens) {
+      return; // Skip tokens from GoalSplitter, TaskPlanner, etc.
+    }
+    
     this.writeSSE({
       type: 'token',
       data: { token },
@@ -39,6 +46,10 @@ export class GeoAIStreamingHandler extends BaseCallbackHandler {
       return;
     }
     
+    // Track current chain and determine if we should stream tokens
+    this.currentChainName = chainName;
+    this.shouldStreamTokens = (chainName === 'summaryGenerator');
+    
     this.writeSSE({
       type: 'step_start',
       step: chainName, // e.g., 'memoryLoader', 'goalSplitter', 'taskPlanner'
@@ -51,6 +62,10 @@ export class GeoAIStreamingHandler extends BaseCallbackHandler {
    * Captures step_complete events
    */
   async handleChainEnd(outputs: any, runId?: string): Promise<void> {
+    // Reset token streaming flag when chain ends
+    this.shouldStreamTokens = false;
+    this.currentChainName = null;
+    
     this.writeSSE({
       type: 'step_complete',
       timestamp: Date.now(),
