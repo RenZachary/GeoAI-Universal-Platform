@@ -206,6 +206,16 @@ npm run package
 
 复制到任意 Windows 机器，运行 `start.bat` 即可 - 无需安装任何依赖！
 
+### 下载 v2.0 版本
+
+**GeoAI-UP v2.0.0** 现已提供下载：
+
+- **文件**: GeoAI-UP-v2.0.0.zip
+- **下载地址**: [百度网盘](https://pan.baidu.com/s/1mNR1fsKMkFW8subVFU_9iQ?pwd=xbst)
+- **提取码**: xbst
+
+此独立安装包包含所有必需组件 - 解压即可运行！
+
 ---
 
 ## 📖 使用指南

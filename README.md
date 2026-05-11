@@ -208,6 +208,16 @@ Generated `package/` directory includes:
 
 Copy to any Windows machine and run `start.bat` - no installation needed!
 
+### Download v2.0 Release
+
+**GeoAI-UP v2.0.0** is now available for download:
+
+- **File**: GeoAI-UP-v2.0.0.zip
+- **Download Link**: [Baidu Pan](https://pan.baidu.com/s/1mNR1fsKMkFW8subVFU_9iQ?pwd=xbst)
+- **Password**: xbst
+
+This standalone package includes everything you need to get started - just extract and run!
+
 ---
 
 ## 📖 Usage Guide
