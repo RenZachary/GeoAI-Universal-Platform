@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { SpatialOperator, type OperatorContext } from '../../SpatialOperator';
+import { SpatialOperator, type OperatorContext, SpatialOutputSchema } from '../../SpatialOperator';
 import { DataSourceRepository } from '../../../data-access/repositories';
 import { ResultPersistenceService } from '../../../services/ResultPersistenceService';
 import type Database from 'better-sqlite3';
@@ -17,9 +17,20 @@ const HeatmapInputSchema = z.object({
   outputFormat: z.enum(['geotiff', 'png']).default('geotiff')
 });
 
-const HeatmapOutputSchema = z.object({
-  result: z.string().describe('Heatmap raster file path or URL'),
-  format: z.string().describe('Output format')
+// Output schema extends SpatialOutputSchema - Heatmap produces styled spatial data
+const HeatmapOutputSchema = SpatialOutputSchema.extend({
+  metadata: z.object({
+    styleConfig: z.object({
+      type: z.literal('heatmap'),
+      radius: z.number(),
+      cellSize: z.number(),
+      weightField: z.string().optional(),
+      colorRamp: z.string(),
+      outputFormat: z.string()
+    }).optional(),
+    geometryType: z.string().optional(),
+    featureCount: z.number().optional()
+  }).optional()
 });
 
 export class HeatmapOperator extends SpatialOperator {
@@ -87,9 +98,18 @@ export class HeatmapOperator extends SpatialOperator {
       { radius: params.radius }
     );
     
+    console.log('[HeatmapOperator] Heatmap generation completed:', {
+      id: persisted.id,
+      type: persisted.type,
+      reference: persisted.reference
+    });
+    
+    // Return complete NativeData structure so metadata is preserved for MVT publishing
     return {
-      result: persisted.reference,
-      format: params.outputFormat
+      id: persisted.id,
+      type: persisted.type,
+      reference: persisted.reference,
+      metadata: persisted.metadata
     };
   }
 }

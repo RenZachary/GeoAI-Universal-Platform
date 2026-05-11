@@ -1,9 +1,14 @@
 /**
- * Placeholder Resolver Utility - SIMPLIFIED VERSION
- * Only supports ONE standard format: {step_id.result} or {step_id.result.field}
+ * Placeholder Resolver Utility - ENHANCED VERSION
+ * Supports returnType-aware resolution for spatial, analytical, and textual operators
  * 
- * This simplification ensures consistency and eliminates LLM confusion.
+ * Resolution rules:
+ * - spatial: {step_id.result.id} returns NativeData.id for chaining
+ * - analytical: {step_id.result.data.fieldName} returns specific data fields
+ * - textual: Terminal operations, typically not referenced
  */
+
+import type { OperatorReturnType } from '../../spatial-operators/SpatialOperator';
 
 export interface ExecutionResult {
   id: string;
@@ -12,6 +17,7 @@ export interface ExecutionResult {
   data?: any;
   error?: string;
   metadata?: Record<string, any>;
+  returnType?: OperatorReturnType; // NEW: Track return type for smart resolution
 }
 
 /**
@@ -55,8 +61,8 @@ export function resolvePlaceholders(
 }
 
 /**
- * Try to resolve a placeholder string
- * ONLY supports: {step_id.result} or {step_id.result.field}
+ * Try to resolve a placeholder string with returnType awareness
+ * Supports: {step_id.result}, {step_id.result.id}, {step_id.result.data.fieldName}
  */
 function tryResolvePlaceholder(value: string, executionResults: Map<string, ExecutionResult>): any {
   // Match pattern: {step_id.result} or {step_id.result.field.path}
@@ -77,16 +83,129 @@ function tryResolvePlaceholder(value: string, executionResults: Map<string, Exec
     return undefined;
   }
   
-  // Extract the result value from metadata.result
+  // Get return type (default to 'spatial' for backward compatibility)
+  const returnType = result.returnType || 'spatial';
+  
+  // Smart resolution based on return type
+  if (returnType === 'spatial') {
+    return resolveSpatialPlaceholder(result, fieldPath);
+  } else if (returnType === 'analytical') {
+    return resolveAnalyticalPlaceholder(result, fieldPath);
+  } else if (returnType === 'textual') {
+    console.warn(`[Placeholder Resolver] Attempting to reference textual operator result: ${stepId}. Textual results are terminal and should not be chained.`);
+    return resolveTextualPlaceholder(result, fieldPath);
+  }
+  
+  // Fallback: legacy behavior
+  return resolveLegacyPlaceholder(result, fieldPath);
+}
+
+/**
+ * Resolve placeholder for spatial operators (returns NativeData)
+ */
+function resolveSpatialPlaceholder(result: ExecutionResult, fieldPath?: string): any {
+  // Special case: if accessing .id field or no field path, return NativeData.id directly
+  // This is the MOST COMMON use case for chaining spatial operations
+  if (fieldPath === 'id' || !fieldPath) {
+    if (!result.data.id) {
+      console.warn(`[Placeholder Resolver] Spatial result missing .id field:`, result.data);
+      return undefined;
+    }
+    return result.data.id;
+  }
+  
+  // For other fields, navigate through metadata
+  let fieldValue: any = result.data.metadata;
+  
+  if (!fieldValue) {
+    console.warn(`[Placeholder Resolver] Spatial result missing metadata`);
+    return undefined;
+  }
+  
+  const fields = fieldPath.split('.');
+  for (const field of fields) {
+    if (fieldValue === null || fieldValue === undefined) {
+      console.warn(`[Placeholder Resolver] Cannot access field "${field}" in null/undefined value`);
+      return undefined;
+    }
+    fieldValue = fieldValue[field];
+  }
+  
+  if (fieldValue === undefined) {
+    console.warn(`[Placeholder Resolver] Field path "${fieldPath}" not found in spatial result metadata`);
+    return undefined;
+  }
+  
+  return fieldValue;
+}
+
+/**
+ * Resolve placeholder for analytical operators (returns statistical/query results)
+ */
+function resolveAnalyticalPlaceholder(result: ExecutionResult, fieldPath?: string): any {
+  if (!fieldPath) {
+    console.warn(`[Placeholder Resolver] Analytical result requires field path. Use {step_id.result.data.fieldName}`);
+    return undefined;
+  }
+  
+  // Navigate through data object
+  let fieldValue: any = result.data.data;
+  
+  if (!fieldValue) {
+    console.warn(`[Placeholder Resolver] Analytical result missing data field`);
+    return undefined;
+  }
+  
+  const fields = fieldPath.split('.');
+  for (const field of fields) {
+    if (fieldValue === null || fieldValue === undefined) {
+      console.warn(`[Placeholder Resolver] Cannot access field "${field}" in analytical result`);
+      return undefined;
+    }
+    fieldValue = fieldValue[field];
+  }
+  
+  if (fieldValue === undefined) {
+    console.warn(`[Placeholder Resolver] Field path "${fieldPath}" not found in analytical result data`);
+    return undefined;
+  }
+  
+  return fieldValue;
+}
+
+/**
+ * Resolve placeholder for textual operators (terminal operations)
+ */
+function resolveTextualPlaceholder(result: ExecutionResult, fieldPath?: string): any {
+  console.warn(`[Placeholder Resolver] Referencing textual operator result is unusual. Textual results are meant for direct display.`);
+  
+  if (!fieldPath) {
+    return result.data.data?.answer || result.data;
+  }
+  
+  let fieldValue: any = result.data.data;
+  const fields = fieldPath.split('.');
+  
+  for (const field of fields) {
+    if (fieldValue === null || fieldValue === undefined) {
+      return undefined;
+    }
+    fieldValue = fieldValue[field];
+  }
+  
+  return fieldValue;
+}
+
+/**
+ * Legacy resolution for backward compatibility (deprecated)
+ */
+function resolveLegacyPlaceholder(result: ExecutionResult, fieldPath?: string): any {
   const resultValue = result.data.metadata?.result;
   
-  // Special case: if accessing .id field or no field path, return NativeData.id directly
-  // This is the most common use case for passing data between steps
   if (fieldPath === 'id' || !fieldPath) {
     return result.data.id;
   }
   
-  // Navigate the field path within resultValue
   let fieldValue: any = resultValue;
   const fields = fieldPath.split('.');
   

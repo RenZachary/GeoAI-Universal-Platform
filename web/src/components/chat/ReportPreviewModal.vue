@@ -165,7 +165,7 @@ watch(() => props.reportUrl, (newUrl) => {
 .report-container {
   height: 100%;
   overflow-y: auto;
-  padding: 24px;
+  padding: 0px 24px;
 }
 
 .loading-state,

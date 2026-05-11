@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { SpatialOperator, type OperatorContext } from '../../SpatialOperator';
+import { SpatialOperator, type OperatorContext, AnalyticalOutputSchema } from '../../SpatialOperator';
 import { DataSourceRepository } from '../../../data-access/repositories';
 import type Database from 'better-sqlite3';
 
@@ -14,12 +14,14 @@ const DataSourceQueryInputSchema = z.object({
   includeDetails: z.boolean().default(true).describe('Include detailed metadata')
 });
 
-const DataSourceQueryOutputSchema = z.object({
-  result: z.object({
-    dataSources: z.array(z.any()),
-    totalCount: z.number(),
-    filteredCount: z.number()
-  }).describe('Query result')
+// Output schema uses AnalyticalOutputSchema - Query returns analytical results
+const DataSourceQueryOutputSchema = AnalyticalOutputSchema.extend({
+  data: z.object({
+    operation: z.string().describe('Operation performed (list, count, summary)'),
+    dataSources: z.array(z.any()).describe('List of data sources'),
+    totalCount: z.number().describe('Total number of data sources'),
+    filteredCount: z.number().describe('Number of data sources after filtering')
+  })
 });
 
 export class DataSourceQueryOperator extends SpatialOperator {
@@ -78,11 +80,25 @@ export class DataSourceQueryOperator extends SpatialOperator {
       }));
     }
     
+    console.log('[DataSourceQueryOperator] Query completed:', {
+      operation: params.operation,
+      totalCount: dataSourceRepo.listAll().length,
+      filteredCount: dataSources.length
+    });
+    
+    // Return analytical result structure
     return {
-      result: {
+      success: true,
+      data: {
+        operation: params.operation,
         dataSources,
         totalCount: dataSourceRepo.listAll().length,
         filteredCount: dataSources.length
+      },
+      metadata: {
+        operatorId: this.operatorId,
+        executedAt: new Date().toISOString(),
+        summary: `Queried ${dataSources.length} data sources (total: ${dataSourceRepo.listAll().length})`
       }
     };
   }

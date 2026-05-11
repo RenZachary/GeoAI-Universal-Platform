@@ -75,6 +75,7 @@ export interface AnalysisResult extends Omit<CoreAnalysisResult, 'completedAt'> 
   goalId: string;
   status: 'success' | 'failed';
   data?: any;
+  returnType?: 'spatial' | 'analytical' | 'textual'; // NEW: Operator return type for smart placeholder resolution
   error?: string;
   metadata?: Record<string, any>; // Operator execution metadata (operatorId, executedAt, etc.)
 }

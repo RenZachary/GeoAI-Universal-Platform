@@ -260,9 +260,16 @@ export class EnhancedPluginExecutor {
       // Check if this operator produces visualization-ready NativeData
       const operatorId = parsedResult.metadata?.operatorId;
       let needsVisualization = false;
+      let returnType: 'spatial' | 'analytical' | 'textual' = 'spatial'; // Default
 
       if (operatorId) {
         const operator = ToolRegistryInstance.getOperator(operatorId);
+        
+        // Get return type from operator metadata
+        if (operator) {
+          returnType = operator.returnType || 'spatial';
+          console.log(`[Enhanced Executor] Task ${taskId} - operator ${operatorId} has returnType: ${returnType}`);
+        }
         
         // Check operator category OR if result is spatial NativeData
         if (operator && operator.category === 'visualization') {
@@ -280,6 +287,7 @@ export class EnhancedPluginExecutor {
         goalId: targetPlan.goalId,
         status: parsedResult.success ? 'success' : 'failed',
         data: parsedResult.data || parsedResult,
+        returnType: returnType, // NEW: Store return type for placeholder resolution
         error: parsedResult.error,
         metadata: {
           // Preserve operator metadata from tool execution

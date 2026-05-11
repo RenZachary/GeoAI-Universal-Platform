@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { SpatialOperator, type OperatorContext } from '../../SpatialOperator';
+import { SpatialOperator, type OperatorContext, AnalyticalOutputSchema } from '../../SpatialOperator';
 
 const GeneralQAInputSchema = z.object({
   question: z.string().describe('The user\'s question'),
@@ -11,12 +11,13 @@ const GeneralQAInputSchema = z.object({
   responseStyle: z.enum(['conversational', 'formal', 'brief', 'detailed']).default('conversational')
 });
 
-const GeneralQAOutputSchema = z.object({
-  result: z.object({
-    answer: z.string(),
-    type: z.string(),
-    suggestions: z.array(z.string()).optional()
-  }).describe('Q&A response')
+// Output schema uses AnalyticalOutputSchema - QA returns textual/analytical results
+const GeneralQAOutputSchema = AnalyticalOutputSchema.extend({
+  data: z.object({
+    answer: z.string().describe('The response to the user\'s question'),
+    type: z.string().describe('Response type'),
+    suggestions: z.array(z.string()).optional().describe('Follow-up suggestions')
+  })
 });
 
 export class GeneralQAOperator extends SpatialOperator {
@@ -39,8 +40,11 @@ export class GeneralQAOperator extends SpatialOperator {
   ): Promise<z.infer<typeof GeneralQAOutputSchema>> {
     // This operator is a placeholder - actual QA logic would be handled by LLM
     // For now, return a simple response structure
+    console.log('[GeneralQAOperator] Processing question:', params.question);
+    
     return {
-      result: {
+      success: true,
+      data: {
         answer: `Response to: ${params.question}`,
         type: 'general_response',
         suggestions: [
@@ -48,6 +52,11 @@ export class GeneralQAOperator extends SpatialOperator {
           'Request spatial analysis like buffer or overlay',
           'Generate reports from your analysis results'
         ]
+      },
+      metadata: {
+        operatorId: this.operatorId,
+        executedAt: new Date().toISOString(),
+        summary: `Answered general question`
       }
     };
   }
