@@ -48,8 +48,7 @@ export class EnhancedPluginExecutor {
    * Execute all plans with parallel support
    */
   async executeWithParallelSupport(
-    state: GeoAIStateType,
-    streamWriter?: any
+    state: GeoAIStateType
   ): Promise<Partial<GeoAIStateType>> {
     if (!state.executionPlans || state.executionPlans.size === 0) {
       return {
@@ -78,16 +77,14 @@ export class EnhancedPluginExecutor {
           state.executionPlans,
           state.parallelGroups,
           executionResults,
-          state,
-          streamWriter
+          state
         );
       } else {
         // Fallback to sequential execution
         await this.executeSequentially(
           state.executionPlans,
           executionResults,
-          state,
-          streamWriter
+          state
         );
       }
 
@@ -118,8 +115,7 @@ export class EnhancedPluginExecutor {
     plans: Map<string, ExecutionPlan>,
     parallelGroups: ParallelGroup[],
     results: Map<string, AnalysisResult>,
-    state: GeoAIStateType,
-    streamWriter?: any
+    state: GeoAIStateType
   ): Promise<void> {
     for (let groupIndex = 0; groupIndex < parallelGroups.length; groupIndex++) {
       const group = parallelGroups[groupIndex];
@@ -127,11 +123,11 @@ export class EnhancedPluginExecutor {
       if (group.tasks.length === 1) {
         // Single task - execute sequentially
         const taskId = group.tasks[0];
-        await this.executeSingleTask(taskId, plans, results, state, streamWriter);
+        await this.executeSingleTask(taskId, plans, results, state);
       } else {
         // Multiple tasks - execute in parallel
         const taskPromises = group.tasks.map(async (taskId: string) => {
-        await this.executeSingleTask(taskId, plans, results, state, streamWriter);
+          await this.executeSingleTask(taskId, plans, results, state);
         });
 
         // Wait for all tasks in the group to complete
@@ -147,8 +143,7 @@ export class EnhancedPluginExecutor {
     taskId: string,
     plans: Map<string, ExecutionPlan>,
     results: Map<string, AnalysisResult>,
-    state: GeoAIStateType,
-    streamWriter?: any
+    state: GeoAIStateType
   ): Promise<void> {
     // Find which plan contains this task
     let targetPlan: ExecutionPlan | undefined;
@@ -225,18 +220,7 @@ export class EnhancedPluginExecutor {
         }
       }
 
-      // Send tool_start event
-      if (streamWriter) {
-        streamWriter.write(`data: ${JSON.stringify({
-          type: 'tool_start',
-          tool: step.operatorId,
-          taskId: taskId,
-          input: JSON.stringify(resolvedParameters).substring(0, 200),
-          timestamp: Date.now()
-        })}\n\n`);
-      }
-
-      // Execute the tool
+      // Execute the tool - LangChain will automatically trigger callbacks via GeoAIStreamingHandler
       const toolResult = await tool.invoke(resolvedParameters);
 
       // Parse result
@@ -306,17 +290,6 @@ export class EnhancedPluginExecutor {
       // Persist intermediate result
       await this.persistIntermediateResult(taskId, result);
 
-      // Send tool_complete event
-      if (streamWriter) {
-        streamWriter.write(`data: ${JSON.stringify({
-          type: 'tool_complete',
-          tool: step.operatorId,
-          taskId: taskId,
-          output: JSON.stringify(parsedResult).substring(0, 2000),
-          timestamp: Date.now()
-        })}\n\n`);
-      }
-
       if (result.status === 'success') {
         console.log(`[Enhanced Executor] Task ${taskId} completed successfully`);
       } else {
@@ -349,8 +322,7 @@ export class EnhancedPluginExecutor {
   private async executeSequentially(
     plans: Map<string, ExecutionPlan>,
     results: Map<string, AnalysisResult>,
-    state: GeoAIStateType,
-    streamWriter?: any
+    state: GeoAIStateType
   ): Promise<void> {
     console.log('[Enhanced Executor] Executing sequentially (no parallel groups)...');
 
@@ -358,7 +330,7 @@ export class EnhancedPluginExecutor {
       console.log(`\n[Enhanced Executor] === Goal: ${goalId} ===`);
 
       for (const step of plan.steps) {
-        await this.executeSingleTask(step.stepId, plans, results, state, streamWriter);
+        await this.executeSingleTask(step.stepId, plans, results, state);
       }
     }
   }

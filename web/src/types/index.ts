@@ -84,12 +84,22 @@ export interface VisualizationService {
 }
 
 export interface SSEEvent {
-  type: 'token' | 'step_start' | 'step_complete' | 'partial_result' | 'complete' | 'error'
-  content?: string
+  type: 'step_start' | 'step_complete' | 'tool_start' | 'tool_complete' | 
+        'partial_result' | 'token' | 'message_complete' | 'error'
+  step?: string
+  tool?: string
+  input?: string
+  output?: string
+  data?: {
+    token?: string
+    conversationId?: string
+    summary?: string
+    services?: VisualizationService[]
+    error?: string
+    message?: string
+  }
   service?: VisualizationService
-  services?: VisualizationService[]
-  message?: string
-  conversationId?: string
+  timestamp?: number
 }
 
 // ============================================================================

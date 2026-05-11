@@ -12,7 +12,6 @@ import { PromptManager } from '../managers/PromptManager';
 import { GoalSplitterAgent } from '../agents/GoalSplitterAgent';
 import { TaskPlannerAgent } from '../agents/TaskPlannerAgent';
 import { ConversationBufferMemoryWithSQLite } from '../managers/ConversationMemoryManager';
-import { ServicePublisher } from './ServicePublisher';
 import { SummaryGenerator } from './SummaryGenerator';
 import { reportDecisionNode } from './nodes/ReportDecisionNode';
 import { EnhancedExecutorInstance } from './nodes/EnhancedPluginExecutor';
@@ -115,8 +114,7 @@ export type GeoAIStateType = typeof GeoAIStateAnnotation.State;
 export function createGeoAIGraph(
   llmConfig: LLMConfig, 
   workspaceBase: string, 
-  onPartialResult?: (service: VisualizationService) => void,  // Callback for incremental streaming
-  streamWriter?: any  // Stream writer for sending tool events
+  onPartialResult?: (service: VisualizationService) => void
 ) {
   // Initialize managers and agents
   const promptManager = new PromptManager(workspaceBase);
@@ -188,7 +186,7 @@ export function createGeoAIGraph(
     })
     .addNode('pluginExecutor', async (state: GeoAIStateType) => {
       // Use EnhancedPluginExecutor for parallel execution
-      const result = await EnhancedExecutorInstance.executeWithParallelSupport(state, streamWriter);
+      const result = await EnhancedExecutorInstance.executeWithParallelSupport(state);
       
       // Get execution metrics
       const metrics = EnhancedExecutorInstance.getMetrics();
@@ -399,9 +397,8 @@ export function createGeoAIGraph(
 export function compileGeoAIGraph(
   llmConfig: LLMConfig, 
   workspaceBase: string, 
-  onPartialResult?: (service: VisualizationService) => void,
-  streamWriter?: any // Add streamWriter for sending tool events
+  onPartialResult?: (service: VisualizationService) => void
 ) {
-  const graph = createGeoAIGraph(llmConfig, workspaceBase, onPartialResult, streamWriter);
+  const graph = createGeoAIGraph(llmConfig, workspaceBase, onPartialResult);
   return graph.compile();
 }

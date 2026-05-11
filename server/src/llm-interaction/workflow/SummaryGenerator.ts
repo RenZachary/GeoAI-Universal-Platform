@@ -181,26 +181,24 @@ export class SummaryGenerator {
       // Create chain with prompt and LLM
       const chain = promptTemplate.pipe(llm);
       
-      // Invoke LLM with context
-      const response = await chain.invoke(context);
+      // Use streaming for real-time token delivery
+      console.log('[Summary Generator] Streaming LLM response...');
+      const stream = await chain.stream(context);
       
-      // Extract text content from response (handle different response types)
-      let summary: string;
-      if (typeof response === 'string') {
-        summary = response;
-      } else if (Array.isArray(response)) {
-        // Handle array of content blocks
-        summary = response
-          .map(block => {
-            if (typeof block === 'string') return block;
-            if (block && typeof block === 'object' && 'text' in block) return block.text;
-            return '';
-          })
-          .join('');
-      } else if (response && typeof response === 'object' && 'content' in response) {
-        summary = String(response.content);
-      } else {
-        summary = String(response);
+      let summary = '';
+      for await (const chunk of stream) {
+        // Extract text content from chunk (handle different response types)
+        let tokenText: string;
+        if (typeof chunk === 'string') {
+          tokenText = chunk;
+        } else if (chunk && typeof chunk === 'object' && 'content' in chunk) {
+          tokenText = String(chunk.content);
+        } else {
+          tokenText = String(chunk);
+        }
+        
+        summary += tokenText;
+        // Tokens are automatically sent via GeoAIStreamingHandler.handleLLMNewToken
       }
       
       console.log('[Summary Generator] LLM generated summary successfully');

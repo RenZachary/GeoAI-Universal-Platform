@@ -117,8 +117,7 @@ export const useChatStore = defineStore('chat', () => {
     
     switch (type) {
       case 'step_start':
-        // Show workflow progress with more detail
-        // step is at top level of event, not in data
+        // Show workflow progress with detailed step descriptions
         const stepName = step || 'Processing'
         
         console.log('[Chat Store] DEBUG: step_start received with stepName:', stepName)
@@ -129,7 +128,8 @@ export const useChatStore = defineStore('chat', () => {
           'goalSplitter': '🎯 Analyzing your request...',
           'taskPlanner': '📋 Planning analysis tasks...',
           'pluginExecutor': '⚙️ Executing analysis...',
-          'outputGenerator': '📊 Generating results...',
+          'reportDecision': '📊 Evaluating report needs...',
+          'outputGenerator': '📤 Preparing results...',
           'summaryGenerator': '📝 Creating summary...'
         }
         
@@ -139,15 +139,14 @@ export const useChatStore = defineStore('chat', () => {
         break
         
       case 'step_complete':
-        // Clear workflow status
+        // Clear workflow status immediately when step completes
         workflowStatus.value = ''
         console.log('[Chat Store] Workflow step complete')
         break
         
       case 'tool_start':
-        // Show tool usage with more detail
-        // Get tool name from event.tool field (set by GeoAIStreamingHandler)
-        const toolName = event.tool || 'Unknown tool'
+        // Show tool execution with user-friendly descriptions
+        const toolName = tool || 'Unknown tool'
         activeTools.value.push(toolName)
         
         // Map tool names to user-friendly descriptions
@@ -156,7 +155,8 @@ export const useChatStore = defineStore('chat', () => {
           'overlay_analysis': '🔀 Performing overlay analysis...',
           'data_filter': '🔍 Filtering data...',
           'data_aggregation': '📊 Calculating statistics...',
-          'mvt_publisher': '🗺️ Publishing map tiles...',
+          'choropleth_map': '🗺️ Generating choropleth map...',
+          'heatmap_visualization': '🔥 Creating heatmap...',
           'statistics_calculator': '📈 Computing statistics...',
           'report_generator': '📄 Generating report...'
         }
@@ -165,43 +165,29 @@ export const useChatStore = defineStore('chat', () => {
         break
         
       case 'tool_complete':
-        // Remove from active tools with detailed status
-        // Try to get tool name from output first, then fall back to activeTools
-        let completedToolName = 'Unknown tool'
-        if (output) {
-          try {
-            const outputData = JSON.parse(output || '{}')
-            completedToolName = outputData.pluginId || completedToolName
-          } catch (e) {
-            console.warn('[Chat Store] Failed to parse tool output', e)
-          }
-        }
-        
-        // If we couldn't get it from output, use the last active tool
-        if (completedToolName === 'Unknown tool' && activeTools.value.length > 0) {
-          completedToolName = activeTools.value[activeTools.value.length - 1]
-        }
+        // Remove completed tool from active list
+        const completedToolName = tool || 'Unknown tool'
         activeTools.value = activeTools.value.filter(t => t !== completedToolName)
         
         // Check if the tool succeeded by parsing output
         let toolSucceeded = true
-        if (data?.output) {
+        if (output) {
           try {
-            const output = JSON.parse(data.output)
-            toolSucceeded = output.success !== false
+            const outputData = JSON.parse(output)
+            toolSucceeded = outputData.success !== false
           } catch (e) {
             // If can't parse, assume success
           }
         }
         
         if (toolSucceeded) {
-          // Show success with emoji based on tool type
+          // Show success message based on tool type
           const successMessages: Record<string, string> = {
-            'buffer_analysis': '✅ Buffer analysis completed',
-            'overlay_analysis': '✅ Overlay analysis completed',
-            'data_filter': '✅ Data filtered successfully',
-            'data_aggregation': '✅ Statistics calculated',
-            'mvt_publisher': '✅ Map tiles published',
+            'buffer_analysis': '✅ Buffer zones created',
+            'overlay_analysis': '✅ Overlay completed',
+            'data_filter': '✅ Data filtered',
+            'choropleth_map': '✅ Map generated',
+            'heatmap_visualization': '✅ Heatmap created',
             'statistics_calculator': '✅ Statistics computed',
             'report_generator': '✅ Report generated'
           }
@@ -212,7 +198,7 @@ export const useChatStore = defineStore('chat', () => {
           console.warn('[Chat Store] Tool failed')
         }
         
-        // Clear status after 2 seconds
+        // Auto-clear status after 2 seconds
         setTimeout(() => {
           if (workflowStatus.value.includes(completedToolName) || workflowStatus.value.includes('completed') || workflowStatus.value.includes('failed')) {
             workflowStatus.value = ''
@@ -248,14 +234,8 @@ export const useChatStore = defineStore('chat', () => {
         break
         
       case 'token':
-        // Streaming token from assistant
-        if (!data) {
-          console.warn('[Chat Store] Token event missing data field', event)
-          break
-        }
-        
-        // Support both data structures for backward compatibility
-        const tokenText = data.token || data.content || ''
+        // Real-time token streaming from LLM (via GeoAIStreamingHandler)
+        const tokenText = data?.token || ''
         if (!tokenText) {
           console.warn('[Chat Store] Token event has no text content', event)
           break
@@ -265,15 +245,15 @@ export const useChatStore = defineStore('chat', () => {
         let updatedMsgs = [...currentMsgs]
         
         if (updatedMsgs.length === 0 || updatedMsgs[updatedMsgs.length - 1].role !== 'assistant') {
-          // Create new assistant message
+          // Create new assistant message with first token
           updatedMsgs.push({
             id: `assistant-${Date.now()}`,
             role: 'assistant',
-            content: tokenText,  // Start with first token
+            content: tokenText,
             timestamp: new Date().toISOString()
           })
         } else {
-          // Append to existing assistant message (create new object to trigger reactivity)
+          // Append token to existing assistant message
           const lastMsg = updatedMsgs[updatedMsgs.length - 1]
           updatedMsgs[updatedMsgs.length - 1] = {
             ...lastMsg,
@@ -281,8 +261,7 @@ export const useChatStore = defineStore('chat', () => {
           }
         }
         
-        // Update the Map with new array reference
-        // Force Vue reactivity by creating a new Map
+        // Update the Map with new array reference for Vue reactivity
         const newMap = new Map(messages.value)
         newMap.set(conversationId, updatedMsgs)
         messages.value = newMap

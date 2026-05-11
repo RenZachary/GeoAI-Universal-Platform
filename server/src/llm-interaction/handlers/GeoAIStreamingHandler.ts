@@ -18,65 +18,68 @@ export class GeoAIStreamingHandler extends BaseCallbackHandler {
 
   /**
    * Called when LLM generates a new token
-   * DISABLED: We manually stream only the final summary to avoid leaking internal LLM calls
+   * Streams real-time tokens for summary generation
    */
   async handleLLMNewToken(token: string): Promise<void> {
-    // Skip intermediate LLM tokens - only stream final summary from ChatController
-    // this.writeSSE({
-    //   type: 'token',
-    //   content: token,
-    //   timestamp: Date.now(),
-    // });
+    this.writeSSE({
+      type: 'token',
+      data: { token },
+      timestamp: Date.now(),
+    });
   }
 
   /**
-   * Called when a chain starts
-   * DISABLED: We use ChatController to send workflow-level step events instead
+   * Called when a chain/workflow node starts
+   * Captures step_start events for all workflow nodes
    */
   async handleChainStart(chain: any, inputs: any): Promise<void> {
-    // Skip sending step_start events - handled by ChatController for cleaner UX
-    // this.writeSSE({
-    //   type: 'step_start',
-    //   step: stepName,
-    //   timestamp: Date.now(),
-    // });
-  }
-
-  /**
-   * Called when a chain ends
-   * DISABLED: We use ChatController to send workflow-level step events instead
-   */
-  async handleChainEnd(outputs: any): Promise<void> {
-    // Skip sending step_complete events - handled by ChatController for cleaner UX
-    // this.writeSSE({
-    //   type: 'step_complete',
-    //   timestamp: Date.now(),
-    // });
-  }
-
-  /**
-   * Called when a tool starts
-   */
-  async handleToolStart(tool: any, input: string): Promise<void> {
-    // Only send event if tool.name exists (avoid duplicate events from manual sending in GeoAIGraph)
-    if (!tool?.name) {
+    // Only send for meaningful workflow nodes (skip internal Runnable chains)
+    const chainName = chain.name || chain.constructor?.name;
+    if (!chainName || chainName.startsWith('Runnable')) {
       return;
     }
     
     this.writeSSE({
+      type: 'step_start',
+      step: chainName, // e.g., 'memoryLoader', 'goalSplitter', 'taskPlanner'
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Called when a chain/workflow node ends
+   * Captures step_complete events
+   */
+  async handleChainEnd(outputs: any, runId?: string): Promise<void> {
+    this.writeSSE({
+      type: 'step_complete',
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Called when a tool starts execution
+   * Automatically triggered by LangChain when tool.invoke() is called
+   */
+  async handleToolStart(tool: any, input: string): Promise<void> {
+    this.writeSSE({
       type: 'tool_start',
-      tool: tool.name,
+      tool: tool.name, // operatorId from ToolAdapter
       input: this.truncate(input, 200),
       timestamp: Date.now(),
     });
   }
 
   /**
-   * Called when a tool ends
+   * Called when a tool completes execution
+   * Automatically triggered by LangChain after tool returns result
    */
   async handleToolEnd(output: string, runId?: string): Promise<void> {
-    // Don't send tool_complete from here - it's handled manually in GeoAIGraph
-    // This avoids duplicate events
+    this.writeSSE({
+      type: 'tool_complete',
+      output: this.truncate(output, 2000),
+      timestamp: Date.now(),
+    });
   }
 
   /**

@@ -57,7 +57,7 @@ export class ChatController {
         timestamp: Date.now()
       })}\n\n`);
 
-      // Create streaming handler for workflow progress (for debugging)
+      // Create streaming handler - unified event source for all SSE events
       const streamingHandler = new GeoAIStreamingHandler(res);
 
       // Initialize LangGraph workflow with conversation memory support
@@ -79,8 +79,7 @@ export class ChatController {
             },
             timestamp: Date.now()
           })}\n\n`);
-        },
-        res // Pass streamWriter for tool event streaming
+        }
       );
 
       // Prepare initial state
@@ -90,59 +89,26 @@ export class ChatController {
         currentStep: 'goal_splitting'
       };
 
-      // Execute workflow with streaming (agents and tools already integrated via GeoAIGraph)
+      // Execute workflow with streaming callbacks
       console.log('[Chat API] Executing workflow...');
 
-      // Execute workflow with streaming
       const stream = await graph.stream(initialState, {
         callbacks: [streamingHandler]
       });
 
-      // Process stream events
-      let finalServices: any[] = [];
+      // Process stream to capture final state
       let finalSummary: string = '';
+      let finalServices: any[] = [];
       
       for await (const chunk of stream) {
-        const stepKeys = Object.keys(chunk);
-        console.log('[Chat API] Workflow step:', stepKeys);
-        
-        // Send step_start event for each workflow node
-        if (stepKeys.length > 0) {
-          const stepName = stepKeys[0]; // e.g., 'goalSplitter', 'taskPlanner', etc.
-          res.write(`data: ${JSON.stringify({
-            type: 'step_start',
-            step: stepName,
-            timestamp: Date.now()
-          })}\n\n`);
-        }
-        
-        // Capture visualization services from outputGenerator node
-        if (chunk.outputGenerator && chunk.outputGenerator.visualizationServices) {
-          finalServices = chunk.outputGenerator.visualizationServices;
-        }
-        
-        // Capture summary from summaryGenerator node
-        if (chunk.summaryGenerator && chunk.summaryGenerator.summary) {
+        // Extract summary from summaryGenerator node
+        if (chunk.summaryGenerator?.summary) {
           finalSummary = chunk.summaryGenerator.summary;
         }
-      }
-
-      // Stream the summary as tokens (what frontend expects for display)
-      if (finalSummary) {
-        // Simulate token-by-token streaming for better UX
-        const words = finalSummary.split(' ');
-        for (let i = 0; i < words.length; i += 5) { // Stream in chunks of 5 words
-          const tokenChunk = words.slice(i, i + 5).join(' ') + ' ';
-          res.write(`data: ${JSON.stringify({
-            type: 'token',
-            data: {
-              token: tokenChunk
-            },
-            timestamp: Date.now()
-          })}\n\n`);
-          
-          // Small delay to simulate natural typing (optional, can be removed for instant display)
-          await new Promise(resolve => setTimeout(resolve, 10));
+        
+        // Extract services from outputGenerator node
+        if (chunk.outputGenerator?.visualizationServices) {
+          finalServices = chunk.outputGenerator.visualizationServices;
         }
       }
 
