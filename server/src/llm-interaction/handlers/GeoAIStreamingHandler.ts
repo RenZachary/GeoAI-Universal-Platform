@@ -10,8 +10,6 @@ export class GeoAIStreamingHandler extends BaseCallbackHandler {
   private streamWriter: Writable;
   private lastErrorTimestamp: number = 0;
   private errorDeduplicationWindow: number = 100; // ms - prevent duplicate errors within 100ms
-  private currentChainName: string | null = null; // Track current workflow node
-  private shouldStreamTokens: boolean = false; // Only stream tokens during summary generation
 
   constructor(streamWriter: Writable) {
     super();
@@ -20,19 +18,9 @@ export class GeoAIStreamingHandler extends BaseCallbackHandler {
 
   /**
    * Called when LLM generates a new token
-   * Only streams tokens during summary generation (not goal splitting or task planning)
+   * Streams all tokens - filtering is done at the application level if needed
    */
   async handleLLMNewToken(token: string): Promise<void> {
-    // Debug logging
-    if (token.length > 0) {
-      console.log(`[GeoAIStreamingHandler] Token received, shouldStreamTokens: ${this.shouldStreamTokens}, currentChain: ${this.currentChainName}, token preview: "${token.substring(0, 30)}..."`);
-    }
-    
-    // Only stream tokens if we're in the summary generation phase
-    if (!this.shouldStreamTokens) {
-      return; // Skip tokens from GoalSplitter, TaskPlanner, etc.
-    }
-    
     this.writeSSE({
       type: 'token',
       data: { token },
@@ -70,12 +58,6 @@ export class GeoAIStreamingHandler extends BaseCallbackHandler {
       return;
     }
     
-    // Track current chain and determine if we should stream tokens
-    this.currentChainName = chainName;
-    this.shouldStreamTokens = (chainName === 'summaryGenerator');
-    
-    console.log(`[GeoAIStreamingHandler] Chain started: ${chainName}, shouldStreamTokens: ${this.shouldStreamTokens}`);
-    
     this.writeSSE({
       type: 'step_start',
       step: chainName,
@@ -88,10 +70,6 @@ export class GeoAIStreamingHandler extends BaseCallbackHandler {
    * Captures step_complete events
    */
   async handleChainEnd(outputs: any, runId?: string): Promise<void> {
-    // Reset token streaming flag when chain ends
-    this.shouldStreamTokens = false;
-    this.currentChainName = null;
-    
     this.writeSSE({
       type: 'step_complete',
       timestamp: Date.now(),
