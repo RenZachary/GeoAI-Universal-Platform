@@ -23,6 +23,11 @@ export class GeoAIStreamingHandler extends BaseCallbackHandler {
    * Only streams tokens during summary generation (not goal splitting or task planning)
    */
   async handleLLMNewToken(token: string): Promise<void> {
+    // Debug logging
+    if (token.length > 0) {
+      console.log(`[GeoAIStreamingHandler] Token received, shouldStreamTokens: ${this.shouldStreamTokens}, currentChain: ${this.currentChainName}, token preview: "${token.substring(0, 30)}..."`);
+    }
+    
     // Only stream tokens if we're in the summary generation phase
     if (!this.shouldStreamTokens) {
       return; // Skip tokens from GoalSplitter, TaskPlanner, etc.
@@ -40,9 +45,28 @@ export class GeoAIStreamingHandler extends BaseCallbackHandler {
    * Captures step_start events for all workflow nodes
    */
   async handleChainStart(chain: any, inputs: any): Promise<void> {
-    // Only send for meaningful workflow nodes (skip internal Runnable chains)
-    const chainName = chain.name || chain.constructor?.name;
-    if (!chainName || chainName.startsWith('Runnable')) {
+    // Try multiple ways to get the chain/node name
+    let chainName: string | undefined;
+    
+    // Method 1: Direct name property
+    if (chain.name && typeof chain.name === 'string' && !chain.name.startsWith('Runnable')) {
+      chainName = chain.name;
+    }
+    // Method 2: From constructor
+    else if (chain.constructor?.name && chain.constructor.name !== 'Object') {
+      chainName = chain.constructor.name;
+    }
+    // Method 3: From run metadata (LangGraph specific)
+    else if (chain.run_metadata?.langgraph_node) {
+      chainName = chain.run_metadata.langgraph_node;
+    }
+    // Method 4: From config
+    else if (chain.config?.run_name) {
+      chainName = chain.config.run_name;
+    }
+    
+    // Skip if we can't get a meaningful name or it's an internal Runnable
+    if (!chainName || chainName.startsWith('Runnable') || chainName === 'Object') {
       return;
     }
     
@@ -50,9 +74,11 @@ export class GeoAIStreamingHandler extends BaseCallbackHandler {
     this.currentChainName = chainName;
     this.shouldStreamTokens = (chainName === 'summaryGenerator');
     
+    console.log(`[GeoAIStreamingHandler] Chain started: ${chainName}, shouldStreamTokens: ${this.shouldStreamTokens}`);
+    
     this.writeSSE({
       type: 'step_start',
-      step: chainName, // e.g., 'memoryLoader', 'goalSplitter', 'taskPlanner'
+      step: chainName,
       timestamp: Date.now(),
     });
   }
