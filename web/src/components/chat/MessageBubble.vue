@@ -18,14 +18,14 @@
       <div class="message-text" v-html="renderedContent" />
       
       <!-- Service links -->
-      <div v-if="message.services && message.services.length > 0" class="service-links">
+      <div v-if="displayedServices && displayedServices.length > 0" class="service-links">
         <div class="service-links-header">
           <el-icon><Link /></el-icon>
-          <span>Generated Services ({{ message.services.length }})</span>
+          <span>Generated Services ({{ displayedServices.length }})</span>
         </div>
         <div class="service-link-list">
           <div 
-            v-for="service in message.services" 
+            v-for="service in displayedServices" 
             :key="service.id"
             class="service-link-item"
           >
@@ -46,10 +46,6 @@
             </el-button>
           </div>
         </div>
-      </div>
-      <!-- Debug: Show when services exist but not rendered -->
-      <div v-else-if="message.services" class="debug-info" style="color: red; font-size: 12px; margin-top: 8px;">
-        Services array exists but length is 0
       </div>
       
       <!-- Streaming indicator -->
@@ -82,7 +78,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import type { ChatMessage, VisualizationService } from '@/types'
 import { VisualizationServiceType } from '@/types'
 import { User, ChatDotRound, DocumentCopy, RefreshRight, Link, Document, MapLocation, Reading } from '@element-plus/icons-vue'
@@ -106,6 +102,29 @@ const props = defineProps<{
   message: ChatMessage
   isStreaming?: boolean
 }>()
+
+// Computed: Get services to display - prefer message.services, fallback to partialServices
+const displayedServices = computed(() => {
+  // If message has services, use those
+  if (props.message.services && props.message.services.length > 0) {
+    return props.message.services
+  }
+  
+  // Otherwise, if this is the last assistant message and streaming is done,
+  // try to get services from partialServices
+  if (props.message.role === 'assistant' && !props.isStreaming) {
+    // Get all messages to check if this is the last one
+    const allMessages = chatStore.currentMessages
+    const lastMsg = allMessages[allMessages.length - 1]
+    
+    // If this is the last message and we have partial services, show them
+    if (lastMsg && lastMsg.id === props.message.id && chatStore.partialServices.length > 0) {
+      return chatStore.partialServices
+    }
+  }
+  
+  return []
+})
 
 // Render markdown content
 const renderedContent = computed(() => {

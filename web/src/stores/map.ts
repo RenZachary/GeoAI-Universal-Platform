@@ -142,9 +142,6 @@ export const useMapStore = defineStore('map', () => {
     const map = mapInstance.value as any
 
     switch (layer.type) {
-      case LayerType.GeoJSON:
-        addGeoJSONLayer(map, layer)
-        break
       case LayerType.MVT:
         addMVTLayer(map, layer)
         break
@@ -158,33 +155,6 @@ export const useMapStore = defineStore('map', () => {
     }
   }
 
-  function addGeoJSONLayer(map: any, layer: Omit<MapLayer, 'createdAt'>) {
-    if (map.getSource(layer.id)) {
-      map.removeLayer(layer.id)
-      map.removeSource(layer.id)
-    }
-
-    // Convert relative URL to absolute URL for Mapbox GL JS
-    const dataUrl = layer.url.startsWith('http')
-      ? layer.url
-      : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${layer.url}`
-
-    map.addSource(layer.id, {
-      type: 'geojson',
-      data: dataUrl
-    })
-
-    map.addLayer({
-      id: layer.id,
-      type: 'fill',
-      source: layer.id,
-      paint: {
-        'fill-color': layer.style?.fillColor || '#409eff',
-        'fill-opacity': layer.style?.fillOpacity || layer.opacity || 0.5
-      }
-    })
-  }
-
   function addMVTLayer(map: any, layer: Omit<MapLayer, 'createdAt'>) {
     if (map.getSource(layer.id)) {
       map.removeLayer(layer.id)
@@ -193,12 +163,8 @@ export const useMapStore = defineStore('map', () => {
 
     // Check if this is a choropleth/thematic map with custom style
     const styleUrl = layer.styleUrl || layer.metadata?.styleUrl
-    console.log('[Map Store] addMVTLayer - layer:', layer.id)
-    console.log('[Map Store] addMVTLayer - metadata:', layer.metadata)
-    console.log('[Map Store] addMVTLayer - styleUrl:', styleUrl)
     
     if (styleUrl) {
-      console.log('[Map Store] Detected custom style, applying...')
       // Apply custom style from StyleFactory
       applyCustomStyleFromURL(map, layer, styleUrl)
     } else {
@@ -212,35 +178,26 @@ export const useMapStore = defineStore('map', () => {
    * Apply custom Mapbox Style JSON from URL
    */
   async function applyCustomStyleFromURL(map: any, layer: Omit<MapLayer, 'createdAt'>, styleUrl: string) {
-    try {
-      console.log('[Map Store] === applyCustomStyleFromURL START ===')
-      console.log('[Map Store] Layer ID:', layer.id)
-      console.log('[Map Store] Style URL:', styleUrl)
-      
+    try {      
       // Check if source already exists and remove it first
       if (map.getSource(layer.id)) {
-        console.log('[Map Store] Source already exists, removing old layers and source...')
         // Remove all layers that use this source
         const allLayers = map.getStyle().layers
         allLayers.forEach((mapLayer: any) => {
           if (mapLayer.source === layer.id && mapLayer.id !== layer.id) {
             if (map.getLayer(mapLayer.id)) {
               map.removeLayer(mapLayer.id)
-              console.log('[Map Store] Removed old layer:', mapLayer.id)
             }
           }
         })
         // Remove the source
         map.removeSource(layer.id)
-        console.log('[Map Store] Removed old source:', layer.id)
       }
       
       // Convert relative URL to absolute (but NOT for blob URLs)
       const fullStyleUrl = styleUrl.startsWith('http') || styleUrl.startsWith('blob:')
         ? styleUrl
         : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${styleUrl}`
-
-      console.log(`[Map Store] Loading custom style from: ${fullStyleUrl}`)
 
       // Fetch the style JSON (handle blob URLs directly)
       let styleJson: any;
@@ -268,18 +225,11 @@ export const useMapStore = defineStore('map', () => {
         maxzoom: layer.maxZoom || 22
       })
       
-      console.log('[Map Store] Source added successfully')
-      console.log('[Map Store] Verifying source exists:', !!map.getSource(layer.id))
-
       // Add layers from style JSON
-      if (styleJson.layers && Array.isArray(styleJson.layers)) {
-        console.log(`[Map Store] Processing ${styleJson.layers.length} layers from style`)
-        
+      if (styleJson.layers && Array.isArray(styleJson.layers)) {        
         const addedLayerIds: string[] = [];
         
-        styleJson.layers.forEach((styleLayer: any, index: number) => {
-          console.log(`\n[Map Store] --- Layer ${index + 1} ---`)
-          
+        styleJson.layers.forEach((styleLayer: any, index: number) => {          
           const layerToAdd: any = {
             id: styleLayer.id,
             type: styleLayer.type,
@@ -288,25 +238,16 @@ export const useMapStore = defineStore('map', () => {
             paint: styleLayer.paint
           }
           
-          console.log('[Map Store] Layer to add - ID:', layerToAdd.id)
-          console.log('[Map Store] Layer to add - Type:', layerToAdd.type)
-          console.log('[Map Store] Layer to add - Source:', layerToAdd.source)
-          console.log('[Map Store] Layer to add - Source-layer:', layerToAdd['source-layer'])
-          console.log('[Map Store] Layer to add - Paint:', JSON.stringify(layerToAdd.paint))
-          
           if (styleLayer.minzoom !== undefined) {
             layerToAdd.minzoom = styleLayer.minzoom
-            console.log('[Map Store] Layer to add - Minzoom:', layerToAdd.minzoom)
           }
           if (styleLayer.maxzoom !== undefined) {
             layerToAdd.maxzoom = styleLayer.maxzoom
-            console.log('[Map Store] Layer to add - Maxzoom:', layerToAdd.maxzoom)
           }
           
           try {
             map.addLayer(layerToAdd)
             addedLayerIds.push(styleLayer.id)
-            console.log(`[Map Store] ✅ Layer added successfully: ${styleLayer.id}`)
           } catch (error) {
             console.error(`[Map Store] ❌ Failed to add layer ${styleLayer.id}:`, error)
           }
@@ -321,15 +262,9 @@ export const useMapStore = defineStore('map', () => {
               ...layers.value[layerIndex].metadata,
               actualLayerIds: addedLayerIds
             }
-            console.log(`[Map Store] Updated layer metadata with actualLayerIds:`, addedLayerIds)
           }
         }
-      } else {
-        console.warn('[Map Store] No layers found in style JSON')
       }
-
-      console.log('[Map Store] === applyCustomStyleFromURL END ===')
-      console.log('[Map Store] Custom style applied successfully')
     } catch (error) {
       console.error('[Map Store] ❌ Failed to apply custom style:', error)
       console.error('[Map Store] Error stack:', error instanceof Error ? error.stack : error)
@@ -344,20 +279,17 @@ export const useMapStore = defineStore('map', () => {
   function applyDefaultMVTStyle(map: any, layer: Omit<MapLayer, 'createdAt'>) {
     // Check if source already exists and remove it first
     if (map.getSource(layer.id)) {
-      console.log('[Map Store] Default style - Source already exists, removing...')
       // Remove all layers that use this source
       const allLayers = map.getStyle().layers
       allLayers.forEach((mapLayer: any) => {
         if (mapLayer.source === layer.id) {
           if (map.getLayer(mapLayer.id)) {
             map.removeLayer(mapLayer.id)
-            console.log('[Map Store] Removed old layer:', mapLayer.id)
           }
         }
       })
       // Remove the source
       map.removeSource(layer.id)
-      console.log('[Map Store] Removed old source:', layer.id)
     }
     
     // Convert relative URL to absolute URL for Mapbox GL JS
@@ -554,9 +486,7 @@ export const useMapStore = defineStore('map', () => {
     // Keep original data layers (have dataSourceId)
     const layersToRemove = layers.value.filter(layer => !layer.dataSourceId)
     const layersToKeep = layers.value.filter(layer => layer.dataSourceId)
-    
-    console.log(`[Map Store] Clearing ${layersToRemove.length} service layers, keeping ${layersToKeep.length} data layers`)
-    
+        
     // STEP 1: Remove ALL layers first (before removing any sources)
     layersToRemove.forEach(layer => {
       try {
@@ -598,8 +528,6 @@ export const useMapStore = defineStore('map', () => {
     
     // Remove service layers from the layers array
     layers.value = layersToKeep
-    
-    console.log(`[Map Store] Remaining layers: ${layers.value.length}`)
   }
 
   /**
@@ -635,9 +563,7 @@ export const useMapStore = defineStore('map', () => {
     const styleConfig = service.metadata?.styleConfig
     
     // If styleConfig is provided, use StyleFactory to generate Mapbox style JSON
-    if (styleConfig) {
-      console.log('[Map Store] Applying styleConfig via StyleFactory:', styleConfig)
-      
+    if (styleConfig) {      
       // Get geometry type from metadata
       const geometryType = service.metadata?.geometryType
         ? GeometryAdapter.normalizeGeometryType(service.metadata.geometryType)

@@ -192,7 +192,6 @@ export const useChatStore = defineStore('chat', () => {
         // service is at top level of event
         if (service) {
           partialServices.value.push(service)
-          console.log('[Chat Store] Partial result received:', service.id)
           
           // Show notification when a new service is ready
           const serviceType = service.type.toUpperCase()
@@ -227,7 +226,6 @@ export const useChatStore = defineStore('chat', () => {
           // Extract the status message and update workflow status
           const statusMessage = tokenText.replace('__STATUS__:', '')
           workflowStatus.value = statusMessage
-          console.log('[Chat Store] Status updated:', statusMessage)
           // IMPORTANT: Return early to prevent appending to message content
           return
         }
@@ -286,31 +284,32 @@ export const useChatStore = defineStore('chat', () => {
         const servicesToStore = data?.services || services
         
         if (servicesToStore && servicesToStore.length > 0) {
-          console.log('[Chat Store] Received visualization services:', servicesToStore)
-          
           // Attach services to the last assistant message
-          const msgsArray = [...currentMsgs]
-          const lastAssistantIndex = msgsArray.map((m, i) => ({ m, i })).reverse().find(({ m }) => m.role === 'assistant')?.i
-          
-          if (lastAssistantIndex !== undefined) {
-            // Create a completely new array with updated message
-            const updatedMsgs = [...msgsArray]
-            updatedMsgs[lastAssistantIndex] = {
-              ...updatedMsgs[lastAssistantIndex],
-              services: servicesToStore
+          // Create a completely new array with all new object references
+          const msgsArray = currentMsgs.map((msg, index) => {
+            // Check if this is the last assistant message
+            const isLastAssistant = index === currentMsgs.map((m, i) => ({ m, i })).reverse().find(({ m }) => m.role === 'assistant')?.i
+            
+            if (isLastAssistant) {
+              // Create a new object with services
+              return {
+                ...msg,
+                services: [...servicesToStore] // Create a new array copy
+              }
             }
-            
-            console.log('[Chat Store] Attached services to message at index', lastAssistantIndex)
-            
-            // Force Vue reactivity by creating a new Map with new array
-            const completeMap = new Map(messages.value)
-            completeMap.set(conversationId, updatedMsgs)
-            messages.value = completeMap
-            
-            console.log('[Chat Store] Services attached successfully')
-          } else {
-            console.warn('[Chat Store] No assistant message found to attach services')
-          }
+            // Return other messages as-is
+            return msg
+          })
+          
+          // Force Vue reactivity by creating a completely new Map
+          const completeMap = new Map()
+          // Copy all existing conversations
+          messages.value.forEach((msgs, convId) => {
+            completeMap.set(convId, msgs)
+          })
+          // Update current conversation with new array
+          completeMap.set(conversationId, msgsArray)
+          messages.value = completeMap
           
           // Also add all services to partialServices for backward compatibility
           servicesToStore.forEach((service: any) => {
@@ -320,12 +319,12 @@ export const useChatStore = defineStore('chat', () => {
               partialServices.value.push(service)
             }
           })
+        } else {
+          // Even if no services to store, still need to update the Map to trigger reactivity
+          const completeMap = new Map(messages.value)
+          completeMap.set(conversationId, [...currentMsgs])
+          messages.value = completeMap
         }
-        
-        // Force Vue reactivity by creating a new Map
-        const completeMap = new Map(messages.value)
-        completeMap.set(conversationId, [...currentMsgs])
-        messages.value = completeMap
         
         isStreaming.value = false
         break

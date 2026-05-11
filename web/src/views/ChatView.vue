@@ -187,13 +187,6 @@ const filteredTools = computed(() => {
 })
 
 // Computed: Highlighted text with @mentions styled
-// Debug: Watch partialServices changes
-watch(() => chatStore.partialServices, (newVal) => {
-  console.log('[ChatView] partialServices changed:', newVal.length, 'services')
-  if (newVal.length > 0) {
-    console.log('[ChatView] First service:', newVal[0])
-  }
-}, { deep: true })
 
 // Computed: Placeholder text for the editor
 const placeholderText = computed(() => t('chat.placeholder', { atSymbol: '@' }))
