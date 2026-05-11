@@ -27,6 +27,7 @@ export class HeatmapOperator extends SpatialOperator {
   readonly name = 'Heatmap Generator';
   readonly description = 'Generate point density heatmaps using kernel density estimation (KDE)';
   readonly category = 'visualization' as const;
+  readonly returnType = 'spatial' as const; // Returns styled spatial data
   
   readonly inputSchema = HeatmapInputSchema;
   readonly outputSchema = HeatmapOutputSchema;

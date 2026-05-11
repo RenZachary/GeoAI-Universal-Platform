@@ -12,7 +12,7 @@
  */
 
 import { z } from 'zod';
-import { SpatialOperator, type OperatorContext } from '../SpatialOperator';
+import { SpatialOperator, type OperatorContext, type OperatorReturnType, SpatialOutputSchema } from '../SpatialOperator';
 import type { PluginManifest } from '../plugins/CustomPluginLoader';
 import { wrapError } from '../../core';
 import { pathToFileURL } from 'url';
@@ -68,8 +68,9 @@ export class CustomPluginAdapter extends SpatialOperator {
   readonly name: string;
   readonly description: string;
   readonly category: 'analysis' | 'visualization' | 'query' | 'transformation';
+  readonly returnType: OperatorReturnType;
   readonly inputSchema: z.ZodObject<any>;
-  readonly outputSchema: z.ZodObject<any> = z.object({}); // Placeholder
+  readonly outputSchema: z.ZodObject<any>;
   
   private manifest: PluginManifest;
   private executeFunction: any = null;
@@ -93,8 +94,31 @@ export class CustomPluginAdapter extends SpatialOperator {
     this.description = manifest.description;
     this.category = this.mapCategory(manifest.category);
     
+    // Determine return type based on plugin category and capabilities
+    // Visualization plugins return spatial data, others depend on their behavior
+    if (manifest.category === 'visualization') {
+      this.returnType = 'spatial';
+    } else if (manifest.capabilities?.includes('returns_spatial_data')) {
+      this.returnType = 'spatial';
+    } else {
+      // Default to analytical for non-visualization plugins
+      this.returnType = 'analytical';
+    }
+    
     // Build Zod schema from plugin's inputSchema (JSON Schema format)
     this.inputSchema = jsonSchemaToZod(manifest.inputSchema) as z.ZodObject<any>;
+    
+    // Set output schema based on return type
+    if (this.returnType === 'spatial') {
+      this.outputSchema = SpatialOutputSchema as any;
+    } else {
+      // For analytical plugins, use a flexible schema
+      this.outputSchema = z.object({
+        success: z.boolean().default(true),
+        data: z.record(z.any()),
+        metadata: z.record(z.any()).optional()
+      }) as any;
+    }
     
     // Load the execute function from the module (async, but we don't await in constructor)
     // The execute() method will check if it's loaded before calling
@@ -178,15 +202,11 @@ export class CustomPluginAdapter extends SpatialOperator {
    * Get operator metadata for LLM understanding
    */
   getMetadata() {
+    const baseMetadata = super.getMetadata();
     return {
-      operatorId: this.operatorId,
-      name: this.name,
-      description: this.description,
-      category: this.category,
-      inputSchema: this.inputSchema,
-      outputSchema: this.outputSchema,
+      ...baseMetadata,
       capabilities: this.manifest.capabilities || [],
-      version: this.manifest.version,
+      version: this.manifest.version || '1.0.0',
       isCustom: true
     };
   }

@@ -43,6 +43,7 @@ export class ChoroplethOperator extends SpatialOperator {
   readonly name = 'Choropleth Renderer';
   readonly description = 'Create statistical choropleth maps with graduated colors based on numeric field values';
   readonly category = 'visualization' as const;
+  readonly returnType = 'spatial' as const; // Returns styled spatial data
   
   readonly inputSchema = ChoroplethInputSchema;
   readonly outputSchema = ChoroplethOutputSchema;

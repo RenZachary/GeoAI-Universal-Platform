@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { SpatialOperator, type OperatorContext } from '../../SpatialOperator';
+import { SpatialOperator, type OperatorContext, AnalyticalOutputSchema } from '../../SpatialOperator';
 import { DataAccessFacade } from '../../../data-access';
 import { DataSourceRepository } from '../../../data-access/repositories';
 import type Database from 'better-sqlite3';
@@ -16,10 +16,13 @@ const StatisticsInputSchema = z.object({
     .describe('Statistics to calculate')
 });
 
-const StatisticsOutputSchema = z.object({
-  result: z.record(z.string(), z.number()).describe('Statistics object'),
-  count: z.number().describe('Feature count'),
-  fieldName: z.string().describe('Field analyzed')
+// Output schema uses AnalyticalOutputSchema - Statistics returns analytical results, not spatial data
+const StatisticsOutputSchema = AnalyticalOutputSchema.extend({
+  data: z.object({
+    statistics: z.record(z.string(), z.number()).describe('Calculated statistics (mean, median, etc.)'),
+    count: z.number().describe('Feature count'),
+    fieldName: z.string().describe('Field that was analyzed')
+  })
 });
 
 export class StatisticsCalculatorOperator extends SpatialOperator {
@@ -27,6 +30,7 @@ export class StatisticsCalculatorOperator extends SpatialOperator {
   readonly name = 'Statistics Calculator';
   readonly description = 'Calculate statistical summaries (mean, median, std dev, etc.) for data attributes';
   readonly category = 'analysis' as const;
+  readonly returnType = 'analytical' as const; // Returns statistics, not spatial data
   
   readonly inputSchema = StatisticsInputSchema;
   readonly outputSchema = StatisticsOutputSchema;
@@ -107,10 +111,25 @@ export class StatisticsCalculatorOperator extends SpatialOperator {
       }
     }
     
+    console.log('[StatisticsCalculatorOperator] Statistics calculation completed:', {
+      fieldName: params.fieldName,
+      statisticsCount: Object.keys(result).length,
+      featureCount: count
+    });
+    
+    // Return analytical result structure (NOT NativeData)
     return {
-      result,
-      count,
-      fieldName: params.fieldName
+      success: true,
+      data: {
+        statistics: result,
+        count: count,
+        fieldName: params.fieldName
+      },
+      metadata: {
+        operatorId: this.operatorId,
+        executedAt: new Date().toISOString(),
+        summary: `Calculated ${params.statistics.length} statistics for field "${params.fieldName}" across ${count} features`
+      }
     };
   }
   

@@ -41,6 +41,7 @@ export class UniformColorOperator extends SpatialOperator {
   readonly name = 'Uniform Color Renderer';
   readonly description = 'Render all features with a single uniform color';
   readonly category = 'visualization' as const;
+  readonly returnType = 'spatial' as const; // Returns styled spatial data
   
   readonly inputSchema = UniformColorInputSchema;
   readonly outputSchema = UniformColorOutputSchema;

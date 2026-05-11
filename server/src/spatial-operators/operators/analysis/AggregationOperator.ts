@@ -16,10 +16,29 @@ const AggregationInputSchema = z.object({
   topN: z.number().min(1).optional().describe('Number of top features (for TOP_N)')
 });
 
+// Output schema - Aggregation can return either scalar values or feature arrays
+// For TOP_N, returns features (spatial); for others, returns statistics (analytical)
 const AggregationOutputSchema = z.object({
-  result: z.union([z.number(), z.array(z.any())]).describe('Aggregation result value or features'),
-  operation: z.string().describe('Operation performed'),
-  field: z.string().describe('Field aggregated')
+  success: z.boolean().default(true),
+  data: z.union([
+    z.object({
+      type: z.literal('scalar'),
+      value: z.number(),
+      operation: z.string(),
+      field: z.string()
+    }),
+    z.object({
+      type: z.literal('features'),
+      features: z.array(z.any()),
+      count: z.number(),
+      operation: z.string(),
+      field: z.string()
+    })
+  ]),
+  metadata: z.object({
+    operatorId: z.string(),
+    executedAt: z.string()
+  }).optional()
 });
 
 export class AggregationOperator extends SpatialOperator {
@@ -27,6 +46,9 @@ export class AggregationOperator extends SpatialOperator {
   readonly name = 'Data Aggregation';
   readonly description = 'Perform aggregation operations (MAX, MIN, AVG, SUM, COUNT, TOP_N) on numeric fields';
   readonly category = 'analysis' as const;
+  // Note: returnType depends on operation - TOP_N returns spatial, others return analytical
+  // For simplicity, we mark as analytical since most operations return scalar values
+  readonly returnType = 'analytical' as const;
   
   readonly inputSchema = AggregationInputSchema;
   readonly outputSchema = AggregationOutputSchema;
@@ -77,10 +99,33 @@ export class AggregationOperator extends SpatialOperator {
       { operation: params.operation, field: params.field }
     );
     
-    return {
-      result: persistedResult.metadata?.value || persistedResult.metadata?.features || [],
+    console.log('[AggregationOperator] Aggregation completed:', {
       operation: params.operation,
-      field: params.field
+      field: params.field,
+      hasFeatures: !!persistedResult.metadata?.features
+    });
+    
+    // Return analytical result structure
+    const isTopN = params.operation === 'TOP_N';
+    
+    return {
+      success: true,
+      data: isTopN ? {
+        type: 'features' as const,
+        features: persistedResult.metadata?.features || [],
+        count: persistedResult.metadata?.featureCount || 0,
+        operation: params.operation,
+        field: params.field
+      } : {
+        type: 'scalar' as const,
+        value: persistedResult.metadata?.value || 0,
+        operation: params.operation,
+        field: params.field
+      },
+      metadata: {
+        operatorId: this.operatorId,
+        executedAt: new Date().toISOString()
+      }
     };
   }
 }

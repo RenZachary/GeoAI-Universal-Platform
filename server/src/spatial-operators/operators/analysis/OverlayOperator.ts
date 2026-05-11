@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { SpatialOperator, type OperatorContext } from '../../SpatialOperator';
+import { SpatialOperator, type OperatorContext, SpatialOutputSchema } from '../../SpatialOperator';
 import { DataAccessFacade } from '../../../data-access';
 import { DataSourceRepository } from '../../../data-access/repositories';
 import { ResultPersistenceService } from '../../../services/ResultPersistenceService';
@@ -15,9 +15,14 @@ const OverlayInputSchema = z.object({
   operation: z.enum(['intersect', 'union', 'difference', 'symmetric_difference']).default('intersect').describe('Overlay operation type')
 });
 
-const OverlayOutputSchema = z.object({
-  result: z.string().describe('File path or URL to the overlay result'),
-  featureCount: z.number().describe('Number of features in the result')
+// Output schema extends SpatialOutputSchema - Overlay produces new spatial data
+const OverlayOutputSchema = SpatialOutputSchema.extend({
+  metadata: z.object({
+    operation: z.string().describe('Overlay operation type (intersect, union, difference, etc.)'),
+    featureCount: z.number().describe('Number of features in the result'),
+    inputDataSourceId: z.string().describe('Primary input data source ID'),
+    overlayDataSourceId: z.string().describe('Overlay data source ID')
+  }).optional()
 });
 
 export class OverlayOperator extends SpatialOperator {
@@ -25,6 +30,7 @@ export class OverlayOperator extends SpatialOperator {
   readonly name = 'Overlay Analysis';
   readonly description = 'Perform spatial overlay operations (intersect, union, difference) between two datasets';
   readonly category = 'analysis' as const;
+  readonly returnType = 'spatial' as const; // Produces new spatial data
   
   readonly inputSchema = OverlayInputSchema;
   readonly outputSchema = OverlayOutputSchema;
@@ -76,9 +82,26 @@ export class OverlayOperator extends SpatialOperator {
       { operation: params.operation }
     );
     
+    console.log('[OverlayOperator] Overlay completed successfully:', {
+      id: persistedResult.id,
+      type: persistedResult.type,
+      reference: persistedResult.reference,
+      operation: params.operation,
+      featureCount: persistedResult.metadata?.featureCount
+    });
+    
+    // Return NativeData structure for chaining
     return {
-      result: persistedResult.metadata?.result || persistedResult.reference,
-      featureCount: persistedResult.metadata?.featureCount || 0
+      id: persistedResult.id,
+      type: persistedResult.type,
+      reference: persistedResult.reference,
+      metadata: {
+        ...persistedResult.metadata,
+        operation: params.operation,
+        featureCount: persistedResult.metadata?.featureCount || 0,
+        inputDataSourceId: params.inputDataSourceId,
+        overlayDataSourceId: params.overlayDataSourceId
+      }
     };
   }
 }

@@ -24,6 +24,7 @@ export class GeneralQAOperator extends SpatialOperator {
   readonly name = 'General Q&A';
   readonly description = 'Handle general questions and provide conversational responses for non-GIS queries';
   readonly category = 'query' as const;
+  readonly returnType = 'textual' as const; // Returns text response, terminal operation
   
   readonly inputSchema = GeneralQAInputSchema;
   readonly outputSchema = GeneralQAOutputSchema;

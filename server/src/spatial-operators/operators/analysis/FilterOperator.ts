@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { SpatialOperator, type OperatorContext } from '../../SpatialOperator';
+import { SpatialOperator, type OperatorContext, SpatialOutputSchema } from '../../SpatialOperator';
 import type { FilterCondition } from '../../../data-access';
 import { DataAccessFacade } from '../../../data-access';
 import { DataSourceRepository } from '../../../data-access/repositories';
@@ -28,10 +28,13 @@ const FilterInputSchema = z.object({
   ]).describe('Filter conditions')
 });
 
-const FilterOutputSchema = z.object({
-  result: z.number().describe('Number of features after filtering'),
-  originalCount: z.number().describe('Original feature count'),
-  filteredCount: z.number().describe('Feature count after filtering')
+// Output schema extends SpatialOutputSchema - Filter produces new spatial data
+const FilterOutputSchema = SpatialOutputSchema.extend({
+  metadata: z.object({
+    originalCount: z.number().describe('Original feature count before filtering'),
+    filteredCount: z.number().describe('Feature count after filtering'),
+    conditions: z.any().describe('Filter conditions applied')
+  }).optional()
 });
 
 export class FilterOperator extends SpatialOperator {
@@ -39,6 +42,7 @@ export class FilterOperator extends SpatialOperator {
   readonly name = 'Data Filter';
   readonly description = 'Filter data sources based on attribute conditions or spatial relationships';
   readonly category = 'analysis' as const;
+  readonly returnType = 'spatial' as const; // Produces new spatial data
   
   readonly inputSchema = FilterInputSchema;
   readonly outputSchema = FilterOutputSchema;
@@ -91,10 +95,25 @@ export class FilterOperator extends SpatialOperator {
       { conditions: params.conditions }
     );
     
+    console.log('[FilterOperator] Filter completed successfully:', {
+      id: persistedResult.id,
+      type: persistedResult.type,
+      reference: persistedResult.reference,
+      originalCount: persistedResult.metadata?.originalCount,
+      filteredCount: persistedResult.metadata?.featureCount
+    });
+    
+    // Return NativeData structure for chaining
     return {
-      result: persistedResult.metadata?.featureCount || 0,
-      originalCount: persistedResult.metadata?.originalCount || 0,
-      filteredCount: persistedResult.metadata?.featureCount || 0
+      id: persistedResult.id,
+      type: persistedResult.type,
+      reference: persistedResult.reference,
+      metadata: {
+        ...persistedResult.metadata,
+        originalCount: persistedResult.metadata?.originalCount || 0,
+        filteredCount: persistedResult.metadata?.featureCount || 0,
+        conditions: params.conditions
+      }
     };
   }
 }

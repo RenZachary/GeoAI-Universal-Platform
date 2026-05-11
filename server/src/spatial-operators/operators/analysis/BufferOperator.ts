@@ -32,6 +32,7 @@ export class BufferOperator extends SpatialOperator {
   readonly name = 'Buffer Analysis';
   readonly description = 'Create buffer zones around spatial features based on specified distance';
   readonly category = 'analysis' as const;
+  readonly returnType = 'spatial' as const; // Produces new spatial data
   
   readonly inputSchema = BufferInputSchema;
   readonly outputSchema = BufferOutputSchema;

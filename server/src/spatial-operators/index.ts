@@ -5,7 +5,8 @@
  */
 
 // Core types and base classes
-export { SpatialOperator, type OperatorContext, type OperatorResult } from './SpatialOperator';
+export { SpatialOperator, type OperatorContext, type OperatorResult, type OperatorReturnType } from './SpatialOperator';
+export { SpatialOutputSchema, AnalyticalOutputSchema } from './SpatialOperator';
 export { SpatialOperatorRegistry, SpatialOperatorRegistryInstance } from './SpatialOperatorRegistry';
 
 // Core utilities

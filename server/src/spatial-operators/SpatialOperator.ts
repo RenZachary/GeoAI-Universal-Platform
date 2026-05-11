@@ -5,8 +5,16 @@
  * type-safe operator pattern using Zod schemas for validation.
  */
 
-import type { z } from 'zod';
+import { z } from 'zod';
 import type { NativeData } from '../core';
+
+/**
+ * Operator return type classification
+ * - 'spatial': Returns NativeData (can be used as dataSourceId in subsequent steps)
+ * - 'analytical': Returns statistical/query results (cannot be used as spatial input)
+ * - 'textual': Returns text responses (terminal operations)
+ */
+export type OperatorReturnType = 'spatial' | 'analytical' | 'textual';
 
 /**
  * Operator execution context
@@ -19,11 +27,35 @@ export interface OperatorContext {
 }
 
 /**
+ * Standard output schema for spatial operators (returns NativeData)
+ */
+export const SpatialOutputSchema = z.object({
+  id: z.string().describe('Unique identifier for the result'),
+  type: z.string().describe('Data source type (postgis, geojson, shapefile, etc.)'),
+  reference: z.string().describe('Reference to the data (table name, file path, etc.)'),
+  metadata: z.record(z.any()).optional().describe('Additional metadata including style config, operation details, etc.')
+});
+
+/**
+ * Standard output schema for analytical operators (returns statistics/queries)
+ */
+export const AnalyticalOutputSchema = z.object({
+  success: z.boolean().default(true),
+  data: z.record(z.any()).describe('Analytical result data'),
+  metadata: z.object({
+    operatorId: z.string(),
+    executedAt: z.string(),
+    summary: z.string().optional()
+  }).optional()
+});
+
+/**
  * Operator execution result
  */
 export interface OperatorResult {
   success: boolean;
-  data?: NativeData;
+  data?: NativeData | Record<string, any>;
+  returnType?: OperatorReturnType;
   error?: string;
   metadata?: Record<string, any>;
 }
@@ -54,6 +86,14 @@ export abstract class SpatialOperator {
   
   /** Output result schema (Zod) */
   abstract readonly outputSchema: z.ZodObject<any>;
+  
+  /**
+   * Return type classification - determines chaining rules
+   * - 'spatial': Can be used as dataSourceId in subsequent steps
+   * - 'analytical': Cannot be used as spatial input, only for reporting
+   * - 'textual': Terminal operation, cannot chain further
+   */
+  abstract readonly returnType: OperatorReturnType;
   
   /**
    * Validate and execute the operator
@@ -135,6 +175,7 @@ export abstract class SpatialOperator {
       name: this.name,
       description: this.description,
       category: this.category,
+      returnType: this.returnType,
       inputSchema: this.inputSchema.shape,
       outputSchema: this.outputSchema.shape,
       capabilities: [] as string[], // Can be overridden by subclasses

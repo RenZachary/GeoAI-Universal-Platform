@@ -40,6 +40,7 @@ export class CategoricalOperator extends SpatialOperator {
   readonly name = 'Categorical Renderer';
   readonly description = 'Render categorical data with distinct colors for each category';
   readonly category = 'visualization' as const;
+  readonly returnType = 'spatial' as const; // Returns styled spatial data
   
   readonly inputSchema = CategoricalInputSchema;
   readonly outputSchema = CategoricalOutputSchema;

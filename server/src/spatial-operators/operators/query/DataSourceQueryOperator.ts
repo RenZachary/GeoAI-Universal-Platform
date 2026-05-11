@@ -27,6 +27,7 @@ export class DataSourceQueryOperator extends SpatialOperator {
   readonly name = 'Data Source Query';
   readonly description = 'Query and list available data sources with their metadata';
   readonly category = 'query' as const;
+  readonly returnType = 'analytical' as const; // Returns query results, not spatial data
   
   readonly inputSchema = DataSourceQueryInputSchema;
   readonly outputSchema = DataSourceQueryOutputSchema;
