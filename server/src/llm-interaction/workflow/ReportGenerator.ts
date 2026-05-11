@@ -7,6 +7,7 @@
 import { PromptManager } from '../managers/PromptManager';
 import { LLMAdapterFactory, type LLMConfig } from '../adapters/LLMAdapterFactory';
 import type { AnalysisResult } from './GeoAIGraph';
+import { wrapError } from '../../core';
 
 export interface ReportGenerationParams {
   title: string;
@@ -102,9 +103,7 @@ export class ReportGenerator {
 
     } catch (error) {
       console.error('[ReportGenerator] Failed to generate report:', error);
-      const wrappedError = new Error(`Report generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      (wrappedError as any).cause = error;
-      throw wrappedError;
+      throw wrapError(error, `Report generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 }
