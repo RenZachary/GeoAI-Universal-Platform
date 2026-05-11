@@ -263,7 +263,7 @@ export const useChatStore = defineStore('chat', () => {
         workflowStatus.value = ''
         activeTools.value = []
         
-        // Message complete - add summary as assistant message if not already added
+        // Message complete - add or update summary as assistant message
         const lastMessage = currentMsgs[currentMsgs.length - 1]
         if (!lastMessage || lastMessage.role !== 'assistant') {
           // If no assistant message was created via tokens, create one with summary
@@ -273,10 +273,13 @@ export const useChatStore = defineStore('chat', () => {
             content: data?.summary || 'Analysis completed',
             timestamp: new Date().toISOString()
           })
-          // Force Vue reactivity by creating a new Map
-          const completeMap1 = new Map(messages.value)
-          completeMap1.set(conversationId, [...currentMsgs])
-          messages.value = completeMap1
+        } else {
+          // Update existing assistant message content with summary
+          // This handles the case where only __STATUS__ tokens were received (no real content tokens)
+          currentMsgs[currentMsgs.length - 1] = {
+            ...lastMessage,
+            content: data?.summary || lastMessage.content || 'Analysis completed'
+          }
         }
         
         // Store visualization services if provided
@@ -317,8 +320,12 @@ export const useChatStore = defineStore('chat', () => {
               partialServices.value.push(service)
             }
           })
-          console.log(`[Chat Store] Total services now: ${partialServices.value.length}`)
         }
+        
+        // Force Vue reactivity by creating a new Map
+        const completeMap = new Map(messages.value)
+        completeMap.set(conversationId, [...currentMsgs])
+        messages.value = completeMap
         
         isStreaming.value = false
         break
