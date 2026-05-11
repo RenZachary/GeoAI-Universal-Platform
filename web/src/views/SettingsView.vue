@@ -190,8 +190,7 @@
       <el-tab-pane :label="$t('settings.about')" name="about">
         <div class="about-section">
           <h3>GeoAI-UP Geographic AI Assistant</h3>
-          <p class="version">{{ $t('settings.version') }} {{ appVersion }}</p>
-          
+          <p class="version">{{ $t('settings.version') }} {{ appVersion }}</p>          
           <el-descriptions :column="1" border>
             <el-descriptions-item :label="$t('settings.frontendFramework')">
               Vue 3.5 + TypeScript
@@ -214,6 +213,10 @@
             <h4>{{ $t('settings.credits') }}</h4>
             <p>{{ $t('settings.creditsText') }}</p>
           </div>
+          
+          <el-link underline href="https://gitee.com/rzcgis/geo-ai-universal-platform" target="_blank">
+            <img src="https://img.shields.io/badge/Blog-CSDN-red.svg" alt="GeoAI-UP Logo">
+          </el-link>
         </div>
       </el-tab-pane>
     </el-tabs>
@@ -414,7 +417,7 @@ function handleSaveMapDefaults() {
   }
   
   .version {
-    margin: 0 0 24px 0;
+    margin: 0 0 16px 0;
     color: var(--el-text-color-secondary);
     font-size: 14px;
   }

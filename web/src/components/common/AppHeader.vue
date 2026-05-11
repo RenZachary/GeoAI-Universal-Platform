@@ -29,6 +29,11 @@
       <el-button text @click="$router.push('/settings')">
         <el-icon><Setting /></el-icon>
       </el-button>
+
+      <!-- Gitee Repository -->
+      <el-button text @click="openGitee">
+          <el-icon><Connection /></el-icon>
+      </el-button>
     </div>
   </div>
 </template>
@@ -37,7 +42,7 @@
 import { useConfigStore } from '@/stores/config'
 import { useUIStore } from '@/stores/ui'
 import { useI18n } from 'vue-i18n'
-import { Moon, Sunny, Setting } from '@element-plus/icons-vue'
+import { Moon, Sunny, Setting, Connection } from '@element-plus/icons-vue'
 
 const configStore = useConfigStore()
 const uiStore = useUIStore()
@@ -51,6 +56,10 @@ function handleLanguageChange(lang: string) {
 function toggleTheme() {
   const newTheme = uiStore.theme === 'dark' ? 'light' : 'dark'
   uiStore.setTheme(newTheme)
+}
+
+function openGitee() {
+  window.open('https://gitee.com/rzcgis/geo-ai-universal-platform', '_blank')
 }
 </script>
 
