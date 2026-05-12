@@ -8,6 +8,7 @@ import { PromptManager } from '../managers/PromptManager';
 import { LLMAdapterFactory } from '../adapters/LLMAdapterFactory';
 import type { LLMConfig } from '../adapters/LLMAdapterFactory';
 import type { GeoAIStateType, AnalysisResult, VisualizationService } from './GeoAIGraph';
+import { SpatialOperatorRegistryInstance } from '../../spatial-operators/SpatialOperatorRegistry';
 
 export interface SummaryOptions {
   language?: string;
@@ -32,6 +33,7 @@ export class SummaryGenerator {
 
   /**
    * Generate summary from workflow state
+   * Adapts behavior based on intent type (GIS_ANALYSIS, KNOWLEDGE_QUERY, HYBRID, GENERAL_CHAT)
    */
   async generate(state: GeoAIStateType, options: SummaryOptions = {}): Promise<string> {
     const {
@@ -45,6 +47,20 @@ export class SummaryGenerator {
     } = options;
 
     try {
+      // NEW: Adapt summary generation based on intent type
+      if (state.intent?.type === 'GENERAL_CHAT') {
+        console.log('[Summary Generator] Generating chat response');
+        return await this.generateChatResponse(state.userInput, language, onToken);
+      }
+      
+      if (state.intent?.type === 'KNOWLEDGE_QUERY' && state.knowledgeContext) {
+        console.log('[Summary Generator] Generating knowledge-based answer');
+        return await this.generateKnowledgeAnswer(state, language, onToken);
+      }
+      
+      // Default: GIS analysis or hybrid summary
+      console.log('[Summary Generator] Generating GIS analysis summary');
+      
       // Try LLM-based generation first (if API keys configured)
       if (this.llmConfig) {
         console.log('[Summary Generator] Using LLM for natural language summary');
@@ -76,6 +92,229 @@ export class SummaryGenerator {
       console.error('[Summary Generator] Error generating summary:', error);
       return this.generateFallback(state, options);
     }
+  }
+  
+  /**
+   * Generate response for general chat queries
+   */
+  private async generateChatResponse(
+    userInput: string,
+    language: string,
+    onToken?: (token: string) => void
+  ): Promise<string> {
+    if (!this.llmConfig) {
+      return 'I understand your message. How can I help you with spatial analysis or knowledge queries?';
+    }
+    
+    try {
+      // Load chat response template
+      const template = await this.promptManager.loadTemplate('chat-response', language);
+      
+      // Dynamic Capability Injection - preprocess template string before formatting
+      let templateStr = (template as any).template || '';
+      if (!templateStr) {
+        console.warn('[Summary Generator] chat-response template not found, using fallback');
+        return 'Hello! How can I assist you today?';
+      }
+      
+      const capabilities = this.getCapabilitiesSummary();
+      
+      // Handle {{#if}} blocks in the raw template string
+      if (capabilities) {
+        const ifBlockRegex = /\{\{#if availableCapabilities\}\}[\s\S]*?\{\{availableCapabilities\}\}[\s\S]*?\{\{\/if\}\}/g;
+        templateStr = templateStr.replace(ifBlockRegex, `\n## Currently Available Capabilities\nThe following capabilities are currently active in the system:\n{{availableCapabilities}}`);
+      } else {
+        const ifBlockRegex = /\{\{#if availableCapabilities\}\}[\s\S]*?\{\{\/if\}\}/g;
+        templateStr = templateStr.replace(ifBlockRegex, '');
+      }
+      
+      // Create a new PromptTemplate with the modified string
+      const { PromptTemplate } = await import('@langchain/core/prompts');
+      const modifiedTemplate = PromptTemplate.fromTemplate(templateStr);
+      
+      // Use LangChain's format method to fill variables
+      const prompt = await modifiedTemplate.format({ 
+        userMessage: userInput,
+        language: language,
+        availableCapabilities: capabilities || ''
+      });
+      
+      const adapter = LLMAdapterFactory.createAdapter(this.llmConfig);
+      
+      // Use streaming if onToken callback is provided
+      if (onToken) {
+        console.log('[Summary Generator] Streaming chat response...');
+        const stream = await adapter.stream(prompt);
+        
+        let fullResponse = '';
+        for await (const chunk of stream) {
+          // Extract text content from chunk robustly
+          let tokenText: string = '';
+          
+          if (typeof chunk === 'string') {
+            tokenText = chunk;
+          } else if (chunk && typeof chunk === 'object') {
+            // Handle AIMessageChunk or similar objects
+            if (typeof chunk.content === 'string') {
+              tokenText = chunk.content;
+            } else if (Array.isArray(chunk.content)) {
+              // Handle ContentBlock arrays (e.g., [{ type: 'text', text: '...' }])
+              tokenText = chunk.content
+                .filter((block: any) => block.type === 'text')
+                .map((block: any) => block.text)
+                .join('');
+            }
+          }
+          
+          if (tokenText) {
+            fullResponse += tokenText;
+            onToken(tokenText);
+          }
+        }
+        
+        return fullResponse;
+      } else {
+        // Fallback to non-streaming mode
+        const response = await adapter.invoke(prompt);
+        return typeof response === 'string' ? response : String(response.content || response);
+      }
+    } catch (error) {
+      console.error('[Summary Generator] Chat response failed:', error);
+      return 'I understand. How can I assist you today?';
+    }
+  }
+  
+  /**
+   * Generate answer from knowledge context (RAG)
+   */
+  private async generateKnowledgeAnswer(
+    state: GeoAIStateType,
+    language: string,
+    onToken?: (token: string) => void
+  ): Promise<string> {
+    if (!this.llmConfig || !state.knowledgeContext) {
+      return 'I could not find relevant information in the knowledge base.';
+    }
+    
+    const { query, contextString } = state.knowledgeContext;
+    
+    try {
+      // Load knowledge answer template
+      const template = await this.promptManager.loadTemplate('knowledge-answer', language);
+      
+      // Use LangChain's format method to fill variables
+      const prompt = await template.format({ 
+        userQuestion: query,
+        knowledgeContext: contextString,
+        language: language
+      });
+      
+      const adapter = LLMAdapterFactory.createAdapter(this.llmConfig);
+      
+      // Use streaming if onToken callback is provided
+      if (onToken) {
+        console.log('[Summary Generator] Streaming knowledge answer...');
+        const stream = await adapter.stream(prompt);
+        
+        let fullResponse = '';
+        for await (const chunk of stream) {
+          // Extract text content from chunk robustly
+          let tokenText: string = '';
+          
+          if (typeof chunk === 'string') {
+            tokenText = chunk;
+          } else if (chunk && typeof chunk === 'object') {
+            // Handle AIMessageChunk or similar objects
+            if (typeof chunk.content === 'string') {
+              tokenText = chunk.content;
+            } else if (Array.isArray(chunk.content)) {
+              // Handle ContentBlock arrays (e.g., [{ type: 'text', text: '...' }])
+              tokenText = chunk.content
+                .filter((block: any) => block.type === 'text')
+                .map((block: any) => block.text)
+                .join('');
+            }
+          }
+          
+          if (tokenText) {
+            fullResponse += tokenText;
+            onToken(tokenText);
+          }
+        }
+        
+        let answer = fullResponse;
+        
+        // Add citations if available
+        if (state.knowledgeContext.retrievedChunks.length > 0) {
+          answer += '\n\n**Sources:**\n';
+          state.knowledgeContext.retrievedChunks.slice(0, 3).forEach((chunk, idx) => {
+            const docName = chunk.metadata.documentName || 'Document';
+            answer += `- ${docName} (Relevance: ${(chunk.score * 100).toFixed(0)}%)\n`;
+          });
+        }
+        
+        return answer;
+      } else {
+        // Fallback to non-streaming mode
+        const response = await adapter.invoke(prompt);
+        let answer = typeof response === 'string' ? response : String(response.content || response);
+        
+        // Add citations if available
+        if (state.knowledgeContext.retrievedChunks.length > 0) {
+          answer += '\n\n**Sources:**\n';
+          state.knowledgeContext.retrievedChunks.slice(0, 3).forEach((chunk, idx) => {
+            const docName = chunk.metadata.documentName || 'Document';
+            answer += `- ${docName} (Relevance: ${(chunk.score * 100).toFixed(0)}%)\n`;
+          });
+        }
+        
+        return answer;
+      }
+    } catch (error) {
+      console.error('[Summary Generator] Knowledge answer failed:', error);
+      return 'I found some relevant documents but encountered an error generating the answer.';
+    }
+  }
+  
+  /**
+   * Generate a summary of available system capabilities for dynamic injection
+   */
+  private getCapabilitiesSummary(): string {
+    try {
+      const operators = SpatialOperatorRegistryInstance.listOperators();
+      if (operators.length === 0) return '';
+
+      // Group by category for better structure
+      const categories: Record<string, string[]> = {};
+      operators.forEach(op => {
+        if (!categories[op.category]) categories[op.category] = [];
+        categories[op.category].push(`- ${op.name}: ${op.description}`);
+      });
+
+      let summary = '';
+      Object.entries(categories).forEach(([category, items]) => {
+        summary += `\n**${this.capitalize(category)}**: \n${items.join('\n')}\n`;
+      });
+
+      return summary.trim();
+    } catch (error) {
+      console.error('[Summary Generator] Failed to generate capabilities summary:', error);
+      return '';
+    }
+  }
+
+  /**
+   * Helper to capitalize first letter
+   */
+  private capitalize(str: string): string {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  }
+
+  /**
+   * Simple fallback for knowledge answer when template is not available
+   */
+  private generateSimpleKnowledgeAnswer(query: string, contextString: string): string {
+    return `Based on the available documents:\n\n${contextString}\n\nThis information relates to your question: ${query}`;
   }
 
   /**

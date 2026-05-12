@@ -27,12 +27,20 @@ export async function reportDecisionNode(
 
   const { llmConfig, workspaceBase } = config;
 
-  // 1. Decision Logic: Check if there are successful results or explicit user request
+  // 1. Intent-based Filtering: Skip report for Chat or pure Knowledge queries
+  const intent = state.intent?.type;
+  if (intent === 'GENERAL_CHAT' || intent === 'KNOWLEDGE_QUERY') {
+    console.log(`[ReportDecisionNode] Skipping report for intent: ${intent}`);
+    return {};
+  }
+
+  // 2. Value-based Decision Logic: Check for substantial analysis results
   const hasResults = state.executionResults && Array.from(state.executionResults.values()).some((r: any) => r.status === 'success');
   const userAskedForReport = state.userInput.toLowerCase().includes('report') || state.userInput.includes('报告');
 
+  // Only generate report if there are successful execution results OR explicit request
   if (!hasResults && !userAskedForReport) {
-    console.log('[ReportDecisionNode] No results found and no explicit request. Skipping report.');
+    console.log('[ReportDecisionNode] No substantial results found and no explicit request. Skipping report.');
     return {};
   }
 

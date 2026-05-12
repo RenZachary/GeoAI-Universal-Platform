@@ -15,6 +15,8 @@ import { ConversationBufferMemoryWithSQLite } from '../managers/ConversationMemo
 import { SummaryGenerator } from './SummaryGenerator';
 import { reportDecisionNode } from './nodes/ReportDecisionNode';
 import { EnhancedExecutorInstance } from './nodes/EnhancedPluginExecutor';
+import { getIntentClassifier } from './nodes/IntentClassifierNode';
+import { getKnowledgeRetriever } from './nodes/KnowledgeRetrieverNode';
 import { SQLiteManagerInstance } from '../../storage/';
 import { VirtualDataSourceManagerInstance } from '../../data-access/managers/VirtualDataSourceManager';
 import { ToolRegistryInstance } from '../tools/ToolRegistry';
@@ -26,12 +28,29 @@ import type {
   ExecutionStep as CoreExecutionStep,
   AnalysisResult as CoreAnalysisResult
 } from '../../core';
+import type { IntentClassification } from '../../knowledge-base/types';
 
 // State interface for the GeoAI workflow
 export interface GeoAIState {
   userInput: string;
   conversationId: string;
   messages?: BaseMessage[];
+  
+  // NEW: Intent classification
+  intent?: IntentClassification;
+  
+  // NEW: Knowledge context from RAG
+  knowledgeContext?: {
+    query: string;
+    retrievedChunks: Array<{
+      content: string;
+      documentId: string;
+      score: number;
+      metadata: any;
+    }>;
+    contextString: string;
+  };
+  
   goals?: AnalysisGoal[];
   executionPlans?: Map<string, ExecutionPlan>;
   parallelGroups?: ParallelGroup[]; // NEW v2.0: Parallel task groups
@@ -39,7 +58,7 @@ export interface GeoAIState {
   executionResults?: Map<string, AnalysisResult>;
   visualizationServices?: VisualizationService[];
   summary?: string;
-  currentStep: 'goal_splitting' | 'task_planning' | 'execution' | 'output' | 'summary';
+  currentStep: 'intent_classification' | 'knowledge_retrieval' | 'goal_splitting' | 'task_planning' | 'execution' | 'output' | 'summary';
   errors?: Array<{ goalId: string; error: string }>;
 }
 
@@ -95,6 +114,22 @@ const GeoAIStateAnnotation = Annotation.Root({
   userInput: Annotation<string>,
   conversationId: Annotation<string>,
   messages: Annotation<BaseMessage[]>,
+  
+  // NEW: Intent classification
+  intent: Annotation<IntentClassification | undefined>,
+  
+  // NEW: Knowledge context from RAG
+  knowledgeContext: Annotation<{
+    query: string;
+    retrievedChunks: Array<{
+      content: string;
+      documentId: string;
+      score: number;
+      metadata: any;
+    }>;
+    contextString: string;
+  } | undefined>,
+  
   goals: Annotation<AnalysisGoal[]>,
   executionPlans: Annotation<Map<string, ExecutionPlan>>,
   parallelGroups: Annotation<ParallelGroup[]>, // NEW v2.0
@@ -102,7 +137,7 @@ const GeoAIStateAnnotation = Annotation.Root({
   executionResults: Annotation<Map<string, AnalysisResult>>,
   visualizationServices: Annotation<VisualizationService[]>,
   summary: Annotation<string>,
-  currentStep: Annotation<'goal_splitting' | 'task_planning' | 'execution' | 'output' | 'summary'>,
+  currentStep: Annotation<'intent_classification' | 'knowledge_retrieval' | 'goal_splitting' | 'task_planning' | 'execution' | 'output' | 'summary'>,
   errors: Annotation<Array<{ goalId: string; error: string }>>,
 });
 
@@ -119,6 +154,8 @@ export function createGeoAIGraph(
 ) {
   // Initialize managers and agents
   const promptManager = new PromptManager(workspaceBase);
+  const intentClassifier = getIntentClassifier(llmConfig, workspaceBase);
+  const knowledgeRetriever = getKnowledgeRetriever();
   const goalSplitter = new GoalSplitterAgent(llmConfig, promptManager);
   
   // Get database instance with validation
@@ -166,16 +203,39 @@ export function createGeoAIGraph(
         
         return {
           messages: allMessages,
-          currentStep: 'goal_splitting'
+          currentStep: 'intent_classification'
         };
       } catch (error) {
         console.error('[Memory Loader] Error loading memory:', error);
         // Continue without memory on error
         return {
           messages: [new HumanMessage({ content: state.userInput })],
-          currentStep: 'goal_splitting'
+          currentStep: 'intent_classification'
         };
       }
+    })
+    // NEW: Intent Classification Node
+    .addNode('intentClassifier', async (state: GeoAIStateType) => {
+      console.log('[Intent Classifier Node] Classifying user intent');
+      if (onToken) {
+        onToken('__STATUS__:🧠 Understanding your request...');
+      }
+      return await intentClassifier.classify(state);
+    })
+    // NEW: Knowledge Retriever Node (conditional)
+    .addNode('knowledgeRetriever', async (state: GeoAIStateType) => {
+      console.log('[Knowledge Retriever Node] Retrieving knowledge context');
+      if (onToken && (state.intent?.type === 'KNOWLEDGE_QUERY' || state.intent?.type === 'HYBRID')) {
+        onToken('__STATUS__:🔍 Searching knowledge base...');
+      }
+      const result = await knowledgeRetriever.retrieve(state);
+      
+      // Send completion event via token callback
+      if (onToken && result.knowledgeContext && result.knowledgeContext.retrievedChunks.length > 0) {
+        onToken(`__STATUS__:✅ Found ${result.knowledgeContext.retrievedChunks.length} relevant documents`);
+      }
+      
+      return result;
     })
     .addNode('goalSplitter', async (state: GeoAIStateType) => {
       // Send status update via onToken callback
@@ -406,7 +466,47 @@ export function createGeoAIGraph(
 
   // Define edges
   workflow.addEdge(START, 'memoryLoader');
-  workflow.addEdge('memoryLoader', 'goalSplitter');
+  workflow.addEdge('memoryLoader', 'intentClassifier');
+  
+  // NEW: Conditional routing based on intent type
+  workflow.addConditionalEdges('intentClassifier', (state: GeoAIStateType) => {
+    console.log('[GeoAIGraph] Routing based on intent:', state.intent?.type);
+    
+    switch (state.intent?.type) {
+      case 'GENERAL_CHAT':
+        // Direct to summary for chat responses
+        return 'summaryGenerator';
+      
+      case 'KNOWLEDGE_QUERY':
+        // Route to knowledge retriever only
+        return 'knowledgeRetriever';
+      
+      case 'GIS_ANALYSIS':
+        // Standard GIS workflow - skip knowledge retrieval
+        return 'goalSplitter';
+      
+      case 'HYBRID':
+        // Hybrid query - retrieve knowledge first, then proceed to GIS
+        return 'knowledgeRetriever';
+      
+      default:
+        // Fallback to standard workflow
+        console.warn('[GeoAIGraph] Unknown intent type, defaulting to goalSplitter');
+        return 'goalSplitter';
+    }
+  });
+  
+  // After knowledge retrieval, route based on intent
+  workflow.addConditionalEdges('knowledgeRetriever', (state: GeoAIStateType) => {
+    if (state.intent?.type === 'KNOWLEDGE_QUERY') {
+      // Pure knowledge query - go directly to summary
+      return 'summaryGenerator';
+    } else {
+      // HYBRID query - continue with GIS workflow
+      return 'goalSplitter';
+    }
+  });
+  
   workflow.addEdge('goalSplitter', 'taskPlanner');
   workflow.addEdge('taskPlanner', 'pluginExecutor');
   workflow.addEdge('pluginExecutor', 'reportDecision');
