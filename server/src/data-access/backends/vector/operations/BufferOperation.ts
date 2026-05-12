@@ -49,9 +49,9 @@ export class BufferOperation {
   
   private convertUnit(unit: string): string {
     const unitMap: Record<string, string> = {
-      'meters': 'kilometers',
+      'meters': 'meters',
       'kilometers': 'kilometers',
-      'feet': 'miles',
+      'feet': 'feet',
       'miles': 'miles',
       'degrees': 'degrees'
     };
