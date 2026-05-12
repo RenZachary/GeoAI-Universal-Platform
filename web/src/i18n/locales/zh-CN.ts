@@ -15,7 +15,8 @@ export default {
     warning: '警告',
     search: '搜索',
     filter: '筛选',
-    reset: '重置'
+    reset: '重置',
+    timeElapsed: '耗时 {time}'
   },
   chat: {
     placeholder: '输入消息... 使用 {atSymbol} 选择数据源，/ 选择工具',
@@ -346,5 +347,48 @@ export default {
     failedToLoad: '加载报告失败',
     noContentToDownload: '没有可下载的内容',
     downloaded: '报告已下载'
+  },
+  kb: {
+    title: '知识库',
+    uploadDocument: '上传文档',
+    totalDocuments: '文档总数',
+    ready: '就绪',
+    processing: '处理中',
+    error: '错误',
+    filterByType: '按类型筛选',
+    filterByStatus: '按状态筛选',
+    clearFilters: '清除筛选',
+    quickSearch: '快速搜索所有文档...',
+    search: '搜索',
+    documentName: '文档名称',
+    type: '类型',
+    status: '状态',
+    chunks: '文本块',
+    size: '大小',
+    uploadedAt: '上传时间',
+    updatedAt: '更新时间',
+    viewDetails: '查看详情',
+    searchInDoc: '文档内搜索',
+    deleteConfirm: '确定要删除 "{name}" 吗？此操作无法撤销。',
+    documentDetails: '文档详情',
+    metadata: '元数据',
+    searchResults: '搜索结果',
+    foundResults: '找到 {count} 条结果',
+    noResults: '未找到结果',
+    similarity: '相似度',
+    prompt: {
+      searchQuery: '输入搜索查询：'
+    },
+    messages: {
+      loadFailed: '加载知识库数据失败',
+      invalidFileType: '不支持的文件类型。仅支持 PDF、Word (.docx) 和 Markdown 文件。',
+      fileTooLarge: '文件过大。最大文件大小为 50MB。',
+      uploadSuccess: '文档上传成功',
+      uploadFailed: '文档上传失败',
+      searchFailed: '搜索失败',
+      loadDetailFailed: '加载文档详情失败',
+      deleteSuccess: '文档删除成功',
+      deleteFailed: '文档删除失败'
+    }
   }
 }

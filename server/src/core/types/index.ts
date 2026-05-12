@@ -441,7 +441,6 @@ export interface WorkspaceInfo {
 
 export interface WorkspaceDirectories {
   dataLocal: string;
-  dataPostgis: string;
   llmConfig: string;
   llmPromptsEnUS: string;
   llmPromptsZhCN: string;
@@ -455,6 +454,10 @@ export interface WorkspaceDirectories {
   resultsMvt: string;
   resultsWms: string;
   resultsReports: string;
+  // Knowledge Base directories
+  kbLancedb: string;
+  kbDocuments: string;
+  kbTemp: string;
 }
 
 // ============================================================================

@@ -42,6 +42,11 @@
         <el-icon><Connection /></el-icon>
         <template #title>{{ $t('plugins.title') }}</template>
       </el-menu-item>
+      
+      <el-menu-item index="/knowledge-base">
+        <el-icon><Reading /></el-icon>
+        <template #title>{{ $t('kb.title') }}</template>
+      </el-menu-item>
     </el-menu>
   </div>
 </template>
@@ -50,7 +55,7 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUIStore } from '@/stores/ui'
-import { ChatDotRound, Folder, Tools, Document, Connection, Setting } from '@element-plus/icons-vue'
+import { ChatDotRound, Folder, Tools, Document, Connection, Setting, Reading } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const uiStore = useUIStore()

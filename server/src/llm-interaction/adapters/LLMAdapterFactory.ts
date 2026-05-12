@@ -1,9 +1,10 @@
 /**
- * LLM Adapter Factory - Creates LangChain chat models based on configuration
+ * LLM Adapter Factory - Creates LangChain chat models and embeddings based on configuration
  */
 
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { ChatOpenAI } from '@langchain/openai';
+import type { Embeddings } from '@langchain/core/embeddings';
+import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
 import { ChatAnthropic } from '@langchain/anthropic';
 // Note: @langchain/ollama is optional - install with: npm install @langchain/ollama
 // import { ChatOllama } from '@langchain/ollama';
@@ -17,6 +18,14 @@ export interface LLMConfig {
   temperature?: number;
   maxTokens?: number;
   streaming?: boolean;
+}
+
+export interface EmbeddingConfig {
+  provider: 'openai' | 'qwen'; // Anthropic doesn't provide embeddings; Ollama requires @langchain/community
+  model?: string;
+  apiKey?: string;
+  baseUrl?: string;
+  dimensions?: number;
 }
 
 export class LLMAdapterFactory {
@@ -188,6 +197,100 @@ export class LLMAdapterFactory {
       return result !== null;
     } catch (error) {
       console.error('LLM connection test failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Create Embedding adapter based on configuration
+   * 
+   * Note: Only OpenAI and Qwen/DashScope are supported for embeddings.
+   * - Anthropic (Claude) does NOT provide an embeddings API
+   * - Ollama requires @langchain/community package (not installed)
+   */
+  static createEmbeddingAdapter(config: EmbeddingConfig): Embeddings {
+    // Check if API key is provided
+    if (!config.apiKey) {
+      console.warn('[LLMAdapterFactory] No API key provided for embeddings, using mock mode');
+      return this.createMockEmbeddingAdapter();
+    }
+    
+    switch (config.provider) {
+      case 'openai':
+        return new OpenAIEmbeddings({
+          modelName: config.model || 'text-embedding-3-small',
+          apiKey: config.apiKey,
+          dimensions: config.dimensions,
+        });
+
+      case 'qwen':
+        // Alibaba Qwen/DashScope uses OpenAI-compatible API for embeddings
+        return new OpenAIEmbeddings({
+          modelName: config.model || 'text-embedding-v2',
+          apiKey: config.apiKey,
+          configuration: {
+            baseURL: config.baseUrl || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+          },
+          dimensions: config.dimensions || 1536,
+        });
+
+      default:
+        throw new Error(`Unsupported embedding provider: ${(config as any).provider}`);
+    }
+  }
+
+  /**
+   * Create a mock embedding adapter for development
+   */
+  private static createMockEmbeddingAdapter(): Embeddings {
+    // Return a simple mock that generates deterministic fake embeddings
+    const mockEmbeddings = {
+      embedQuery: async (query: string): Promise<number[]> => {
+        console.warn('[MockEmbeddings] Using mock embeddings - configure API key for real embeddings');
+        // Generate a deterministic 1536-dimension vector based on query hash
+        return this.generateMockEmbedding(query, 1536);
+      },
+      embedDocuments: async (documents: string[]): Promise<number[][]> => {
+        console.warn('[MockEmbeddings] Using mock embeddings for batch');
+        return documents.map(doc => this.generateMockEmbedding(doc, 1536));
+      },
+    } as any;
+    
+    return mockEmbeddings;
+  }
+
+  /**
+   * Generate a deterministic mock embedding vector
+   */
+  private static generateMockEmbedding(text: string, dimensions: number): number[] {
+    // Simple hash-based mock embedding (NOT for production!)
+    const embedding = new Array(dimensions).fill(0);
+    let hash = 0;
+    
+    for (let i = 0; i < text.length; i++) {
+      const char = text.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    
+    // Fill embedding with deterministic values based on hash
+    for (let i = 0; i < dimensions; i++) {
+      embedding[i] = Math.sin(hash + i) * 0.1; // Normalize to small range
+    }
+    
+    return embedding;
+  }
+
+  /**
+   * Test embedding connection
+   */
+  static async testEmbeddingConnection(config: EmbeddingConfig): Promise<boolean> {
+    try {
+      const embeddings = this.createEmbeddingAdapter(config);
+      const result = await embeddings.embedQuery('test');
+      return Array.isArray(result) && result.length > 0;
+    } catch (error) {
+      console.error('Embedding connection test failed:', error);
       return false;
     }
   }

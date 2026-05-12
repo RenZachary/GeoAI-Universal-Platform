@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
-import { createMapState } from './impl/state'
-import { useMapCore } from './impl/map-core'
-import { useLayerRenderers } from './impl/layer-renderers'
-import { useLayerManager } from './impl/layer-manager'
-import { useServiceIntegration } from './impl/service-integration'
+import { createMapState } from './mapImpl/state'
+import { useMapCore } from './mapImpl/map-core'
+import { useLayerRenderers } from './mapImpl/layer-renderers'
+import { useLayerManager } from './mapImpl/layer-manager'
+import { useServiceIntegration } from './mapImpl/service-integration'
 
 /**
  * Map Store - Modularized Version

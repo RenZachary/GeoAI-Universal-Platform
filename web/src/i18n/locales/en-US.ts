@@ -15,7 +15,8 @@ export default {
     warning: 'Warning',
     search: 'Search',
     filter: 'Filter',
-    reset: 'Reset'
+    reset: 'Reset',
+    timeElapsed: '{time}s elapsed'
   },
   chat: {
     placeholder: 'Type your message... Use {atSymbol} for data sources, / for tools',
@@ -346,5 +347,48 @@ export default {
     failedToLoad: 'Failed to load report',
     noContentToDownload: 'No content to download',
     downloaded: 'Report downloaded'
+  },
+  kb: {
+    title: 'Knowledge Base',
+    uploadDocument: 'Upload Document',
+    totalDocuments: 'Total Documents',
+    ready: 'Ready',
+    processing: 'Processing',
+    error: 'Error',
+    filterByType: 'Filter by Type',
+    filterByStatus: 'Filter by Status',
+    clearFilters: 'Clear Filters',
+    quickSearch: 'Quick search across all documents...',
+    search: 'Search',
+    documentName: 'Document Name',
+    type: 'Type',
+    status: 'Status',
+    chunks: 'Chunks',
+    size: 'Size',
+    uploadedAt: 'Uploaded At',
+    updatedAt: 'Updated At',
+    viewDetails: 'View Details',
+    searchInDoc: 'Search in Doc',
+    deleteConfirm: 'Are you sure you want to delete "{name}"? This action cannot be undone.',
+    documentDetails: 'Document Details',
+    metadata: 'Metadata',
+    searchResults: 'Search Results',
+    foundResults: 'Found {count} result(s)',
+    noResults: 'No results found',
+    similarity: 'Similarity',
+    prompt: {
+      searchQuery: 'Enter search query:'
+    },
+    messages: {
+      loadFailed: 'Failed to load knowledge base data',
+      invalidFileType: 'Invalid file type. Only PDF, Word (.docx), and Markdown files are supported.',
+      fileTooLarge: 'File is too large. Maximum size is 50MB.',
+      uploadSuccess: 'Document uploaded successfully',
+      uploadFailed: 'Failed to upload document',
+      searchFailed: 'Search failed',
+      loadDetailFailed: 'Failed to load document details',
+      deleteSuccess: 'Document deleted successfully',
+      deleteFailed: 'Failed to delete document'
+    }
   }
 }

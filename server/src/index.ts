@@ -14,6 +14,7 @@ import { ApiRouter } from './api/routes';
 import { CustomPluginLoader } from './spatial-operators/plugins/CustomPluginLoader';
 import { LLMConfigManagerInstance } from './services/LLMConfigService';
 import { scanAndRegisterDataFiles } from './storage';
+import { scanAndIngestKBDocuments } from './knowledge-base';
 
 // Load environment variables
 const __filename = fileURLToPath(import.meta.url);
@@ -28,12 +29,22 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+
+// Initialize workspace and database from .env configuration
+const WORKSPACE_BASE = process.env.WORKSPACE_DIR
+  ? path.resolve(__dirname, '..', process.env.WORKSPACE_DIR)
+  : path.join(__dirname, '..', 'workspace');
+WorkspaceManagerInstance.init(WORKSPACE_BASE);
+SQLiteManagerInstance.init(WorkspaceManagerInstance.getDirectoryPath('DATABASE'));
+
+WorkspaceManagerInstance.initialize();
+SQLiteManagerInstance.initialize();
 // Serve static files from client directory (for packaged deployment)
 const CLIENT_PATH = process.env.CLIENT_PATH || path.join(__dirname, '..', 'client');
 if (fs.existsSync(CLIENT_PATH)) {
   // Serve at root path
   app.use(express.static(CLIENT_PATH));
-  
+
   // Also serve at /geo-ai path if configured in frontend
   const VITE_BASE_URL = process.env.VITE_BASE_URL || '/';
   if (VITE_BASE_URL !== '/' && VITE_BASE_URL !== '') {
@@ -47,12 +58,6 @@ if (fs.existsSync(CLIENT_PATH)) {
   console.log(`Client directory not found at: ${CLIENT_PATH}, skipping static file serving`);
 }
 
-// Initialize workspace and database from .env configuration
-const WORKSPACE_BASE = process.env.WORKSPACE_DIR 
-  ? path.resolve(__dirname, '..', process.env.WORKSPACE_DIR)
-  : path.join(__dirname, '..', 'workspace');
-WorkspaceManagerInstance.init(WORKSPACE_BASE);
-SQLiteManagerInstance.init(WorkspaceManagerInstance.getDirectoryPath('DATABASE'));
 
 // Initialize LLM configuration manager - loads from workspace/llm/config
 LLMConfigManagerInstance.init(WORKSPACE_BASE);
@@ -73,13 +78,17 @@ async function startServer() {
   try {
     // Initialize storage layer
     console.log('Initializing storage layer...');
-    WorkspaceManagerInstance.initialize();
-    SQLiteManagerInstance.initialize();
-      
+
     // Scan and register existing files in data directory
     console.log('Scanning data directory for existing files... in', WORKSPACE_BASE);
     await scanAndRegisterDataFiles(WORKSPACE_BASE);
-    
+
+    // Scan and ingest knowledge base documents
+    console.log('Scanning knowledge base directory for documents...');
+    const lancedbPath = WorkspaceManagerInstance.getDirectoryPath('KB_LANCEDB');
+    const db = SQLiteManagerInstance.getDatabase();
+    await scanAndIngestKBDocuments(WORKSPACE_BASE, lancedbPath, db);
+
     // Initialize cleanup scheduler
     console.log('Initializing cleanup scheduler...');
     const cleanupScheduler = new CleanupScheduler(WORKSPACE_BASE, {
@@ -92,21 +101,21 @@ async function startServer() {
     });
     cleanupScheduler.start();
     console.log('Filesystem cleanup scheduler started');
-    
+
     // Initialize plugin system
     console.log('Initializing plugin system...');
     const customPluginLoader = new CustomPluginLoader(WORKSPACE_BASE);
     await customPluginLoader.loadAllPlugins();
     console.log(`Plugin system initialized with ${customPluginLoader.getAllPluginStatuses().length} plugins`);
-    
+
     // NOTE: Executor and capability registration removed in v2.0
     // All operators are now registered via SpatialOperatorRegistry
     console.log('Spatial operators registered via SpatialOperatorRegistry');
-    
+
     // Initialize API routes after database is ready
     const apiRouter = new ApiRouter(llmConfig, WORKSPACE_BASE, customPluginLoader);
     app.use('/api', apiRouter.getRouter());
-    
+
     // Start Express server
     app.listen(PORT, () => {
       console.log(`GeoAI-UP Server running on http://localhost:${PORT}`);

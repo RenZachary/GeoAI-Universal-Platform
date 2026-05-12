@@ -8,7 +8,6 @@
 
 export const WORKSPACE_DIRS = {
   DATA_LOCAL: 'data/local',
-  DATA_POSTGIS: 'data/postgis',
   LLM_CONFIG: 'llm/config',
   LLM_PROMPTS_EN_US: 'llm/prompts/en-US',
   LLM_PROMPTS_ZH_CN: 'llm/prompts/zh-CN',
@@ -23,6 +22,10 @@ export const WORKSPACE_DIRS = {
   RESULTS_WMS: 'results/wms',
   RESULTS_REPORTS: 'results/reports',
   RESULTS_STYLE: 'results/styles',
+  // Knowledge Base directories
+  KB_LANCEDB: 'knowledge-base/lancedb',
+  KB_DOCUMENTS: 'knowledge-base/documents',
+  KB_TEMP: 'knowledge-base/temp',
 } as const;
 
 // ============================================================================

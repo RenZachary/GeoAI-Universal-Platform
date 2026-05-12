@@ -309,7 +309,7 @@ export class VectorBackend implements DataBackend {
   }
   
   private async saveGeoJSON(geojson: PlatformFeatureCollection): Promise<string> {
-    const workspaceDir = process.env.WORKSPACE_DIR || './workspace';
+    const workspaceDir = this.workspaceBase || './workspace';
     const resultsDir = path.join(workspaceDir, 'results', 'geojson');
     
     if (!fs.existsSync(resultsDir)) {

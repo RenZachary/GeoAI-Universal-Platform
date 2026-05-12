@@ -52,7 +52,7 @@
       
       <el-table-column prop="createdAt" :label="$t('data.uploadedAt')" width="180">
         <template #default="{ row }">
-          {{ formatDate(row.createdAt) }}
+          {{ formatDateTime(row.createdAt) }}
         </template>
       </el-table-column>
       
@@ -284,7 +284,7 @@
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item :label="$t('data.uploadedAt')">
-            {{ formatDate(selectedDataSource.createdAt) }}
+            {{ formatDateTime(selectedDataSource.createdAt) }}
           </el-descriptions-item>
           <el-descriptions-item :label="$t('data.size')">
             {{ formatFileSize(selectedDataSource.metadata?.fileSize) }}
@@ -350,6 +350,7 @@ import { ElMessage } from 'element-plus'
 import { Upload, Document, UploadFilled, Connection, InfoFilled, Delete } from '@element-plus/icons-vue'
 import type { UploadUserFile } from 'element-plus'
 import * as dataSourceService from '@/services/dataSource'
+import { formatFileSize, formatDateTime } from '@/utils/formatters'
 
 const { t } = useI18n()
 const dataSourceStore = useDataSourceStore()
@@ -569,130 +570,8 @@ function getTaskStatusColor(status: string): 'success' | 'warning' | 'danger' | 
   }
   return colors[status] || 'info'
 }
-
-function formatFileSize(bytes: number): string {
-  if (!bytes) return 'N/A'
-  const mb = bytes / (1024 * 1024)
-  if (mb >= 1) {
-    return `${mb.toFixed(2)} MB`
-  }
-  const kb = bytes / 1024
-  return `${kb.toFixed(2)} KB`
-}
-
-function formatDate(dateString: string): string {
-  if (!dateString) return 'N/A'
-  const date = new Date(dateString)
-  return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
 </script>
 
 <style scoped lang="scss">
-.data-management-view {
-  padding: 24px;
-  height: 100%;
-  overflow-y: auto;
-}
-
-.view-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-  
-  h2 {
-    margin: 0;
-    font-size: 24px;
-    color: var(--el-text-color-primary);
-  }
-  
-  .header-actions {
-    display: flex;
-    gap: 12px;
-  }
-}
-
-.data-source-name {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.upload-progress {
-  margin-top: 24px;
-  
-  h4 {
-    margin-bottom: 12px;
-    color: var(--el-text-color-regular);
-  }
-}
-
-.upload-task {
-  margin-bottom: 16px;
-  padding: 12px;
-  background: var(--el-fill-color-light);
-  border-radius: 8px;
-}
-
-.task-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.task-name {
-  font-size: 14px;
-  color: var(--el-text-color-primary);
-}
-
-.task-error {
-  margin-top: 8px;
-  font-size: 12px;
-  color: var(--el-color-danger);
-}
-
-.preview-content {
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.form-tip {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  margin-top: 4px;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.connections-section {
-  margin-top: 32px;
-  
-  h3 {
-    margin-bottom: 16px;
-    font-size: 16px;
-    font-weight: 600;
-  }
-}
-
-.connection-name {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.metadata-content {
-  .bbox-code {
-    font-family: 'Courier New', monospace;
-    font-size: 12px;
-    background: var(--el-fill-color-light);
-    padding: 4px 8px;
-    border-radius: 4px;
-    display: inline-block;
-  }
-}
+@use '@/assets/dmView.scss';
 </style>

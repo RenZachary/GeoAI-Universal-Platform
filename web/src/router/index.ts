@@ -39,6 +39,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'plugins.title' }
       },
       {
+        path: 'knowledge-base',
+        name: 'knowledgeBase',
+        component: () => import('@/views/KnowledgeBaseView.vue'),
+        meta: { title: 'kb.title' }
+      },
+      {
         path: 'settings',
         name: 'settings',
         component: () => import('@/views/SettingsView.vue'),

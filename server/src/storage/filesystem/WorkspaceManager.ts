@@ -49,7 +49,6 @@ class WorkspaceManager {
   private ensureDirectories(): void {
     const dirs = [
       WORKSPACE_DIRS.DATA_LOCAL,
-      WORKSPACE_DIRS.DATA_POSTGIS,
       WORKSPACE_DIRS.LLM_CONFIG,
       WORKSPACE_DIRS.LLM_PROMPTS_EN_US,
       WORKSPACE_DIRS.LLM_PROMPTS_ZH_CN,
@@ -63,6 +62,10 @@ class WorkspaceManager {
       WORKSPACE_DIRS.RESULTS_MVT,
       WORKSPACE_DIRS.RESULTS_WMS,
       WORKSPACE_DIRS.RESULTS_REPORTS,
+      // Knowledge Base directories
+      WORKSPACE_DIRS.KB_LANCEDB,
+      WORKSPACE_DIRS.KB_DOCUMENTS,
+      WORKSPACE_DIRS.KB_TEMP,
     ];
     if (!this.baseDir) 
     {
@@ -90,7 +93,6 @@ class WorkspaceManager {
 
     const directories: WorkspaceDirectories = {
       dataLocal: path.join(this.baseDir, WORKSPACE_DIRS.DATA_LOCAL),
-      dataPostgis: path.join(this.baseDir, WORKSPACE_DIRS.DATA_POSTGIS),
       llmConfig: path.join(this.baseDir, WORKSPACE_DIRS.LLM_CONFIG),
       llmPromptsEnUS: path.join(this.baseDir, WORKSPACE_DIRS.LLM_PROMPTS_EN_US),
       llmPromptsZhCN: path.join(this.baseDir, WORKSPACE_DIRS.LLM_PROMPTS_ZH_CN),
@@ -104,6 +106,10 @@ class WorkspaceManager {
       resultsMvt: path.join(this.baseDir, WORKSPACE_DIRS.RESULTS_MVT),
       resultsWms: path.join(this.baseDir, WORKSPACE_DIRS.RESULTS_WMS),
       resultsReports: path.join(this.baseDir, WORKSPACE_DIRS.RESULTS_REPORTS),
+      // Knowledge Base directories
+      kbLancedb: path.join(this.baseDir, WORKSPACE_DIRS.KB_LANCEDB),
+      kbDocuments: path.join(this.baseDir, WORKSPACE_DIRS.KB_DOCUMENTS),
+      kbTemp: path.join(this.baseDir, WORKSPACE_DIRS.KB_TEMP),
     };
     
     return {

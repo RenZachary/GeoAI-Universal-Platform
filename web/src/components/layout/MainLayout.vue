@@ -1,7 +1,7 @@
 <template>
   <el-container class="main-layout">
     <!-- Sidebar -->
-    <el-aside :width="uiStore.sidebarCollapsed ? '64px' : '160px'" class="sidebar">
+    <el-aside :width="uiStore.sidebarCollapsed ? '64px' : '180px'" class="sidebar">
       <AppSidebar />
     </el-aside>
     

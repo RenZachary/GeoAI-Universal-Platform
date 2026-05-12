@@ -183,6 +183,59 @@ class SQLiteManager {
       )
     `);
 
+    // ========================================================================
+    // Knowledge Base Tables
+    // ========================================================================
+
+    // kb_documents: Registry of all uploaded documents
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS kb_documents (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL CHECK(type IN ('pdf', 'word', 'markdown')),
+        file_path TEXT NOT NULL,
+        file_size INTEGER NOT NULL CHECK(file_size > 0),
+        chunk_count INTEGER NOT NULL DEFAULT 0 CHECK(chunk_count >= 0),
+        status TEXT NOT NULL DEFAULT 'processing' 
+          CHECK(status IN ('processing', 'ready', 'error')),
+        error_message TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `);
+
+    // kb_document_metadata: Flexible key-value metadata for documents
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS kb_document_metadata (
+        id TEXT PRIMARY KEY,
+        document_id TEXT NOT NULL REFERENCES kb_documents(id) ON DELETE CASCADE,
+        key TEXT NOT NULL,
+        value TEXT,
+        UNIQUE(document_id, key)
+      )
+    `);
+
+    // kb_chunks: Track individual text chunks for debugging and rebuild
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS kb_chunks (
+        id TEXT PRIMARY KEY,
+        document_id TEXT NOT NULL REFERENCES kb_documents(id) ON DELETE CASCADE,
+        chunk_index INTEGER NOT NULL CHECK(chunk_index >= 0),
+        content_preview TEXT NOT NULL,
+        vector_id TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `);
+
+    // Indexes for KB tables
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_kb_docs_status ON kb_documents(status)`);
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_kb_docs_type ON kb_documents(type)`);
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_kb_docs_created ON kb_documents(created_at DESC)`);
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_kb_meta_doc ON kb_document_metadata(document_id)`);
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_kb_meta_key ON kb_document_metadata(key)`);
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_kb_chunks_doc ON kb_chunks(document_id)`);
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_kb_chunks_index ON kb_chunks(document_id, chunk_index)`);
+
     console.log('Database tables created');
   }
 

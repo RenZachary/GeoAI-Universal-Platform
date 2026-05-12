@@ -13,6 +13,7 @@ import { MVTController } from '../controllers/MVTController';
 import { WMSServiceController } from '../controllers/WMSServiceController';
 import { ResultController } from '../controllers/ResultController';
 import { LLMConfigController } from '../controllers/LLMConfigController';
+import { createKnowledgeBaseRouter } from './knowledge-base';
 import { DataSourceService, FileUploadService, PromptTemplateService, ConversationService, VisualizationServicePublisher } from '../../services';
 import { DataSourceRepository } from '../../data-access/repositories';
 import type { LLMConfig } from '../../llm-interaction';
@@ -181,6 +182,10 @@ export class ApiRouter {
     this.router.post('/llm/config', (req, res) => this.llmConfigController.saveConfig(req, res));
     this.router.delete('/llm/config', (req, res) => this.llmConfigController.deleteConfig(req, res));
     this.router.post('/llm/config/test', (req, res) => this.llmConfigController.testConnection(req, res));
+
+    // Knowledge Base endpoints - create router with proper initialization
+    const kbRouter = createKnowledgeBaseRouter();
+    this.router.use('/kb', kbRouter);
   }
 
   /**

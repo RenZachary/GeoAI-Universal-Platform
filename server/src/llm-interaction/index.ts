@@ -3,7 +3,7 @@
  */
 
 // Adapters
-export { LLMAdapterFactory, type LLMConfig } from './adapters/LLMAdapterFactory';
+export { LLMAdapterFactory, type LLMConfig, type EmbeddingConfig } from './adapters/LLMAdapterFactory';
 
 // Managers
 export { PromptManager } from './managers/PromptManager';
