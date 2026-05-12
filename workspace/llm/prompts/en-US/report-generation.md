@@ -32,7 +32,7 @@ For each significant result in the `results` data:
 - If a result contains a simple metric (e.g., record count = 263), state it directly: "The dataset contains 263 features."
 - Do NOT invent scenarios or add fictional analysis if the data is simple
 - Only report what is actually present in the results
-- Use Table to summarize if possible
+- Use Table or chart to summarize if possible
 
 ## Visualization Services
 If visualization services are available, describe them:
