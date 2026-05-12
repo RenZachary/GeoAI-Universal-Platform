@@ -20,19 +20,11 @@
                 <!-- Status Text with Gradient -->
                 <span class="status-text">{{ status }}</span>
 
-                <!-- Active Tools Chips -->
-                <div v-if="activeTools.length > 0" class="active-tools">
-                    <el-tag 
-                        v-for="tool in activeTools" 
-                        :key="tool" 
-                        size="small" 
-                        type="primary" 
-                        effect="dark"
-                        class="tool-chip"
-                    >
-                        <el-icon><Tools /></el-icon>
-                        {{ tool }}
-                    </el-tag>
+                <!-- Intent Indicator (right side) -->
+                <div v-if="intent" class="intent-indicator">
+                    <span class="intent-type">{{ getIntentShortLabel(intent.type) }}</span>
+                    <span class="intent-divider">·</span>
+                    <span class="intent-reasoning">{{ intent.reasoning }}</span>
                 </div>
             </div>
             
@@ -46,11 +38,11 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Loading, CircleCheck, CircleClose, Tools } from '@element-plus/icons-vue'
+import { Loading, CircleCheck, CircleClose } from '@element-plus/icons-vue'
 
 interface Props {
     status: string
-    activeTools: string[]
+    intent?: { type: string; confidence: number; reasoning: string } | null
 }
 
 const props = defineProps<Props>()
@@ -88,6 +80,17 @@ const statusClass = computed(() => {
     if (isError.value) return 'status-error'
     return ''
 })
+
+// Helper function for intent type short label
+const getIntentShortLabel = (type: string) => {
+    const labels: Record<string, string> = {
+        'GIS_ANALYSIS': 'Analysis',
+        'KNOWLEDGE_QUERY': 'Knowledge',
+        'HYBRID': 'Hybrid',
+        'GENERAL_CHAT': 'Chat'
+    }
+    return labels[type] || type
+}
 </script>
 
 <style scoped lang="scss">
@@ -209,30 +212,45 @@ const statusClass = computed(() => {
     background-clip: text;
 }
 
-.active-tools {
-    display: flex;
-    gap: 8px;
-    margin-left: auto;
-    flex-wrap: wrap;
-}
-
-.tool-chip {
+.intent-indicator {
     display: flex;
     align-items: center;
-    gap: 4px;
-    padding: 4px 10px;
+    gap: 6px;
+    margin-left: auto;
+    padding-left: 16px;
     font-size: 12px;
-    border-radius: 12px;
-    transition: all 0.2s ease;
+    opacity: 0.85;
+    animation: fadeIn 0.3s ease-out;
+    max-width: 50%;
+}
 
-    &:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+@keyframes fadeIn {
+    from {
+        opacity: 0;
     }
+    to {
+        opacity: 0.85;
+    }
+}
 
-    .el-icon {
-        font-size: 12px;
-    }
+.intent-type {
+    color: var(--el-color-primary);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.intent-divider {
+    color: var(--el-border-color);
+    margin: 0 2px;
+}
+
+.intent-reasoning {
+    color: var(--el-text-color-secondary);
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    text-overflow: ellipsis;
+    max-width: 400px;
 }
 
 .progress-bar {

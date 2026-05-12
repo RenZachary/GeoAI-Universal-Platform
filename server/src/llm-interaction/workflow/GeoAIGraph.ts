@@ -220,7 +220,21 @@ export function createGeoAIGraph(
       if (onToken) {
         onToken('__STATUS__:🧠 Understanding your request...');
       }
-      return await intentClassifier.classify(state);
+      
+      const result = await intentClassifier.classify(state);
+      
+      // Send intent classification result to frontend
+      if (onToken && result.intent) {
+        const intentInfo = JSON.stringify({
+          type: 'intent_classified',
+          intent: result.intent.type,
+          confidence: result.intent.confidence,
+          reasoning: result.intent.reasoning
+        });
+        onToken(`__EVENT__:${intentInfo}`);
+      }
+      
+      return result;
     })
     // NEW: Knowledge Retriever Node (conditional)
     .addNode('knowledgeRetriever', async (state: GeoAIStateType) => {

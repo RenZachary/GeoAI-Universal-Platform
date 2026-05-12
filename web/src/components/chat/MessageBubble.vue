@@ -111,18 +111,7 @@ const displayedServices = computed(() => {
   }
   
   // Otherwise, if this is the last assistant message and streaming is done,
-  // try to get services from partialServices
-  if (props.message.role === 'assistant' && !props.isStreaming) {
-    // Get all messages to check if this is the last one
-    const allMessages = chatStore.currentMessages
-    const lastMsg = allMessages[allMessages.length - 1]
-    
-    // If this is the last message and we have partial services, show them
-    if (lastMsg && lastMsg.id === props.message.id && chatStore.partialServices.length > 0) {
-      return chatStore.partialServices
-    }
-  }
-  
+  // services should already be in the message
   return []
 })
 

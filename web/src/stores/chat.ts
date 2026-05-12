@@ -16,8 +16,6 @@ interface Conversation {
 
 interface WorkflowState {
   status: string
-  activeTools: string[]
-  partialServices: any[]
 }
 
 interface SSEEvent {
@@ -57,6 +55,7 @@ const TOOL_SUCCESS_MESSAGES: Record<string, string> = {
 }
 
 const STATUS_TOKEN_PREFIX = '__STATUS__:'
+const EVENT_TOKEN_PREFIX = '__EVENT__:'
 const AUTO_CLEAR_STATUS_DELAY = 2000
 const SERVICE_READY_CLEAR_DELAY = 3000
 
@@ -69,10 +68,11 @@ export const useChatStore = defineStore('chat', () => {
   
   // Workflow state (grouped together)
   const workflow = ref<WorkflowState>({
-    status: '',
-    activeTools: [],
-    partialServices: []
+    status: ''
   })
+  
+  // Intent classification state
+  const currentIntent = ref<{ type: string; confidence: number; reasoning: string } | null>(null)
   
   // Computed
   const currentMessages = computed(() => {
@@ -97,9 +97,7 @@ export const useChatStore = defineStore('chat', () => {
       
       // Clear workflow state for loaded conversation
       workflow.value = {
-        status: '',
-        activeTools: [],
-        partialServices: []
+        status: ''
       }
     } catch (error) {
       console.error('Failed to load conversation:', error)
@@ -112,9 +110,7 @@ export const useChatStore = defineStore('chat', () => {
     
     // Clear workflow state before starting new message
     workflow.value = {
-      status: '',
-      activeTools: [],
-      partialServices: []
+      status: ''
     }
     
     const conversationId = getOrCreateConversationId()
@@ -194,44 +190,39 @@ export const useChatStore = defineStore('chat', () => {
   // ========================================================================
   
   function handleToolStart(toolName: string) {
-    workflow.value.activeTools.push(toolName)
-    workflow.value.status = TOOL_DESCRIPTIONS[toolName] || `Using ${toolName}...`
+    // Deprecated: activeTools feature removed
+    console.log('[Chat Store] Tool started:', toolName)
   }
   
   function handleToolComplete(toolName: string, output?: string) {
-    // Remove from active tools
-    workflow.value.activeTools = workflow.value.activeTools.filter(t => t !== toolName)
-    
-    // Check if tool succeeded
-    let succeeded = true
-    if (output) {
-      try {
-        const outputData = JSON.parse(output)
-        succeeded = outputData.success !== false
-      } catch {
-        // If can't parse, assume success
-      }
-    }
-    
-    // Update status
-    if (succeeded) {
-      workflow.value.status = TOOL_SUCCESS_MESSAGES[toolName] || `${toolName} completed ✓`
-      autoClearStatus(toolName)
-    } else {
-      workflow.value.status = `❌ ${toolName} failed`
-      console.warn('[Chat Store] Tool failed:', toolName)
-    }
+    // Deprecated: activeTools feature removed
+    console.log('[Chat Store] Tool completed:', toolName)
   }
   
   function handlePartialResult(service: any) {
-    workflow.value.partialServices.push(service)
-    workflow.value.status = `🎉 ${service.type.toUpperCase()} service ready!`
-    autoClearStatus('service ready', SERVICE_READY_CLEAR_DELAY)
+    // Deprecated: partialServices feature removed
+    console.log('[Chat Store] Partial result:', service)
   }
   
   function handleStatusToken(tokenText: string) {
     const statusMessage = tokenText.replace(STATUS_TOKEN_PREFIX, '')
     workflow.value.status = statusMessage
+  }
+  
+  function handleEventToken(tokenText: string) {
+    try {
+      const eventData = JSON.parse(tokenText.replace(EVENT_TOKEN_PREFIX, ''))
+      if (eventData.type === 'intent_classified') {
+        currentIntent.value = {
+          type: eventData.intent,
+          confidence: eventData.confidence,
+          reasoning: eventData.reasoning
+        }
+        console.log('[Chat Store] Intent classified:', currentIntent.value)
+      }
+    } catch (error) {
+      console.error('[Chat Store] Failed to parse event:', error)
+    }
   }
   
   function handleToken(tokenText: string, conversationId: string) {
@@ -288,7 +279,6 @@ export const useChatStore = defineStore('chat', () => {
     // Update messages and clear workflow state
     updateMessages(conversationId, currentMsgs)
     workflow.value.status = ''
-    workflow.value.activeTools = []
     isStreaming.value = false
   }
   
@@ -307,12 +297,8 @@ export const useChatStore = defineStore('chat', () => {
   }
   
   function addServicesToPartialList(services: any[]) {
-    services.forEach(service => {
-      const exists = workflow.value.partialServices.some(s => s.id === service.id)
-      if (!exists) {
-        workflow.value.partialServices.push(service)
-      }
-    })
+    // Deprecated: partialServices feature removed
+    console.log('[Chat Store] Services published:', services.length)
   }
   
   function handleError(data: any, conversationId: string) {
@@ -362,20 +348,22 @@ export const useChatStore = defineStore('chat', () => {
         
       case 'token':
         const tokenText = data?.token || ''
-        if (!tokenText) {
-          console.warn('[Chat Store] Token event has no text content')
-          break
-        }
         
+        // Handle special markers first
         if (tokenText.startsWith(STATUS_TOKEN_PREFIX)) {
           handleStatusToken(tokenText)
-        } else {
+        } else if (tokenText.startsWith(EVENT_TOKEN_PREFIX)) {
+          handleEventToken(tokenText)
+        } else if (tokenText) {
+          // Only handle as normal text if it's not empty and not a marker
           handleToken(tokenText, conversationId)
         }
         break
         
       case 'message_complete':
         handleMessageComplete(data, conversationId)
+        // Clear intent after message is complete
+        currentIntent.value = null
         break
         
       case 'error':
@@ -397,9 +385,7 @@ export const useChatStore = defineStore('chat', () => {
     currentConversationId.value = null
     messages.value.clear()
     workflow.value = {
-      status: '',
-      activeTools: [],
-      partialServices: []
+      status: ''
     }
   }
   
@@ -436,8 +422,7 @@ export const useChatStore = defineStore('chat', () => {
     currentMessages,
     isStreaming,
     workflowStatus: computed(() => workflow.value.status),
-    activeTools: computed(() => workflow.value.activeTools),
-    partialServices: computed(() => workflow.value.partialServices),
+    currentIntent: computed(() => currentIntent.value),
     loadConversations,
     loadConversation,
     sendMessage,
