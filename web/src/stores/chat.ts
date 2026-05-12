@@ -110,6 +110,13 @@ export const useChatStore = defineStore('chat', () => {
     console.log('[Chat Store] Sending message:', message.substring(0, 50) + '...')
     isStreaming.value = true
     
+    // Clear workflow state before starting new message
+    workflow.value = {
+      status: '',
+      activeTools: [],
+      partialServices: []
+    }
+    
     const conversationId = getOrCreateConversationId()
     const currentMsgs = messages.value.get(conversationId) || []
     
