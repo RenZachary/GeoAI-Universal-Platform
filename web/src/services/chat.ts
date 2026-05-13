@@ -1,9 +1,26 @@
 import api from './api'
 import type { ChatMessage } from '@/types'
 
+export interface SpatialContext {
+  viewportBbox?: [number, number, number, number]
+  selectedFeature?: {
+    datasetId: string
+    featureId: string
+    geometry: GeoJSON.Geometry
+    properties: Record<string, any>
+  }
+  drawnGeometries?: Array<{
+    id: string
+    type: 'polygon' | 'circle' | 'line'
+    geometry: GeoJSON.Geometry
+    properties?: Record<string, any>
+  }>
+}
+
 export interface SendMessageParams {
   message: string
   conversationId?: string | null
+  context?: SpatialContext
   llmConfig?: {
     provider: string
     model: string
@@ -30,6 +47,7 @@ export async function sendMessageStream(
     body: JSON.stringify({
       message: params.message,
       conversationId: params.conversationId,
+      context: params.context,
       llmConfig: params.llmConfig
     })
   })

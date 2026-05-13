@@ -8,6 +8,7 @@ import { compileGeoAIGraph } from '../../llm-interaction';
 import { GeoAIStreamingHandler } from '../../llm-interaction';
 import type { LLMConfig } from '../../llm-interaction';
 import type { ConversationService } from '../../services';
+import type { SpatialContext } from '../../llm-interaction/types/SpatialContext';
 import { VirtualDataSourceManagerInstance } from '../../data-access/managers/VirtualDataSourceManager';
 
 export class ChatController {
@@ -26,7 +27,7 @@ export class ChatController {
    */
   async handleChat(req: Request, res: Response): Promise<void> {
     try {
-      const { message, conversationId, language = 'en-US' } = req.body;
+      const { message, conversationId, language = 'en-US', context } = req.body;
 
       if (!message) {
         res.status(400).json({
@@ -34,6 +35,15 @@ export class ChatController {
           error: 'Message is required'
         });
         return;
+      }
+
+      // Log spatial context if provided
+      if (context) {
+        console.log('[Chat API] Received spatial context:', {
+          hasViewport: !!context.viewportBbox,
+          hasSelection: !!context.selectedFeature,
+          drawnGeometriesCount: context.drawnGeometries?.length || 0
+        });
       }
 
       // Generate or use existing conversation ID
@@ -94,7 +104,8 @@ export class ChatController {
       const initialState: Partial<GeoAIStateType> = {
         userInput: message,
         conversationId: convId,
-        currentStep: 'goal_splitting'
+        context: context as SpatialContext | undefined,
+        currentStep: 'intent_classification'
       };
 
       // Execute workflow with streaming callbacks
@@ -136,8 +147,8 @@ export class ChatController {
         this.conversationService.saveServicesToLastMessage(convId, finalServices);
       }
 
-      // Clean up virtual data sources for this conversation
-      VirtualDataSourceManagerInstance.cleanup(convId);
+      // Note: Virtual data sources are cleaned up at the START of each new message by ContextExtractorNode
+      // No need to clean here - they will be cleaned when the next message arrives or conversation is deleted
 
       res.end();
       console.log(`[Chat API] Conversation completed: ${convId}`);
@@ -197,6 +208,10 @@ export class ChatController {
     try {
       const { id } = req.params;
       const conversationId = Array.isArray(id) ? id[0] : id;
+
+      // Clean up virtual data sources for this conversation
+      console.log(`[Chat API] Cleaning up virtual sources for deleted conversation: ${conversationId}`);
+      VirtualDataSourceManagerInstance.cleanup(conversationId);
 
       this.conversationService.deleteConversation(conversationId);
 

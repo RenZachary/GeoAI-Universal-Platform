@@ -111,12 +111,6 @@ export class StatisticsCalculatorOperator extends SpatialOperator {
       }
     }
     
-    console.log('[StatisticsCalculatorOperator] Statistics calculation completed:', {
-      fieldName: params.fieldName,
-      statisticsCount: Object.keys(result).length,
-      featureCount: count
-    });
-    
     // Return analytical result structure (NOT NativeData)
     return {
       success: true,

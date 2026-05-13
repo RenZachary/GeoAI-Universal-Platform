@@ -19,7 +19,7 @@ export class BufferOperation {
     
     for (const feature of geojson.features) {
       try {
-        const buffered = turf.buffer(feature, distance, { units: this.convertUnit(unit) });
+        const buffered = (turf as any).buffer(feature, distance, { units: this.convertUnit(unit) });
         if (buffered) {
           bufferedFeatures.push(buffered);
         }

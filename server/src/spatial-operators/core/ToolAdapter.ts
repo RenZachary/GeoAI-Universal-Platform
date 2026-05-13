@@ -28,7 +28,19 @@ export class ToolAdapter {
         try {
           console.log(`[ToolAdapter] Executing operator: ${metadata.operatorId}`);
           
+          // Debug: Log the exact structure of coordinates before passing to operator
+          if (input.conditions && input.conditions.geometry && input.conditions.geometry.coordinates) {
+            console.log('[ToolAdapter] Coordinates structure BEFORE execute:', {
+              type: typeof input.conditions.geometry.coordinates,
+              isArray: Array.isArray(input.conditions.geometry.coordinates),
+              firstElement: input.conditions.geometry.coordinates[0],
+              firstElementType: typeof input.conditions.geometry.coordinates[0],
+              isObject: typeof input.conditions.geometry.coordinates[0] === 'object' && !Array.isArray(input.conditions.geometry.coordinates[0])
+            });
+          }
+          
           // Execute the operator with the provided parameters
+          console.log(`[ToolAdapter] Operator input:`, input);
           const result = await operator.execute(input);
           
           // Debug: Log the result structure before serialization

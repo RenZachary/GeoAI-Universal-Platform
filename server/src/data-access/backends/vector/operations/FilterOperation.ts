@@ -44,16 +44,17 @@ export class FilterOperation {
     } else if (condition.type === 'spatial') {
       // Spatial filter
       if (!condition.geometry) {
+        console.error('[FilterOperation] No geometry available for spatial filter');
         return false;
       }
       
       switch (condition.operation) {
         case 'intersects':
-          return (turf as any).booleanIntersects(feature, { type: 'Feature', geometry: condition.geometry });
+          return turf.booleanIntersects(feature, { type: 'Feature', geometry: condition.geometry, properties: {} });
         case 'within':
-          return (turf as any).booleanWithin(feature, { type: 'Feature', geometry: condition.geometry });
+          return turf.booleanWithin(feature, { type: 'Feature', geometry: condition.geometry, properties: {} });
         case 'contains':
-          return (turf as any).booleanContains({ type: 'Feature', geometry: condition.geometry }, feature);
+          return turf.booleanContains({ type: 'Feature', geometry: condition.geometry, properties: {} }, feature);
         default:
           console.warn(`[FilterOperation] Unsupported spatial operation: ${condition.operation}`);
           return false;

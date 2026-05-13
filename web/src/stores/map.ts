@@ -41,6 +41,11 @@ export const useMapStore = defineStore('map', () => {
     mapInstance: state.mapInstance,
     mapContainer: state.mapContainer,
     
+    // Spatial context state
+    viewportBbox: state.viewportBbox,
+    selectedFeature: state.selectedFeature,
+    drawnGeometries: state.drawnGeometries,
+    
     // Computed
     visibleLayers: core.visibleLayers,
     

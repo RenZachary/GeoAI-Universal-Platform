@@ -54,9 +54,6 @@ export class BufferOperator extends SpatialOperator {
       throw new Error('Database connection not available');
     }
     
-    console.log('[BufferOperator] Starting buffer analysis...');
-    console.log('[BufferOperator] Params:', params);
-    
     // Initialize services
     const dataSourceRepo = new DataSourceRepository(this.db);
     const dataAccess = DataAccessFacade.getInstance(this.workspaceBase);
@@ -69,13 +66,6 @@ export class BufferOperator extends SpatialOperator {
       throw new Error(`Data source not found: ${params.dataSourceId}`);
     }
     
-    console.log('[BufferOperator] Found data source:', {
-      id: dataSource.id,
-      name: dataSource.name,
-      type: dataSource.type,
-      reference: dataSource.reference
-    });
-    
     // Step 2: Execute buffer operation using DataAccessFacade
     const result = await dataAccess.buffer(
       dataSource.type,
@@ -87,8 +77,6 @@ export class BufferOperator extends SpatialOperator {
       }
     );
     
-    console.log('[BufferOperator] Buffer completed successfully');
-    
     // Step 4: Persist result
     const persistedResult = await resultPersistence.persistResult(
       result,
@@ -96,14 +84,6 @@ export class BufferOperator extends SpatialOperator {
       dataSource,
       { distance: params.distance, unit: params.unit }
     );
-    
-    console.log('[BufferOperator] Persisted result:', {
-      id: persistedResult.id,
-      type: persistedResult.type,
-      reference: persistedResult.reference,
-      hasMetadata: !!persistedResult.metadata,
-      metadataKeys: persistedResult.metadata ? Object.keys(persistedResult.metadata) : []
-    });
     
     // Return complete NativeData structure so metadata (including connection info) is preserved for MVT publishing
     return {

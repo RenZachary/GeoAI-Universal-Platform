@@ -39,7 +39,7 @@ export class IntentClassifierNode {
     
     try {
       // Use LLM for robust semantic classification
-      const llmResult = await this.llmBasedClassification(userInput);
+      const llmResult = await this.llmBasedClassification(userInput, state);
       
       console.log(`[IntentClassifier] LLM classification: ${llmResult.type} (confidence: ${llmResult.confidence})`);
       
@@ -98,21 +98,21 @@ export class IntentClassifierNode {
   /**
    * LLM-based classification for complex/ambiguous queries
    */
-  private async llmBasedClassification(input: string): Promise<IntentClassification> {
+  private async llmBasedClassification(input: string, state: GeoAIStateType): Promise<IntentClassification> {
     try {
-      // Load intent classification template
       const template = await this.promptManager.loadTemplate('intent-classification', this.language);
       
-      // Use LangChain's format method to fill variables
-      const prompt = await template.format({ userQuery: input });
+      // Pass spatial context summary to template
+      const ctx = (state as any).context;
+      const spatialContext = ctx ? JSON.stringify(ctx) : '';
       
-      // console.log('[IntentClassifier] Prompt length:', prompt.length);
+      const prompt = await template.format({ userQuery: input, spatialContext });
+      // console.log('[IntentClassifier] Prompt:', prompt);
       const response = await this.llmAdapter.invoke(prompt);
+      // console.log('[IntentClassifier] LLM Response:', response);
       const content = typeof response === 'string' ? response : String(response.content || response);
       
-      // Parse JSON response with robust extraction
       const parsed = this.extractJsonFromResponse(content);
-      //console.log('[IntentClassifier] LLM Response:', content.substring(0, 200));
       return {
         type: parsed.type as IntentType,
         confidence: parseFloat(parsed.confidence) || 0.7,
@@ -120,7 +120,6 @@ export class IntentClassifierNode {
       };
     } catch (error) {
       console.error('[IntentClassifier] LLM classification failed:', error);
-      // Fallback to rule-based with low confidence
       return {
         type: 'GIS_ANALYSIS',
         confidence: 0.5,

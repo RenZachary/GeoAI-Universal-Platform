@@ -61,8 +61,6 @@ export class SpatialJoinOperator extends SpatialOperator {
       throw new Error('Database connection not available');
     }
     
-    console.log('[SpatialJoinOperator] Starting spatial join...');
-    
     const dataSourceRepo = new DataSourceRepository(this.db);
     const dataAccess = DataAccessFacade.getInstance(this.workspaceBase);
     const resultPersistence = new ResultPersistenceService(this.db);
@@ -74,11 +72,6 @@ export class SpatialJoinOperator extends SpatialOperator {
     if (!targetDS || !joinDS) {
       throw new Error('One or both data sources not found');
     }
-    
-    console.log('[SpatialJoinOperator] Data sources:', {
-      target: { id: targetDS.id, name: targetDS.name, type: targetDS.type },
-      join: { id: joinDS.id, name: joinDS.name, type: joinDS.type }
-    });
     
     // Check backend compatibility for VectorBackend
     // Note: VectorBackend spatial join has O(n²) complexity, warn for large datasets
@@ -100,8 +93,6 @@ export class SpatialJoinOperator extends SpatialOperator {
       params.joinType
     );
     
-    console.log('[SpatialJoinOperator] Spatial join completed successfully');
-    
     // Persist result to database (registers temp table if PostGIS)
     const persistedResult = await resultPersistence.persistResult(
       result,
@@ -113,13 +104,6 @@ export class SpatialJoinOperator extends SpatialOperator {
         joinDataSourceId: params.joinDataSourceId
       }
     );
-    
-    console.log('[SpatialJoinOperator] Persisted result:', {
-      id: persistedResult.id,
-      type: persistedResult.type,
-      reference: persistedResult.reference,
-      featureCount: persistedResult.metadata?.featureCount
-    });
     
     // Return NativeData structure for chaining
     return {

@@ -13,6 +13,7 @@ import { type DataSourceRecord } from '../data-access/repositories';
 import { DataAccessFacade, MetadataFormatter } from '../data-access';
 import { wrapError, type PostGISConnectionConfig } from '../core';
 import { PostGISCleanupScheduler } from '../storage';
+import { VirtualDataSourceManagerInstance } from '../data-access/managers/VirtualDataSourceManager';
 import type Database from 'better-sqlite3';
 
 // ============================================================================
@@ -196,6 +197,29 @@ export class DataSourceService {
    */
   formatDataSourcesForLLM(): string {
     const sources = this.dataSourceRepo.listAll();
+    
+    // Also include virtual data sources (viewport, selection, drawing)
+    const virtualSources = VirtualDataSourceManagerInstance.listAll();
+    
+    if (virtualSources.length > 0) {
+      console.log(`[DataSourceService] Including ${virtualSources.length} virtual data sources in LLM context`);
+      
+      // Convert virtual sources to DataSourceRecord-like format
+      const virtualRecords = virtualSources.map((vds: any) => ({
+        id: vds.id,
+        name: vds.nativeData.metadata?.name || vds.id,
+        type: vds.type,
+        reference: vds.reference,
+        metadata: vds.nativeData.metadata,
+        createdAt: vds.createdAt,
+        updatedAt: vds.createdAt
+      }));
+      
+      // Combine physical and virtual sources
+      const allSources = [...sources, ...virtualRecords];
+      return MetadataFormatter.formatForLLM(allSources);
+    }
+    
     return MetadataFormatter.formatForLLM(sources);
   }
 

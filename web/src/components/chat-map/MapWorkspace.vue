@@ -2,8 +2,12 @@
   <div class="map-workspace">
     <!-- Top Toolbar -->
     <div class="map-toolbar">
+      <div class="toolbar-left">
+        <!-- Drawing Toolbar -->
+        <DrawingToolbar />
+      </div>
+      
       <div class="toolbar-right">
-        <!-- Basemap Selector -->
         <el-dropdown @command="handleBasemapChange" trigger="click">
           <el-button class="toolbar-btn basemap-btn" size="default">
             <el-icon><MapLocation /></el-icon>
@@ -103,6 +107,7 @@ import { useDataSourceStore } from '@/stores/dataSources'
 import { MapLocation, List, Delete, ArrowDown } from '@element-plus/icons-vue'
 import LayerItemCard from '@/components/map/LayerItemCard.vue'
 import FeatureInfoPopup from '@/components/map/FeatureInfoPopup.vue'
+import DrawingToolbar from '@/components/map/DrawingToolbar.vue'
 import { ElMessage } from 'element-plus'
 import { DataSource, LayerType } from '@/types'
 import { getDataSourceServiceUrl } from '@/services/dataSource'
@@ -304,12 +309,13 @@ function closeFeaturePopup() {
 .map-toolbar {
   position: absolute;
   top: 8px;
-  right: 48px;
+  left: 0;
+  right: 0;
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 0px;
-  border-radius: 12px;
+  align-items: flex-start;
+  padding: 0 16px;
+  pointer-events: none; /* Allow clicks to pass through to map */
   z-index: 1000;
   transition: all 0.3s ease;
 }
@@ -319,6 +325,10 @@ function closeFeaturePopup() {
   display: flex;
   align-items: center;
   gap: 8px;
+  pointer-events: auto; /* Re-enable pointer events for buttons */
+}
+.toolbar-right {
+  margin-right: 32px;
 }
 
 .toolbar-btn {

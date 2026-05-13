@@ -22,7 +22,10 @@ export class OverlayOperation {
           
           switch (operation) {
             case 'intersect':
-              if ((turf as any).booleanIntersects(feature1, feature2)) {
+                console.log('[OverlayOperation] Intersecting features...');
+                console.log('[OverlayOperation] Feature 1:', feature1);
+                console.log('[OverlayOperation] Feature 2:', feature2);
+              if ((turf).booleanIntersects(feature1, feature2)) {
                 result = (turf as any).intersect(feature1, feature2);
               }
               break;

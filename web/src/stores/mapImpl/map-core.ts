@@ -36,10 +36,33 @@ export function useMapCore(state: MapState) {
         const lngLat = state.mapInstance.value.getCenter()
         state.center.value = [lngLat.lng, lngLat.lat]
         state.zoom.value = state.mapInstance.value.getZoom()
+        
+        // Update viewport bbox
+        updateViewportBbox()
       }
     })
+    
+    // Initial viewport bbox
+    setTimeout(() => {
+      updateViewportBbox()
+    }, 100)
 
     return state.mapInstance.value
+  }
+  
+  /**
+   * Update viewport bounding box
+   */
+  function updateViewportBbox() {
+    if (!state.mapInstance.value) return
+    
+    const bounds = state.mapInstance.value.getBounds()
+    state.viewportBbox.value = [
+      bounds.getWest(),
+      bounds.getSouth(),
+      bounds.getEast(),
+      bounds.getNorth()
+    ]
   }
 
   /**

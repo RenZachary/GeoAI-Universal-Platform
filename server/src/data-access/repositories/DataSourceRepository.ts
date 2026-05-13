@@ -175,8 +175,8 @@ export class DataSourceRepository {
       FROM data_sources
       ORDER BY created_at DESC
     `).all() as any[];
-
-    return rows
+      const dsInDb = 
+    rows
       .map(row => ({
         id: row.id,
         name: row.name,
@@ -198,6 +198,17 @@ export class DataSourceRepository {
         }
         return true;
       });
+      const dsInVirtual = VirtualDataSourceManagerInstance.listAll();
+      const dsInVirtualConv = dsInVirtual.map(vds => ({
+        id: vds.id,
+        name: vds.name,
+        type: vds.type as any,
+        reference: vds.reference,
+        metadata: vds.nativeData.metadata || {},
+        createdAt: vds.createdAt,
+        updatedAt: vds.createdAt
+      }));
+      return [...dsInDb, ...dsInVirtualConv];
   }
 
   /**

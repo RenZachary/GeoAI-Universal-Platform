@@ -39,6 +39,10 @@ export class VirtualDataSourceManager {
     return VirtualDataSourceManager.instance;
   }
 
+  listAll(): VirtualDataSource[] {
+    return Array.from(this.virtualSources.values());
+  }
+
   /**
    * Register a virtual data source from plugin execution result
    */

@@ -13,6 +13,7 @@ import { DataSourceRepository } from '../../data-access';
 import { SQLiteManagerInstance } from '../../storage/';
 import { ParallelTaskAnalyzer } from '../analyzers/ParallelTaskAnalyzer';
 import { DataSourceService } from '../../services/DataSourceService';
+import { VirtualDataSourceManagerInstance } from '../../data-access/managers/VirtualDataSourceManager';
 
 export class TaskPlannerAgent {
   private llmConfig: LLMConfig;
@@ -54,7 +55,6 @@ export class TaskPlannerAgent {
 
       // Get available data sources with metadata
       const dataSourcesMetadata = this.dataSourceService.formatDataSourcesForLLM();
-
       // Define output schema for structured output
       const stepSchema = z.object({
         stepId: z.string().describe('Unique identifier for this step'),
@@ -127,7 +127,8 @@ export class TaskPlannerAgent {
               previousResultsContext = JSON.stringify(previousGoalsResults, null, 2);
             }
           }
-
+          // console.log(`[Task Planner] dataSourcesMetadata:`, dataSourcesMetadata);
+          // console.log(`[Task Planner] virtualDataSourceInfo:`, virtualDataSourceInfo);
           // STAGE 2: LLM-based selection from filtered candidates
           const plan = await chain.invoke({
             goalId: goal.id,
@@ -148,6 +149,7 @@ export class TaskPlannerAgent {
             timestamp: new Date().toISOString()
           }) as any; // Cast as any first since LLM output doesn't match ExecutionPlan exactly
 
+          console.log(`[Task Planner] LLM Output for goal ${goal.id}:`, plan);
           // Transform LLM output to match ExecutionPlan interface
           // LLM returns: requiredOperators, dependsOn
           // ExecutionPlan expects: requiredPlugins, dependencies (in steps)
@@ -361,6 +363,7 @@ export class TaskPlannerAgent {
     }
 
     console.log(`[Task Planner] Validating plan with ${plan.steps.length} steps`);
+    console.log(`[Task Planner] Validating plan with ${plan.steps[0]?.operatorId}`);
 
     // Step 1: Identify terminal nodes
     const terminalPluginIds = this.getTerminalPluginIds(compatiblePluginIds);

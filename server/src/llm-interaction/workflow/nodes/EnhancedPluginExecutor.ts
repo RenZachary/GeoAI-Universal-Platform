@@ -221,6 +221,8 @@ export class EnhancedPluginExecutor {
       }
 
       // Execute the tool - LangChain will automatically trigger callbacks via GeoAIStreamingHandler
+      console.log(`[Enhanced Executor] Executing task ${tool.name}...`);
+      console.log(`[Enhanced Executor] Task ${taskId} - resolvedParameters:`, resolvedParameters);
       const toolResult = await tool.invoke(resolvedParameters);
 
       // Parse result

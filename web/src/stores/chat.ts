@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import type { ChatMessage } from '@/types'
 import * as chatService from '@/services/chat'
 import { translateWorkflowStatus } from '@/utils/i18n'
+import { useMapStore } from './map'
 
 // ============================================================================
 // Type Definitions
@@ -117,6 +118,40 @@ export const useChatStore = defineStore('chat', () => {
     const conversationId = getOrCreateConversationId()
     const currentMsgs = messages.value.get(conversationId) || []
     
+    // Get spatial context from map store
+    const mapStore = useMapStore()
+    
+    console.log('[Chat Store] MapStore drawnGeometries before mapping:', mapStore.drawnGeometries)
+    console.log('[Chat Store] MapStore drawnGeometries length:', mapStore.drawnGeometries?.length)
+    
+    const spatialContext: chatService.SpatialContext = {
+      viewportBbox: mapStore.viewportBbox || undefined,
+      selectedFeature: mapStore.selectedFeature || undefined,
+      drawnGeometries: (mapStore.drawnGeometries || []).map(d => ({
+        id: d.id,
+        type: d.type,
+        geometry: d.geometry,
+        properties: d.properties
+      }))
+    }
+    
+    // Log context for debugging
+    console.log('[Chat Store] Spatial context before sending:', {
+      hasViewport: !!spatialContext.viewportBbox,
+      viewportBbox: spatialContext.viewportBbox,
+      hasSelection: !!spatialContext.selectedFeature,
+      drawnCount: spatialContext.drawnGeometries?.length || 0,
+      rawViewportBbox: mapStore.viewportBbox,
+      rawSelectedFeature: mapStore.selectedFeature,
+      rawDrawnGeometries: mapStore.drawnGeometries
+    })
+    
+    if (spatialContext.viewportBbox || spatialContext.selectedFeature || (spatialContext.drawnGeometries?.length || 0) > 0) {
+      console.log('[Chat Store] ✅ Including spatial context in message')
+    } else {
+      console.log('[Chat Store] ⚠️ No spatial context available (user has not interacted with map)')
+    }
+    
     // Create user and empty assistant messages immediately
     const updatedMsgs: ChatMessage[] = [
       ...currentMsgs,
@@ -140,7 +175,8 @@ export const useChatStore = defineStore('chat', () => {
       await chatService.sendMessageStream(
         {
           message,
-          conversationId: currentConversationId.value!
+          conversationId: currentConversationId.value!,
+          context: spatialContext
         },
         (event) => {
           handleSSEEvent(event)

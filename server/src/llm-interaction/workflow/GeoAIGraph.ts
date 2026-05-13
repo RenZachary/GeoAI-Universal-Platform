@@ -17,6 +17,7 @@ import { reportDecisionNode } from './nodes/ReportDecisionNode';
 import { EnhancedExecutorInstance } from './nodes/EnhancedPluginExecutor';
 import { getIntentClassifier } from './nodes/IntentClassifierNode';
 import { getKnowledgeRetriever } from './nodes/KnowledgeRetrieverNode';
+import { ContextExtractorNode } from './nodes/ContextExtractorNode';
 import { SQLiteManagerInstance } from '../../storage/';
 import { VirtualDataSourceManagerInstance } from '../../data-access/managers/VirtualDataSourceManager';
 import { ToolRegistryInstance } from '../tools/ToolRegistry';
@@ -29,12 +30,21 @@ import type {
   AnalysisResult as CoreAnalysisResult
 } from '../../core';
 import type { IntentClassification } from '../../knowledge-base/types';
+import type { SpatialContext } from '../types/SpatialContext';
 
 // State interface for the GeoAI workflow
 export interface GeoAIState {
   userInput: string;
   conversationId: string;
   messages?: BaseMessage[];
+  
+  // NEW: Spatial context from frontend
+  context?: SpatialContext;
+  contextMetadata?: {
+    hasViewport: boolean;
+    hasSelection: boolean;
+    hasDrawing: boolean;
+  };
   
   // NEW: Intent classification
   intent?: IntentClassification;
@@ -115,6 +125,14 @@ const GeoAIStateAnnotation = Annotation.Root({
   conversationId: Annotation<string>,
   messages: Annotation<BaseMessage[]>,
   
+  // NEW: Spatial context from frontend
+  context: Annotation<SpatialContext | undefined>,
+  contextMetadata: Annotation<{
+    hasViewport: boolean;
+    hasSelection: boolean;
+    hasDrawing: boolean;
+  } | undefined>,
+  
   // NEW: Intent classification
   intent: Annotation<IntentClassification | undefined>,
   
@@ -177,7 +195,15 @@ export function createGeoAIGraph(
   // Initialize service publisher and summary generator
   const summaryGenerator = new SummaryGenerator(workspaceBase, 'en-US', llmConfig);
   
+  // Initialize context extractor
+  const contextExtractor = new ContextExtractorNode(workspaceBase);
+  
   const workflow = new StateGraph(GeoAIStateAnnotation)
+    // NEW: Context Extractor Node - Process spatial context first
+    .addNode('contextExtractor', async (state: GeoAIStateType) => {
+      console.log('[Context Extractor Node] Processing spatial context');
+      return await contextExtractor.execute(state);
+    })
     // Memory Loading Node - Load conversation history at start
     .addNode('memoryLoader', async (state: GeoAIStateType) => {
       console.log('[Memory Loader] Loading conversation history');
@@ -511,7 +537,8 @@ export function createGeoAIGraph(
     });
 
   // Define edges
-  workflow.addEdge(START, 'memoryLoader');
+  workflow.addEdge(START, 'contextExtractor');
+  workflow.addEdge('contextExtractor', 'memoryLoader');
   workflow.addEdge('memoryLoader', 'intentClassifier');
   
   // NEW: Conditional routing based on intent type

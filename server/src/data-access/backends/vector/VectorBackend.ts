@@ -19,11 +19,13 @@ import { AggregateOperation } from './operations/AggregateOperation';
 import { SpatialJoinOperation } from './operations/SpatialJoinOperation';
 import { VectorStatisticalOperation } from './operations/VectorStatisticalOperation';
 import { ProximityOperation } from './operations/ProximityOperation';
-import { tryMultipleEncodings } from '../../utils/ShapefileEncodingUtils';
+import { tryMultipleEncodings } from '../../utils/ShapefileEncodingUtils';  
+import { SQLiteManagerInstance } from '../../../storage';
+import { DataSourceRepository } from '../../repositories/DataSourceRepository';
 
 export class VectorBackend implements DataBackend {
   readonly backendType = 'vector' as const;
-  
+
   private workspaceBase: string;
   private bufferOp: BufferOperation;
   private overlayOp: OverlayOperation;
@@ -32,7 +34,7 @@ export class VectorBackend implements DataBackend {
   private spatialJoinOp: SpatialJoinOperation;
   private statisticalOp: VectorStatisticalOperation;
   private proximityOp: ProximityOperation;
-  
+
   constructor(workspaceBase?: string) {
     this.workspaceBase = workspaceBase || process.cwd();
     this.bufferOp = new BufferOperation();
@@ -43,19 +45,19 @@ export class VectorBackend implements DataBackend {
     this.statisticalOp = new VectorStatisticalOperation();
     this.proximityOp = new ProximityOperation();
   }
-  
+
   canHandle(dataSourceType: string, _reference: string): boolean {
     return dataSourceType === 'geojson' || dataSourceType === 'shapefile';
   }
-  
+
   // ========== Core Spatial Operations (delegate to operation classes) ==========
-  
+
   async buffer(reference: string, distance: number, options?: BufferOptions): Promise<NativeData> {
     const geojson = await this.loadGeoJSON(reference);
     const result = await this.bufferOp.execute(geojson, distance, options);
     const outputPath = await this.saveGeoJSON(result);
     const metadata = this.extractMetadata(result, outputPath);
-    
+
     return {
       id: generateId(),
       type: 'geojson',
@@ -68,7 +70,7 @@ export class VectorBackend implements DataBackend {
       createdAt: new Date()
     };
   }
-  
+
   async overlay(
     reference1: string,
     reference2: string,
@@ -79,7 +81,7 @@ export class VectorBackend implements DataBackend {
     const result = await this.overlayOp.execute(geojson1, geojson2, operation);
     const outputPath = await this.saveGeoJSON(result);
     const metadata = this.extractMetadata(result, outputPath);
-    
+
     return {
       id: generateId(),
       type: 'geojson',
@@ -92,13 +94,43 @@ export class VectorBackend implements DataBackend {
       createdAt: new Date()
     };
   }
-  
+
   async filter(reference: string, filterCondition: FilterCondition): Promise<NativeData> {
+    // If filter condition has referenceDataSourceId, resolve it to actual geometry
+    let resolvedCondition = filterCondition;
+
+    if ('type' in filterCondition && filterCondition.type === 'spatial' && (filterCondition as any).referenceDataSourceId) {
+      // Get database instance from DataSourceRepository
+      const dataSourceRepo = new DataSourceRepository(SQLiteManagerInstance.getDatabase());
+      const refDataSource = dataSourceRepo.getById((filterCondition as any).referenceDataSourceId);
+
+      if (!refDataSource) {
+        throw new Error(`Reference data source not found: ${(filterCondition as any).referenceDataSourceId}`);
+      }
+
+      // Use VectorBackend to load the referenced data source
+      const vb = new VectorBackend(this.workspaceBase);
+      const refData = await vb.loadGeoJSON(refDataSource.reference);
+
+      if ((refData as any).features && (refData as any).features.length > 0) {
+        const geometry = (refData as any).features[0].geometry;
+
+        // Create new condition with geometry instead of referenceDataSourceId
+        resolvedCondition = {
+          ...filterCondition,
+          geometry: geometry
+        } as FilterCondition;
+        delete (resolvedCondition as any).referenceDataSourceId;
+      } else {
+        throw new Error('No features found in reference data source');
+      }
+    }
+
     const geojson = await this.loadGeoJSON(reference);
-    const result = await this.filterOp.execute(geojson, filterCondition);
+    const result = await this.filterOp.execute(geojson, resolvedCondition);
     const outputPath = await this.saveGeoJSON(result);
     const metadata = this.extractMetadata(result, outputPath);
-    
+
     return {
       id: generateId(),
       type: 'geojson',
@@ -111,7 +143,7 @@ export class VectorBackend implements DataBackend {
       createdAt: new Date()
     };
   }
-  
+
   async aggregate(
     reference: string,
     aggFunc: string,
@@ -121,7 +153,7 @@ export class VectorBackend implements DataBackend {
     const geojson = await this.loadGeoJSON(reference);
     const result = await this.aggregateOp.execute(geojson, aggFunc, field, returnFeature);
     const outputPath = await this.saveGeoJSON(result);
-    
+
     // Extract scalar value for non-feature results
     let scalarValue: number | undefined;
     if (!returnFeature && result.features && result.features.length > 0) {
@@ -131,7 +163,7 @@ export class VectorBackend implements DataBackend {
         scalarValue = props.count ?? props.sum ?? props.avg ?? props.min ?? props.max ?? props.value;
       }
     }
-    
+
     return {
       id: generateId(),
       type: 'geojson',
@@ -145,7 +177,7 @@ export class VectorBackend implements DataBackend {
       createdAt: new Date()
     };
   }
-  
+
   async spatialJoin(
     targetReference: string,
     joinReference: string,
@@ -157,7 +189,7 @@ export class VectorBackend implements DataBackend {
     const result = await this.spatialJoinOp.execute(targetGeoJSON, joinGeoJSON, operation, joinType);
     const outputPath = await this.saveGeoJSON(result);
     const metadata = this.extractMetadata(result, outputPath);
-    
+
     return {
       id: generateId(),
       type: 'geojson',
@@ -170,35 +202,35 @@ export class VectorBackend implements DataBackend {
       createdAt: new Date()
     };
   }
-  
+
   // ========== Visualization Operations (to be implemented in separate module) ==========
-  
+
   async choropleth(): Promise<NativeData> {
     throw new Error('Choropleth visualization requires classification logic - not yet implemented');
   }
-  
+
   async heatmap(): Promise<NativeData> {
     throw new Error('Heatmap visualization requires density calculation - not yet implemented');
   }
-  
+
   async categorical(): Promise<NativeData> {
     throw new Error('Categorical visualization requires color mapping - not yet implemented');
   }
-  
+
   async uniformColor(): Promise<NativeData> {
     throw new Error('Uniform color visualization is a rendering concern, not a data operation');
   }
-  
+
   // ========== CRUD Operations ==========
-  
+
   async read(reference: string): Promise<NativeData> {
     if (!fs.existsSync(reference)) {
       throw new Error(`File not found: ${reference}`);
     }
-    
+
     const geojson = await this.loadGeoJSON(reference);
     const metadata = this.extractMetadata(geojson, reference);
-    
+
     return {
       id: generateId(),
       type: 'geojson',
@@ -211,11 +243,11 @@ export class VectorBackend implements DataBackend {
       createdAt: new Date()
     };
   }
-  
+
   async write(data: any, _metadata?: any): Promise<string> {
     return this.saveGeoJSON(data);
   }
-  
+
   async delete(reference: string): Promise<void> {
     try {
       fs.rmSync(reference, { force: true });
@@ -224,61 +256,61 @@ export class VectorBackend implements DataBackend {
       throw error;
     }
   }
-  
+
   async getMetadata(reference: string): Promise<any> {
     const geojson = await this.loadGeoJSON(reference);
     return this.extractMetadata(geojson, reference);
   }
-  
+
   async validate(reference: string): Promise<boolean> {
     try {
       if (!fs.existsSync(reference)) {
         return false;
       }
-      
+
       const ext = path.extname(reference).toLowerCase();
       if (!['.geojson', '.json'].includes(ext)) {
         return false;
       }
-      
+
       const content = fs.readFileSync(reference, 'utf-8');
       const geojson = JSON.parse(content);
-      
+
       return geojson.type === 'Feature' || geojson.type === 'FeatureCollection';
     } catch (error) {
       console.error('Validation failed:', error);
       return false;
     }
   }
-  
+
   // ========== Private Helper Methods ==========
-  
+
   private async loadGeoJSON(reference: string): Promise<PlatformFeatureCollection> {
     const ext = path.extname(reference).toLowerCase();
-    
+
     // Handle Shapefile - convert to GeoJSON first
     if (ext === '.shp' || reference.includes('shapefile')) {
       return await this.loadShapefileAsGeoJSON(reference);
     }
-    
+
     // Handle GeoJSON file
     const content = fs.readFileSync(reference, 'utf-8');
     const geojson = JSON.parse(content);
-    
+
     if (geojson.type === 'Feature') {
       return {
         type: 'FeatureCollection',
         features: [geojson]
       };
     }
-    
+
     if (geojson.type !== 'FeatureCollection') {
       throw new Error('Invalid GeoJSON format: must be Feature or FeatureCollection');
     }
-    
+
     return geojson;
   }
-  
+
   /**
    * Load a shapefile and convert to GeoJSON using the 'shapefile' library
    * Uses shared ShapefileEncodingUtils for intelligent encoding detection
@@ -287,27 +319,22 @@ export class VectorBackend implements DataBackend {
     try {
       // Import shapefile library dynamically
       const shapefileModule = await import('shapefile');
-      
+
       // Remove .shp extension for the shapefile library
       const shapefilePath = shpPath.replace(/\.shp$/i, '');
-      
-      console.log(`[VectorBackend] Loading shapefile: ${shapefilePath}`);
-      
+
       // Use shared encoding utility with automatic detection
       const features = await tryMultipleEncodings(
         async (encoding) => {
           return await (shapefileModule as any).open(shapefilePath, undefined, { encoding });
         },
-        shapefilePath,
-        (message) => console.log(`[VectorBackend] ${message}`)
+        shapefilePath
       );
-      
-      console.log(`[VectorBackend] Successfully loaded shapefile with ${features.length} features`);
-      
+
       // Cast features to proper GeoJSON Feature type
       // The shapefile library returns complete GeoJSON features with geometry and properties
       const geojsonFeatures = features as PlatformFeatureCollection['features'];
-      
+
       // Return as FeatureCollection
       return {
         type: 'FeatureCollection',
@@ -318,30 +345,30 @@ export class VectorBackend implements DataBackend {
       throw wrapError(error, `Failed to load shapefile: ${message}`);
     }
   }
-  
+
   private async saveGeoJSON(geojson: PlatformFeatureCollection): Promise<string> {
     const workspaceDir = this.workspaceBase || './workspace';
     const resultsDir = path.join(workspaceDir, 'results', 'geojson');
-    
+
     if (!fs.existsSync(resultsDir)) {
       fs.mkdirSync(resultsDir, { recursive: true });
     }
-    
+
     const fileId = generateId();
     const filename = `${fileId}.geojson`;
     const filepath = path.join(resultsDir, filename);
-    
+
     fs.writeFileSync(filepath, JSON.stringify(geojson, null, 2));
     return filepath;
   }
-  
+
   private extractMetadata(geojson: PlatformFeatureCollection, reference: string): DataMetadata {
     const stats = fs.statSync(reference);
     const featureCount = geojson.features?.length || 0;
     const geometryTypes = new Set(
       geojson.features.map((f: any) => f.geometry?.type).filter(Boolean)
     );
-    
+
     return {
       fileSize: stats.size,
       featureCount,
@@ -352,11 +379,11 @@ export class VectorBackend implements DataBackend {
       sampleValues: this.extractSampleValues(geojson)
     };
   }
-  
+
   private extractCRS(_geojson: PlatformFeatureCollection): string {
     return 'EPSG:4326';
   }
-  
+
   private calculateBbox(geojson: PlatformFeatureCollection): [number, number, number, number] | null {
     try {
       const bbox = (turf as any).bbox(geojson);
@@ -365,23 +392,23 @@ export class VectorBackend implements DataBackend {
       return null;
     }
   }
-  
+
   private extractFields(geojson: PlatformFeatureCollection): any[] {
     if (geojson.features.length === 0) return [];
-    
+
     const firstFeature = geojson.features[0];
     const properties = firstFeature.properties || {};
-    
+
     return Object.keys(properties).map(key => ({
       name: key,
       type: typeof properties[key]
     }));
   }
-  
+
   private extractSampleValues(geojson: PlatformFeatureCollection): Record<string, any[]> {
     const samples: Record<string, any[]> = {};
     const maxSamples = 5;
-    
+
     for (const feature of geojson.features.slice(0, maxSamples)) {
       const properties = feature.properties || {};
       for (const [key, value] of Object.entries(properties)) {
@@ -393,28 +420,28 @@ export class VectorBackend implements DataBackend {
         }
       }
     }
-    
+
     return samples;
   }
-  
+
   async getSchema(_reference: string): Promise<any> {
     // For vector backends, schema is extracted from GeoJSON properties
     // This method is typically not used for file-based sources
     throw new Error('Schema extraction for vector files should use metadata from registration');
   }
-  
+
   // ========== Statistical Operations ==========
-  
+
   async getUniqueValues(reference: string, fieldName: string): Promise<string[]> {
     const geojson = await this.loadGeoJSON(reference);
     return this.statisticalOp.getUniqueValues(geojson, fieldName);
   }
-  
+
   async getFieldStatistics(reference: string, fieldName: string): Promise<any> {
     const geojson = await this.loadGeoJSON(reference);
     return this.statisticalOp.getFieldStatistics(geojson, fieldName);
   }
-  
+
   async getClassificationBreaks(
     reference: string,
     fieldName: string,
@@ -424,9 +451,9 @@ export class VectorBackend implements DataBackend {
     const geojson = await this.loadGeoJSON(reference);
     return this.statisticalOp.getClassificationBreaks(geojson, fieldName, method, numClasses);
   }
-  
+
   // ========== Proximity Operations ==========
-  
+
   async calculateDistance(
     reference1: string,
     reference2: string,
@@ -437,10 +464,10 @@ export class VectorBackend implements DataBackend {
   ): Promise<Array<{ sourceId: string | number; targetId: string | number; distance: number; unit: string }>> {
     const geojson1 = await this.loadGeoJSON(reference1);
     const geojson2 = await this.loadGeoJSON(reference2);
-    
+
     return this.proximityOp.calculateDistance(geojson1, geojson2, options);
   }
-  
+
   async findNearestNeighbors(
     sourceReference: string,
     targetReference: string,
@@ -457,10 +484,10 @@ export class VectorBackend implements DataBackend {
   }>> {
     const sourceGeoJSON = await this.loadGeoJSON(sourceReference);
     const targetGeoJSON = await this.loadGeoJSON(targetReference);
-    
+
     return this.proximityOp.findNearestNeighbors(sourceGeoJSON, targetGeoJSON, limit, options);
   }
-  
+
   async filterByDistance(
     reference: string,
     centerReference: string,
@@ -471,20 +498,20 @@ export class VectorBackend implements DataBackend {
   ): Promise<NativeData> {
     const geojson = await this.loadGeoJSON(reference);
     const centerGeoJSON = await this.loadGeoJSON(centerReference);
-    
+
     // Get the first feature from center as reference point
     const centerFeature = centerGeoJSON.features[0];
     if (!centerFeature) {
       throw new Error('Center reference must contain at least one feature');
     }
-    
+
     // Filter using ProximityOperation
     const result = this.proximityOp.filterByDistance(geojson, centerFeature, distance, options);
-    
+
     // Save result
     const outputPath = await this.saveGeoJSON(result);
     const metadata = this.extractMetadata(result, outputPath);
-    
+
     return {
       id: generateId(),
       type: 'geojson',

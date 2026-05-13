@@ -28,7 +28,7 @@ const OverlayOutputSchema = SpatialOutputSchema.extend({
 export class OverlayOperator extends SpatialOperator {
   readonly operatorId = 'overlay_analysis';
   readonly name = 'Overlay Analysis';
-  readonly description = 'Perform spatial overlay operations (intersect, union, difference) between two datasets';
+  readonly description = 'Perform spatial overlay operations (intersect, union, difference) between two datasets to generate new geometries. Use for spatial analysis that requires geometric computation and combination of multiple datasets.';
   readonly category = 'analysis' as const;
   readonly returnType = 'spatial' as const; // Produces new spatial data
   
@@ -81,14 +81,6 @@ export class OverlayOperator extends SpatialOperator {
       dataSource1,
       { operation: params.operation }
     );
-    
-    console.log('[OverlayOperator] Overlay completed successfully:', {
-      id: persistedResult.id,
-      type: persistedResult.type,
-      reference: persistedResult.reference,
-      operation: params.operation,
-      featureCount: persistedResult.metadata?.featureCount
-    });
     
     // Return NativeData structure for chaining
     return {

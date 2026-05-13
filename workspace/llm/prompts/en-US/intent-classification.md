@@ -27,7 +27,7 @@ Classify the user query into one of these intent categories to enable intelligen
 - **Contextual Analysis**: Requires retrieving documents to filter or interpret spatial data (e.g., filtering based on regulatory criteria).
 
 ### 4. GENERAL_CHAT
-**Definition**: Casual conversation, greetings, or non-task-oriented interactions.
+**Definition**: Casual conversation, greetings, or non-task-oriented interactions, or the answer was mentioned in the 'User Query' and 'User Mentioned Info' directly and exactly.
 
 **Classification Principles**:
 - **Social Interactions**: Greetings, small talk, gratitude, or farewells.
@@ -37,6 +37,10 @@ Classify the user query into one of these intent categories to enable intelligen
 
 {{userQuery}}
 
+## User Mentioned Info
+
+{{spatialContext}}
+
 ## Classification Instructions
 
 **IMPORTANT**: The user query may be in any language and may contain technical identifiers (like @mentions or IDs). You MUST look past these identifiers to find the core action verbs.
@@ -44,6 +48,7 @@ Classify the user query into one of these intent categories to enable intelligen
 Analyze the user query carefully and determine the most appropriate intent category based on the principles above.
 
 **CRITICAL RULES**:
+- If the answer was contained in the question directly and exactly, it is **GENERAL_CHAT**
 - If the query mentions spatial operations (buffer, area, distance) or visualization (show, display, color), it is ALWAYS **GIS_ANALYSIS**.
 - If the query is a simple greeting or small talk, it is **GENERAL_CHAT**.
 - Do NOT be misled by technical IDs or @mentions; focus on the human-readable instructions.

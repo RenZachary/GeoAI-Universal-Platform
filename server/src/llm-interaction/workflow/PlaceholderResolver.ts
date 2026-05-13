@@ -66,6 +66,10 @@ export function resolvePlaceholders(
  */
 function tryResolvePlaceholder(value: string, executionResults: Map<string, ExecutionResult>): any {
   // Match pattern: {step_id.result} or {step_id.result.field.path}
+  console.log('[Placeholder Resolver] Trying to resolve placeholder:', value);
+  for(let i = 0; i < executionResults.size; i++){
+    console.log('[Placeholder Resolver] Execution result found:', executionResults.keys().next().value);
+  }
   const match = value.match(/^\{([a-zA-Z0-9_-]+)\.result(?:\.([a-zA-Z0-9_.]+))?\}$/);
   
   if (!match) {
