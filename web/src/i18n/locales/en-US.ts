@@ -46,7 +46,16 @@ export default {
     deleteSuccess: 'Conversation deleted successfully',
     send: 'Send',
     expandSidebar: 'Expand Sidebar',
-    collapseSidebar: 'Collapse Sidebar'
+    collapseSidebar: 'Collapse Sidebar',
+    // Workflow status messages
+    kbSearching: '🔍 Searching knowledge base...',
+    kbFound: '✅ Found {count} relevant documents ({time}ms)',
+    intentUnderstanding: '🧠 Understanding your request...',
+    goalAnalyzing: '🎯 Analyzing your request...',
+    taskPlanning: '📋 Planning analysis tasks...',
+    executing: '⚙️ Executing analysis...',
+    reportEvaluating: '📊 Evaluating report needs...',
+    summaryCreating: '📝 Creating summary...'
   },
   map: {
     title: 'Map',

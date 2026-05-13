@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { ChatMessage } from '@/types'
 import * as chatService from '@/services/chat'
+import { translateWorkflowStatus } from '@/utils/i18n'
 
 // ============================================================================
 // Type Definitions
@@ -212,6 +213,8 @@ export const useChatStore = defineStore('chat', () => {
   function handleEventToken(tokenText: string) {
     try {
       const eventData = JSON.parse(tokenText.replace(EVENT_TOKEN_PREFIX, ''))
+      console.log('[Chat Store] Received event:', eventData.type, eventData)
+      
       if (eventData.type === 'intent_classified') {
         currentIntent.value = {
           type: eventData.intent,
@@ -220,8 +223,31 @@ export const useChatStore = defineStore('chat', () => {
         }
         console.log('[Chat Store] Intent classified:', currentIntent.value)
       }
+      
+      // Handle KB retrieval start event
+      else if (eventData.type === 'kb_retrieval_start') {
+        workflow.value.status = translateWorkflowStatus('kbSearching')
+      }
+      
+      // Handle KB retrieval complete event
+      else if (eventData.type === 'kb_retrieval_complete') {
+        const count = eventData.data?.resultCount || 0
+        const time = eventData.data?.searchTime || 0
+        workflow.value.status = translateWorkflowStatus('kbFound', { count, time })
+        
+        // Don't auto-clear - let subsequent status updates overwrite it naturally
+        // The next node (goalSplitter/taskPlanner) will send its own __STATUS__ message
+      }
+      
+      // Handle source citation events
+      else if (eventData.type === 'source_citation') {
+        console.log('[Chat Store] Source citation:', eventData.data)
+        // Note: Citations are already included in the summary text by SummaryGenerator
+        // This event can be used for future enhancements like clickable source links
+      }
+      
     } catch (error) {
-      console.error('[Chat Store] Failed to parse event:', error)
+      console.error('[Chat Store] Failed to parse event:', error, 'Raw token:', tokenText)
     }
   }
   

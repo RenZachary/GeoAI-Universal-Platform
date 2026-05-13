@@ -46,7 +46,16 @@ export default {
     deleteSuccess: '对话删除成功',
     send: '发送',
     expandSidebar: '展开侧边栏',
-    collapseSidebar: '折叠侧边栏'
+    collapseSidebar: '折叠侧边栏',
+    // Workflow status messages
+    kbSearching: '🔍 正在搜索知识库...',
+    kbFound: '✅ 找到 {count} 个相关文档（耗时 {time}ms）',
+    intentUnderstanding: '🧠 理解您的请求...',
+    goalAnalyzing: '🎯 分析您的请求...',
+    taskPlanning: '📋 规划分析任务...',
+    executing: '⚙️ 执行分析...',
+    reportEvaluating: '📊 评估报告需求...',
+    summaryCreating: '📝 创建摘要...'
   },
   map: {
     title: '地图',

@@ -144,49 +144,4 @@ function getCategoryColor(category: string): 'primary' | 'success' | 'warning' |
   line-height: 1.5;
   min-height: 42px;
 }
-
-.tool-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.execution-form {
-  max-height: 60vh;
-  overflow-y: auto;
-}
-
-.param-help {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  margin-top: 4px;
-}
-
-.execution-result {
-  margin-top: 24px;
-  padding: 16px;
-  background: var(--el-fill-color-light);
-  border-radius: 8px;
-  
-  h4 {
-    margin: 0 0 12px 0;
-    color: var(--el-text-color-primary);
-  }
-  
-  pre {
-    max-height: 300px;
-    overflow: auto;
-    background: var(--el-bg-color-page);
-    color: var(--el-text-color-regular);
-    padding: 12px;
-    border-radius: 4px;
-    font-size: 12px;
-    border: 1px solid var(--el-border-color);
-  }
-}
-
-.result-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
-}
 </style>

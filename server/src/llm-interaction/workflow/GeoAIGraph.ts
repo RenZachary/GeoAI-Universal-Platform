@@ -239,14 +239,46 @@ export function createGeoAIGraph(
     // NEW: Knowledge Retriever Node (conditional)
     .addNode('knowledgeRetriever', async (state: GeoAIStateType) => {
       console.log('[Knowledge Retriever Node] Retrieving knowledge context');
-      if (onToken && (state.intent?.type === 'KNOWLEDGE_QUERY' || state.intent?.type === 'HYBRID')) {
-        onToken('__STATUS__:🔍 Searching knowledge base...');
-      }
-      const result = await knowledgeRetriever.retrieve(state);
       
-      // Send completion event via token callback
-      if (onToken && result.knowledgeContext && result.knowledgeContext.retrievedChunks.length > 0) {
-        onToken(`__STATUS__:✅ Found ${result.knowledgeContext.retrievedChunks.length} relevant documents`);
+      // Send structured KB retrieval start event
+      if (onToken && (state.intent?.type === 'KNOWLEDGE_QUERY' || state.intent?.type === 'HYBRID')) {
+        const startEvent = JSON.stringify({
+          type: 'kb_retrieval_start',
+          data: { query: state.userInput }
+        });
+        onToken(`__EVENT__:${startEvent}`);
+      }
+      
+      const startTime = Date.now();
+      const result = await knowledgeRetriever.retrieve(state);
+      const searchTime = Date.now() - startTime;
+      
+      // Send structured KB retrieval complete event
+      if (onToken && result.knowledgeContext) {
+        const completeEvent = JSON.stringify({
+          type: 'kb_retrieval_complete',
+          data: { 
+            resultCount: result.knowledgeContext.retrievedChunks.length,
+            searchTime
+          }
+        });
+        onToken(`__EVENT__:${completeEvent}`);
+        
+        // Send source citation events for each retrieved chunk
+        result.knowledgeContext.retrievedChunks.forEach((chunk, index) => {
+          const citationEvent = JSON.stringify({
+            type: 'source_citation',
+            data: {
+              documentId: chunk.documentId,
+              documentName: chunk.metadata?.documentName || 'Unknown',
+              pageNumber: chunk.metadata?.pageNumber,
+              score: chunk.score,
+              preview: chunk.content.substring(0, 200),
+              index: index + 1
+            }
+          });
+          onToken(`__EVENT__:${citationEvent}`);
+        });
       }
       
       return result;
