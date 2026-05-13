@@ -56,7 +56,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
 import { useDataSourceStore } from '@/stores/dataSources'
 import { useToolStore } from '@/stores/tools'
@@ -68,6 +68,7 @@ import MapWorkspace from '@/components/chat-map/MapWorkspace.vue'
 
 const { t, locale } = useI18n()
 const route = useRoute()
+const router = useRouter()
 const chatStore = useChatStore()
 const dataSourceStore = useDataSourceStore()
 const toolStore = useToolStore()
@@ -144,11 +145,17 @@ function updatePlaceholderVariable() {
 function handleNewChat() {
   chatStore.createNewConversation()
   inputMessage.value = ''
+  
+  // Clear conversation ID from URL for new chat
+  router.push({ query: {} })
 }
 
 async function handleSelectConversation(conversationId: string) {
   await chatStore.loadConversation(conversationId)
   inputMessage.value = ''
+  
+  // Update URL to include conversation ID for bookmarking and page refresh
+  router.push({ query: { conversation: conversationId } })
 }
 
 async function handleRenameConversation(conversationId: string, currentTitle: string) {
@@ -176,6 +183,11 @@ async function handleDeleteConversation(conversationId: string) {
     
     await chatStore.deleteConversation(conversationId)
     ElMessage.success(t('chat.deleteSuccess'))
+    
+    // If deleted conversation was current, clear URL parameter
+    if (!chatStore.currentConversationId) {
+      router.push({ query: {} })
+    }
   } catch {
     // User cancelled
   }

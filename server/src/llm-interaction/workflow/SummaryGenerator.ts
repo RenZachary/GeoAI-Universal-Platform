@@ -242,7 +242,7 @@ export class SummaryGenerator {
           }
         }
         
-        let answer = fullResponse;
+        const answer = fullResponse;
         
         // Note: Sources are already included by LLM based on prompt template
         // No need to append additional sources here to avoid duplication
@@ -251,7 +251,7 @@ export class SummaryGenerator {
       } else {
         // Fallback to non-streaming mode
         const response = await adapter.invoke(prompt);
-        let answer = typeof response === 'string' ? response : String(response.content || response);
+        const answer = typeof response === 'string' ? response : String(response.content || response);
         
         // Note: Sources are already included by LLM based on prompt template
         // No need to append additional sources here to avoid duplication
@@ -296,13 +296,6 @@ export class SummaryGenerator {
    */
   private capitalize(str: string): string {
     return str.charAt(0).toUpperCase() + str.slice(1);
-  }
-
-  /**
-   * Simple fallback for knowledge answer when template is not available
-   */
-  private generateSimpleKnowledgeAnswer(query: string, contextString: string): string {
-    return `Based on the available documents:\n\n${contextString}\n\nThis information relates to your question: ${query}`;
   }
 
   /**
@@ -568,19 +561,6 @@ export class SummaryGenerator {
         summary += `- **${err.goalId}**: ${err.error}\n`;
       });
       summary += '\n';
-    }
-    
-    // Next steps suggestion
-    if (options.includeNextSteps) {
-      summary += '---\n\n';
-      if (state.visualizationServices && state.visualizationServices.length > 0) {
-        summary += '**Next Steps:**\n\n';
-        summary += '- View the generated visualization services above\n';
-        summary += '- Use the provided URLs to access your data\n';
-        summary += '- Services will expire after the TTL period\n';
-      } else {
-        summary += '*No visualization services were generated. Check the execution results for details.*\n';
-      }
     }
     
     return summary;
