@@ -223,7 +223,7 @@ export function useLayerRenderers(state: MapState) {
         'source-layer': sourceLayer,
         paint: {
           'line-color': layer.style?.strokeColor || layer.style?.fillColor || '#409eff',
-          'line-width': layer.style?.strokeWidth || 2,
+          'line-width': layer.style?.strokeWidth || 8,
           'line-opacity': layer.style?.fillOpacity || layer.opacity || 0.8
         }
       })

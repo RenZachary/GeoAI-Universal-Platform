@@ -242,17 +242,15 @@ export function useServiceIntegration(
    * Query features at a specific point on the map
    * Returns features from all visible MVT and GeoJSON layers
    */
-  function queryFeaturesAtPoint(lngLat: [number, number], radius: number = 5): Array<{ layerId: string; layerName?: string; properties: Record<string, any> }> {
+  function queryFeaturesAtPoint(lngLat: [number, number], radius: number = 10): Array<{ layerId: string; layerName?: string; properties: Record<string, any> }> {
     if (!state.mapInstance.value) return []
 
     const map = state.mapInstance.value
     const results: Array<{ layerId: string; layerName?: string; properties: Record<string, any> }> = []
-
     // Get all visible layers that can be queried
     const queryableLayers = (state.layers.value || []).filter(layer => 
       layer.visible && (layer.type === LayerType.MVT || layer.type === LayerType.GeoJSON)
     )
-
     if (queryableLayers.length === 0) return []
 
     // Convert lng/lat to pixel coordinates
@@ -292,7 +290,6 @@ export function useServiceIntegration(
         }
         
         const existingLayers = layersToQueryFinal.filter(id => map.getLayer(id))
-        
         if (existingLayers.length === 0) {
           console.warn(`[Map Store] No valid layers found for query: ${layer.id}`)
           return
@@ -302,7 +299,6 @@ export function useServiceIntegration(
         const features = map.queryRenderedFeatures(bbox, {
           layers: existingLayers
         })
-
         if (features && features.length > 0) {
           features.forEach((feature: any) => {
             // Avoid duplicates - check if we already have this feature
