@@ -16,7 +16,8 @@ export default {
     search: 'Search',
     filter: 'Filter',
     reset: 'Reset',
-    timeElapsed: '{time}s elapsed'
+    timeElapsed: '{time}s elapsed',
+    required: 'This field is required'
   },
   chat: {
     placeholder: 'Type your message... Use {atSymbol} for data sources, / for tools',
@@ -41,6 +42,8 @@ export default {
     renameConversation: 'Rename Conversation',
     enterNewTitle: 'Enter new title',
     renameConfirm: 'Confirm Rename',
+    renameSuccess: 'Conversation renamed successfully',
+    deleteSuccess: 'Conversation deleted successfully',
     send: 'Send',
     expandSidebar: 'Expand Sidebar',
     collapseSidebar: 'Collapse Sidebar'

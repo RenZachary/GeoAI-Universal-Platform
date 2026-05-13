@@ -2,7 +2,7 @@
   <aside class="conversation-sidebar" :class="{ collapsed: collapsed }">
     <div class="sidebar-header">
       <el-tooltip :content="$t('chat.newChat')" placement="right">
-        <el-button class="new-chat-btn" text circle @click="$emit('new-chat')">
+        <el-button class="new-chat-btn" text @click="$emit('new-chat')">
           <el-icon>
             <Plus />
           </el-icon>
@@ -11,16 +11,14 @@
     </div>
 
     <div v-if="!collapsed" class="conversation-list">
-      <div 
-        v-for="conv in conversations" 
-        :key="conv.id" 
-        class="conversation-item"
-        :class="{ active: conv.id === currentConversationId }" 
-        @click="$emit('select-conversation', conv.id)"
-      >
+      <div v-for="conv in conversations" :key="conv.id" class="conversation-item"
+        :class="{ active: conv.id === currentConversationId }" @click="$emit('select-conversation', conv.id)">
         <div class="info">
           <span class="conversation-title">{{ conv.title || 'Untitled' }}</span>
-          <el-tag type="info" size="small">{{ new Date(conv.createdAt || '').toLocaleString() }}</el-tag>
+          <span> 
+            <el-tag type="info" effect="plain" size="small">{{ new Date(conv.createdAt || '').toLocaleString()
+              }}</el-tag>
+          </span>
         </div>
         <div class="conversation-actions">
           <el-icon class="rename-icon" @click.stop="$emit('rename-conversation', conv.id, conv.title || '')">
@@ -32,19 +30,12 @@
         </div>
       </div>
 
-      <el-empty 
-        v-if="conversations.length === 0" 
-        :description="$t('chat.noMessages')" 
-        :image-size="80" 
-      />
+      <el-empty v-if="conversations.length === 0" :description="$t('chat.noMessages')" :image-size="80" />
     </div>
 
     <div class="sidebar-footer">
-      <el-tooltip 
-        :content="collapsed ? $t('chat.expandSidebar') : $t('chat.collapseSidebar')" 
-        placement="right"
-      >
-        <el-button class="sidebar-toggle-btn" text circle @click="$emit('toggle-collapse')">
+      <el-tooltip :content="collapsed ? $t('chat.expandSidebar') : $t('chat.collapseSidebar')" placement="right">
+        <el-button class="sidebar-toggle-btn" text @click="$emit('toggle-collapse')">
           <el-icon v-if="collapsed">
             <DArrowRight />
           </el-icon>
@@ -99,7 +90,7 @@ defineEmits<{
 }
 
 .sidebar-header {
-  padding: 16px;
+  padding: 4px;
   border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
@@ -110,11 +101,11 @@ defineEmits<{
 .conversation-list {
   flex: 1;
   overflow-y: auto;
-  padding: 8px;
+  padding: 4px;
 }
 
 .conversation-item {
-  padding: 12px;
+  padding: 8px;
   margin-bottom: 4px;
   border-radius: 8px;
   cursor: pointer;
@@ -122,6 +113,7 @@ defineEmits<{
   display: flex;
   justify-content: space-between;
   align-items: center;
+  border-bottom: 1px solid var(--el-border-color-lighter);
 
   &:hover {
     background: var(--el-fill-color-light);
@@ -171,7 +163,7 @@ defineEmits<{
 }
 
 .sidebar-footer {
-  padding: 16px;
+  padding: 4px;
   border-top: 1px solid var(--el-border-color-lighter);
 }
 

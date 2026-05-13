@@ -64,21 +64,24 @@ defineExpose({
 <style scoped lang="scss">
 .messages-container {
   flex: 1;
+  min-height: 0; // Critical for flex child scrolling
   overflow-y: auto;
-  padding: 20px;
+  overflow-x: hidden;
+  padding: 8px;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
 .empty-state {
-  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 16px;
   color: var(--el-text-color-secondary);
+  flex: 1 1 auto; // Changed from flex: 1 to allow shrinking
+  min-height: 0;
 
   p {
     font-size: 16px;

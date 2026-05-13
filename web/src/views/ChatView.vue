@@ -16,33 +16,35 @@
     <main class="chat-main">
       <el-splitter style="height: 100%">
         <!-- Left Panel: Chat -->
-        <el-splitter-panel min="300">
-          <ChatPanel
-            ref="chatPanelRef"
-            :workflow-status="chatStore.workflowStatus"
-            :current-intent="chatStore.currentIntent"
-            :messages="chatStore.currentMessages"
-            :is-streaming="chatStore.isStreaming"
-            :input-message="inputMessage"
-            @update:input-message="inputMessage = $event"
-            :show-autocomplete="showAutocomplete"
-            :autocomplete-type="autocompleteType"
-            :active-suggestion-index="activeSuggestionIndex"
-            :filtered-data-sources="filteredDataSources"
-            :filtered-tools="filteredTools"
-            @send-message="handleSendMessage"
-            @quick-action="handleQuickAction"
-            @editor-input="handleEditorInput"
-            @editor-keydown="handleEditorKeydown"
-            @editor-paste="handlePaste"
-            @select-datasource="selectDataSource"
-            @select-tool="selectTool"
-            @update:active-suggestion-index="activeSuggestionIndex = $event"
-          />
+        <el-splitter-panel min="300" style="height: 100%; overflow: hidden;">
+          <div style="height: 100%; display: flex; flex-direction: column; overflow: hidden;">
+            <ChatPanel
+              ref="chatPanelRef"
+              :workflow-status="chatStore.workflowStatus"
+              :current-intent="chatStore.currentIntent"
+              :messages="chatStore.currentMessages"
+              :is-streaming="chatStore.isStreaming"
+              :input-message="inputMessage"
+              @update:input-message="inputMessage = $event"
+              :show-autocomplete="showAutocomplete"
+              :autocomplete-type="autocompleteType"
+              :active-suggestion-index="activeSuggestionIndex"
+              :filtered-data-sources="filteredDataSources"
+              :filtered-tools="filteredTools"
+              @send-message="handleSendMessage"
+              @quick-action="handleQuickAction"
+              @editor-input="handleEditorInput"
+              @editor-keydown="handleEditorKeydown"
+              @editor-paste="handlePaste"
+              @select-datasource="selectDataSource"
+              @select-tool="selectTool"
+              @update:active-suggestion-index="activeSuggestionIndex = $event"
+            />
+          </div>
         </el-splitter-panel>
 
         <!-- Right Panel: Map -->
-        <el-splitter-panel min="300">
+        <el-splitter-panel min="300" style="height: 100%; overflow: hidden;">
           <div class="map-panel">
             <MapWorkspace />
           </div>
@@ -151,15 +153,15 @@ async function handleSelectConversation(conversationId: string) {
 
 async function handleRenameConversation(conversationId: string, currentTitle: string) {
   try {
-    const { value: newTitle } = await ElMessageBox.prompt('Enter new title', 'Rename Conversation', {
+    const { value: newTitle } = await ElMessageBox.prompt(t('chat.enterNewTitle'), t('chat.renameConversation'), {
       inputValue: currentTitle,
       inputPattern: /.+/,
-      inputErrorMessage: 'Title cannot be empty'
+      inputErrorMessage: t('common.required')
     })
     
     if (newTitle) {
       await chatStore.renameConversation(conversationId, newTitle)
-      ElMessage.success('Conversation renamed')
+      ElMessage.success(t('chat.renameSuccess'))
     }
   } catch {
     // User cancelled
@@ -168,12 +170,12 @@ async function handleRenameConversation(conversationId: string, currentTitle: st
 
 async function handleDeleteConversation(conversationId: string) {
   try {
-    await ElMessageBox.confirm('Are you sure you want to delete this conversation?', 'Delete Conversation', {
+    await ElMessageBox.confirm(t('chat.deleteConfirm'), t('chat.confirmDelete'), {
       type: 'warning'
     })
     
     await chatStore.deleteConversation(conversationId)
-    ElMessage.success('Conversation deleted')
+    ElMessage.success(t('chat.deleteSuccess'))
   } catch {
     // User cancelled
   }
@@ -389,10 +391,13 @@ function selectTool(tool: any) {
 </script>
 
 <style scoped lang="scss">
+// .chat-view 已在 chatView.scss 中定义，无需重复
+// 移除了 height: 100vh 的错误定义
+
 .chat-view {
-  height: 100vh;
   display: flex;
-  overflow: hidden;
+  height: 100%;  // ✅ 正确：继承父容器高度
+  background: var(--el-bg-color-page);
 }
 
 .chat-main {

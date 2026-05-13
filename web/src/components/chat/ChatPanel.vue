@@ -112,9 +112,13 @@ defineExpose({
 
 <style scoped lang="scss">
 .chat-panel {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+  height: 100% !important;
+  max-height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
   background: var(--el-bg-color);
+  overflow: hidden !important;
+  position: relative;
+  box-sizing: border-box;
 }
 </style>

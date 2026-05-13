@@ -90,7 +90,27 @@ export async function getConversation(conversationId: string): Promise<ChatMessa
  */
 export async function listConversations(): Promise<any[]> {
   const response = await api.get('/api/chat/conversations')
-  return response.data.conversations || []
+  const conversations = response.data.conversations || []
+  
+  // Convert snake_case to camelCase for frontend consistency
+  return conversations.map((conv: any) => ({
+    id: conv.id,
+    createdAt: formatDate(conv.created_at),
+    updatedAt: formatDate(conv.updated_at),
+    messageCount: conv.message_count,
+    customTitle: conv.custom_title,
+    title: conv.title
+  }))
+}
+
+/**
+ * Helper function to format date strings from backend
+ * Converts "2026-05-12 16:21:38" to ISO format "2026-05-12T16:21:38"
+ */
+function formatDate(dateStr: string): string {
+  if (!dateStr) return ''
+  // Replace space with 'T' to make it ISO 8601 compatible
+  return dateStr.replace(' ', 'T')
 }
 
 /**

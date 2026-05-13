@@ -16,7 +16,8 @@ export default {
     search: '搜索',
     filter: '筛选',
     reset: '重置',
-    timeElapsed: '耗时 {time}'
+    timeElapsed: '耗时 {time}',
+    required: '此字段为必填项'
   },
   chat: {
     placeholder: '输入消息... 使用 {atSymbol} 选择数据源，/ 选择工具',
@@ -41,6 +42,8 @@ export default {
     renameConversation: '重命名对话',
     enterNewTitle: '输入新标题',
     renameConfirm: '确认重命名',
+    renameSuccess: '对话重命名成功',
+    deleteSuccess: '对话删除成功',
     send: '发送',
     expandSidebar: '展开侧边栏',
     collapseSidebar: '折叠侧边栏'

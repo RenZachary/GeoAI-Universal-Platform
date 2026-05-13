@@ -8,6 +8,7 @@
       @keydown="handleEditorKeydown" 
       @paste="handlePaste" 
       :disabled="disabled"
+      :data-placeholder="t('chat.placeholder')"
     ></div>
 
     <!-- Custom autocomplete dropdown for @datasources -->
@@ -52,7 +53,7 @@
     <div class="input-actions">
       <el-button 
         :loading="loading" 
-        :disabled="!canSend"
+        :disabled="disabled || !canSend"
         @click="$emit('send')"
       >
         <el-icon>
@@ -65,8 +66,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Promotion, Tools } from '@element-plus/icons-vue'
+
+const { t } = useI18n()
 
 interface DataSource {
   id: string
@@ -106,15 +110,30 @@ const emit = defineEmits<{
 }>()
 
 const editorRef = ref<HTMLElement>()
+let isSyncing = false
 
-// Sync editor content with modelValue
+// Only sync editor when modelValue is cleared externally (after sending)
 watch(() => props.modelValue, (newValue) => {
-  if (editorRef.value && document.activeElement !== editorRef.value) {
-    editorRef.value.innerText = newValue
+  if (editorRef.value && !isSyncing) {
+    const currentContent = editorRef.value.innerText
+    
+    // Only sync if the content is different AND newValue is empty (cleared after send)
+    // This prevents the infinite loop during normal typing
+    if (newValue === '' && currentContent !== '') {
+      isSyncing = true
+      editorRef.value.innerText = ''
+      // Use nextTick to reset flag after DOM update
+      nextTick(() => {
+        isSyncing = false
+      })
+    }
   }
 })
 
 function handleEditorInput(event: Event) {
+  // Skip if we're syncing from watch
+  if (isSyncing) return
+  
   const target = event.target as HTMLElement
   emit('update:modelValue', target.innerText || '')
   emit('input', event)
@@ -140,13 +159,19 @@ defineExpose({
 
 <style scoped lang="scss">
 .input-area {
-  padding: 16px;
+  padding: 4px;
   border-top: 1px solid var(--el-border-color-lighter);
   background: var(--el-bg-color);
   position: relative;
+  display: flex;
+  gap: 12px;
+  align-items: center; // Changed from flex-end to center for vertical alignment
+  flex-shrink: 0; // Prevent shrinking
+  min-height: 70px; // Ensure minimum visibility
 }
 
 .rich-editor {
+  flex: 1;
   min-height: 60px;
   max-height: 200px;
   overflow-y: auto;
@@ -170,18 +195,11 @@ defineExpose({
     cursor: not-allowed;
   }
 
-  &::before {
-    content: var(--chat-placeholder, 'Type your message...');
+  // Placeholder using data-placeholder attribute
+  &[data-placeholder]:empty::before {
+    content: attr(data-placeholder);
     color: var(--el-text-color-placeholder);
     pointer-events: none;
-    display: block;
-    height: 0;
-    visibility: hidden;
-  }
-
-  &:empty::before {
-    visibility: visible;
-    height: auto;
   }
 }
 
@@ -230,8 +248,8 @@ defineExpose({
 }
 
 .input-actions {
-  margin-top: 12px;
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  flex-shrink: 0;
 }
 </style>
