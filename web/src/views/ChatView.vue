@@ -90,7 +90,13 @@ const sidebarCollapsed = ref(savedSidebarState === 'true')
 // Computed: Filtered data sources
 const filteredDataSources = computed(() => {
   if (mentionStartPos.value === -1 || autocompleteType.value !== 'datasource') return []
-  const textAfterSymbol = inputMessage.value.slice(mentionStartPos.value + 1).toLowerCase()
+  
+  // Find the position of the last @ symbol in the current input
+  // This ensures we're using the correct reference frame (inputMessage string)
+  const lastAtIndex = inputMessage.value.lastIndexOf('@')
+  if (lastAtIndex === -1) return []
+  
+  const textAfterSymbol = inputMessage.value.slice(lastAtIndex + 1).toLowerCase()
   return dataSourceStore.dataSources.filter((ds: any) =>
     ds.name.toLowerCase().includes(textAfterSymbol)
   )
@@ -99,7 +105,13 @@ const filteredDataSources = computed(() => {
 // Computed: Filtered tools
 const filteredTools = computed(() => {
   if (mentionStartPos.value === -1 || autocompleteType.value !== 'tool') return []
-  const textAfterSlash = inputMessage.value.slice(mentionStartPos.value + 1).toLowerCase()
+  
+  // Find the position of the last / symbol in the current input
+  // This ensures we're using the correct reference frame (inputMessage string)
+  const lastSlashIndex = inputMessage.value.lastIndexOf('/')
+  if (lastSlashIndex === -1) return []
+  
+  const textAfterSlash = inputMessage.value.slice(lastSlashIndex + 1).toLowerCase()
   return toolStore.tools.filter((tool: any) =>
     tool.name.toLowerCase().includes(textAfterSlash) ||
     (tool.description && tool.description.toLowerCase().includes(textAfterSlash))
@@ -221,15 +233,33 @@ function handleEditorInput(event: Event) {
   const target = event.target as HTMLElement
   // Use conversion function to preserve mention formats
   inputMessage.value = convertEditorContentToMessageFormat(target)
+  
+  // Note: Don't close autocomplete here based on character checks.
+  // Autocomplete closing is handled by:
+  // 1. User selecting an item (in selectDataSource/selectTool)
+  // 2. Pressing Escape (in handleEditorKeydown)
+  // 3. Typing other keys when autocomplete is active (handled in keydown)
+}
+
+// Helper function to get caret position in contenteditable
+function getCaretPosition(element: HTMLElement): number {
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0) return 0
+  
+  const range = selection.getRangeAt(0)
+  const preCaretRange = range.cloneRange()
+  preCaretRange.selectNodeContents(element)
+  preCaretRange.setEnd(range.endContainer, range.endOffset)
+  return preCaretRange.toString().length
 }
 
 function handleEditorKeydown(event: KeyboardEvent) {
   // Handle @ and / for autocomplete
   if (event.key === '@' || event.key === '/') {
-    const selection = window.getSelection()
-    if (selection && selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0)
-      mentionStartPos.value = range.startOffset
+    const editor = document.querySelector('[contenteditable="true"]') as HTMLElement
+    if (editor) {
+      // Use getCaretPosition to get consistent position measurement
+      mentionStartPos.value = getCaretPosition(editor)
       autocompleteType.value = event.key === '@' ? 'datasource' : 'tool'
       showAutocomplete.value = true
       activeSuggestionIndex.value = 0
@@ -317,76 +347,47 @@ function convertEditorContentToMessageFormat(editor: HTMLElement): string {
 
 function selectDataSource(ds: any) {
   const editor = document.querySelector('[contenteditable="true"]') as HTMLElement
-  if (!editor || mentionStartPos.value === -1) return
+  if (!editor) return
 
   try {
-    // Focus the editor first to ensure we have a valid selection
+    // Focus the editor
     editor.focus()
     
+    // Get current selection
     const selection = window.getSelection()
     if (!selection || selection.rangeCount === 0) {
       console.warn('[ChatView] No valid selection')
       return
     }
 
-    // Get current cursor position
+    // Get the full text content and cursor position
+    const fullText = editor.innerText || ''
     const range = selection.getRangeAt(0)
+    const preCaretRange = range.cloneRange()
+    preCaretRange.selectNodeContents(editor)
+    preCaretRange.setEnd(range.endContainer, range.endOffset)
+    const cursorPos = preCaretRange.toString().length
     
-    // Create a new range to delete from @ symbol to current position
-    const deleteRange = document.createRange()
+    // Find the last @ symbol before the cursor
+    const textBeforeCursor = fullText.slice(0, cursorPos)
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@')
     
-    // Find the text node containing the @ symbol
-    let startNode: Node | null = range.startContainer
-    let startOffset = range.startOffset
-    
-    // Walk back to find the @ character
-    let charsToWalkBack = range.startOffset - mentionStartPos.value
-    
-    while (charsToWalkBack > 0 && startNode) {
-      if (startNode.nodeType === Node.TEXT_NODE) {
-        const textLength = (startNode as Text).length
-        if (startOffset >= charsToWalkBack) {
-          // Found the position
-          deleteRange.setStart(startNode, startOffset - charsToWalkBack)
-          charsToWalkBack = 0
-        } else {
-          charsToWalkBack -= startOffset
-          startNode = startNode.previousSibling
-          startOffset = startNode ? (startNode.nodeType === Node.TEXT_NODE ? (startNode as Text).length : 0) : 0
-        }
-      } else {
-        startNode = startNode.previousSibling
-        startOffset = startNode ? (startNode.nodeType === Node.TEXT_NODE ? (startNode as Text).length : 0) : 0
-      }
+    if (lastAtIndex === -1) {
+      console.warn('[ChatView] No @ symbol found before cursor')
+      return
     }
     
-    // Set end position
-    deleteRange.setEnd(range.startContainer, range.startOffset)
+    // Calculate how many characters to delete (from @ to cursor)
+    const charsToDelete = cursorPos - lastAtIndex
     
-    // Delete the @ symbol and any typed characters
-    deleteRange.deleteContents()
+    // Move cursor back to the @ symbol by deleting characters
+    for (let i = 0; i < charsToDelete; i++) {
+      document.execCommand('delete', false)
+    }
     
-    // Create the mention span
-    const mentionSpan = document.createElement('span')
-    mentionSpan.className = 'datasource-mention'
-    mentionSpan.textContent = `@${ds.name}`
-    mentionSpan.dataset.datasourceId = ds.id
-    mentionSpan.contentEditable = 'false'  // Prevent text from being inserted into the span
-    
-    // Insert the span at the current cursor position
-    const currentRange = selection.getRangeAt(0)
-    currentRange.insertNode(mentionSpan)
-    
-    // Add a space after the mention
-    const spaceNode = document.createTextNode(' ')
-    mentionSpan.parentNode?.insertBefore(spaceNode, mentionSpan.nextSibling)
-    
-    // Move cursor after the space
-    const newRange = document.createRange()
-    newRange.setStartAfter(spaceNode)
-    newRange.collapse(true)
-    selection.removeAllRanges()
-    selection.addRange(newRange)
+    // Insert the mention span using execCommand with HTML
+    const mentionHtml = `<span class="datasource-mention" data-datasource-id="${ds.id}" contenteditable="false">@${ds.name}</span> `
+    document.execCommand('insertHTML', false, mentionHtml)
     
     // Update the input message with special format for persistence
     inputMessage.value = convertEditorContentToMessageFormat(editor)
@@ -399,11 +400,8 @@ function selectDataSource(ds: any) {
     const editor = document.querySelector('[contenteditable="true"]') as HTMLElement
     if (editor) {
       editor.focus()
-      // Try to delete the @ symbol first
-      document.execCommand('delete', false)
-      // Insert the mention as plain text
       document.execCommand('insertText', false, `@${ds.name} `)
-      inputMessage.value = editor.innerText || ''
+      inputMessage.value = convertEditorContentToMessageFormat(editor)
     }
     showAutocomplete.value = false
     mentionStartPos.value = -1
@@ -412,74 +410,47 @@ function selectDataSource(ds: any) {
 
 function selectTool(tool: any) {
   const editor = document.querySelector('[contenteditable="true"]') as HTMLElement
-  if (!editor || mentionStartPos.value === -1) return
+  if (!editor) return
 
   try {
-    // Focus the editor first to ensure we have a valid selection
+    // Focus the editor
     editor.focus()
     
+    // Get current selection
     const selection = window.getSelection()
     if (!selection || selection.rangeCount === 0) {
       console.warn('[ChatView] No valid selection')
       return
     }
 
-    // Get current cursor position
+    // Get the full text content and cursor position
+    const fullText = editor.innerText || ''
     const range = selection.getRangeAt(0)
+    const preCaretRange = range.cloneRange()
+    preCaretRange.selectNodeContents(editor)
+    preCaretRange.setEnd(range.endContainer, range.endOffset)
+    const cursorPos = preCaretRange.toString().length
     
-    // Create a new range to delete from / symbol to current position
-    const deleteRange = document.createRange()
+    // Find the last / symbol before the cursor
+    const textBeforeCursor = fullText.slice(0, cursorPos)
+    const lastSlashIndex = textBeforeCursor.lastIndexOf('/')
     
-    // Find the text node containing the / symbol
-    let startNode: Node | null = range.startContainer
-    let startOffset = range.startOffset
-    
-    // Walk back to find the / character
-    let charsToWalkBack = range.startOffset - mentionStartPos.value
-    
-    while (charsToWalkBack > 0 && startNode) {
-      if (startNode.nodeType === Node.TEXT_NODE) {
-        if (startOffset >= charsToWalkBack) {
-          deleteRange.setStart(startNode, startOffset - charsToWalkBack)
-          charsToWalkBack = 0
-        } else {
-          charsToWalkBack -= startOffset
-          startNode = startNode.previousSibling
-          startOffset = startNode ? (startNode.nodeType === Node.TEXT_NODE ? (startNode as Text).length : 0) : 0
-        }
-      } else {
-        startNode = startNode.previousSibling
-        startOffset = startNode ? (startNode.nodeType === Node.TEXT_NODE ? (startNode as Text).length : 0) : 0
-      }
+    if (lastSlashIndex === -1) {
+      console.warn('[ChatView] No / symbol found before cursor')
+      return
     }
     
-    // Set end position
-    deleteRange.setEnd(range.startContainer, range.startOffset)
+    // Calculate how many characters to delete (from / to cursor)
+    const charsToDelete = cursorPos - lastSlashIndex
     
-    // Delete the / symbol and any typed characters
-    deleteRange.deleteContents()
+    // Move cursor back to the / symbol by deleting characters
+    for (let i = 0; i < charsToDelete; i++) {
+      document.execCommand('delete', false)
+    }
     
-    // Create the tool span
-    const toolSpan = document.createElement('span')
-    toolSpan.className = 'tool-highlight'
-    toolSpan.textContent = `/${tool.name}`
-    toolSpan.dataset.toolId = tool.id  // Store tool ID for persistence
-    toolSpan.contentEditable = 'false'  // Prevent text from being inserted into the span
-    
-    // Insert the span at the current cursor position
-    const currentRange = selection.getRangeAt(0)
-    currentRange.insertNode(toolSpan)
-    
-    // Add a space after the tool mention
-    const spaceNode = document.createTextNode(' ')
-    toolSpan.parentNode?.insertBefore(spaceNode, toolSpan.nextSibling)
-    
-    // Move cursor after the space
-    const newRange = document.createRange()
-    newRange.setStartAfter(spaceNode)
-    newRange.collapse(true)
-    selection.removeAllRanges()
-    selection.addRange(newRange)
+    // Insert the tool span using execCommand with HTML
+    const toolHtml = `<span class="tool-highlight" data-tool-id="${tool.id}" contenteditable="false">/${tool.name}</span> `
+    document.execCommand('insertHTML', false, toolHtml)
     
     // Update the input message with special format for persistence
     inputMessage.value = convertEditorContentToMessageFormat(editor)
@@ -492,9 +463,8 @@ function selectTool(tool: any) {
     const editor = document.querySelector('[contenteditable="true"]') as HTMLElement
     if (editor) {
       editor.focus()
-      document.execCommand('delete', false)
       document.execCommand('insertText', false, `/${tool.name} `)
-      inputMessage.value = editor.innerText || ''
+      inputMessage.value = convertEditorContentToMessageFormat(editor)
     }
     showAutocomplete.value = false
     mentionStartPos.value = -1
