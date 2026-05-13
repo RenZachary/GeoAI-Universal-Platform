@@ -388,7 +388,7 @@ function handleRegenerate() {
 .message-actions {
   display: flex;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 4px;
   opacity: 0;
   transition: opacity 0.2s;
 }
@@ -398,8 +398,8 @@ function handleRegenerate() {
 }
 
 .service-links {
-  margin-top: 16px;
-  padding: 12px;
+  margin-top: 4px;
+  padding: 4px;
   background: var(--el-fill-color-lighter);
   border-radius: 8px;
   border: 1px solid var(--el-border-color-lighter);

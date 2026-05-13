@@ -14,6 +14,23 @@ export class AggregateOperation {
     const values: number[] = [];
     let targetFeature: any = null;
     
+    // Special handling for COUNT with wildcard field
+    const isCountAll = aggFunc.toUpperCase() === 'COUNT' && (field === '*' || !field);
+    
+    if (isCountAll) {
+      // For COUNT(*), simply count all features
+      return {
+        type: 'FeatureCollection' as const,
+        features: [{
+          type: 'Feature' as const,
+          geometry: null,
+          properties: {
+            count: geojson.features.length
+          }
+        }]
+      };
+    }
+    
     // Extract numeric values from features
     for (const feature of geojson.features) {
       const value = feature.properties?.[field];

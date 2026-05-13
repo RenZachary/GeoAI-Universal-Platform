@@ -10,8 +10,8 @@
       </el-tooltip>
     </div>
 
-    <div v-if="!collapsed" class="conversation-list">
-      <div v-for="conv in conversations" :key="conv.id" class="conversation-item"
+    <div class="conversation-list">
+      <div v-if="!collapsed" v-for="conv in conversations" :key="conv.id" class="conversation-item"
         :class="{ active: conv.id === currentConversationId }" @click="$emit('select-conversation', conv.id)">
         <div class="info">
           <span class="conversation-title">{{ conv.title || 'Untitled' }}</span>
@@ -85,7 +85,7 @@ defineEmits<{
   transition: width 0.3s ease;
 
   &.collapsed {
-    width: 60px;
+    width: 40px;
   }
 }
 

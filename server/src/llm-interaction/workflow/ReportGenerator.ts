@@ -47,12 +47,20 @@ export class ReportGenerator {
       // 2. Prepare context data for the LLM
       // We serialize the results to JSON so the LLM can interpret the raw data
       // Note: We filter out large geometry data to prevent token overflow
-      const processedResults = params.results.map(r => ({
-        stepId: r.id,
-        status: r.status,
-        summary: r.data?.metadata?.description || 'No description',
-        keyMetrics: r.data?.metadata?.result // Only pass the core result/metrics
-      }));
+      const processedResults = params.results.map(r => {
+        // Contract: All operators MUST return AnalyticalResult structure:
+        // { success, data: { type, value, ... }, metadata: { operatorId, executedAt, result, description } }
+        // For NativeData results (spatial operations), data contains { id, type, reference, metadata }
+        
+        const actualData = r.data?.data || r.data;
+        
+        return {
+          stepId: r.id,
+          status: r.status,
+          summary: r.metadata?.description || 'No description',
+          keyMetrics: actualData
+        };
+      });
 
       const context = {
         title: params.title,

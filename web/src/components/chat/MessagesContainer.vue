@@ -57,10 +57,10 @@ defineExpose({
   min-height: 0; // Critical for flex child scrolling
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 8px;
+  padding: 4px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 4px;
 }
 
 .empty-state {

@@ -164,7 +164,7 @@ defineExpose({
   background: var(--el-bg-color);
   position: relative;
   display: flex;
-  gap: 12px;
+  gap: 4px;
   align-items: center; // Changed from flex-end to center for vertical alignment
   flex-shrink: 0; // Prevent shrinking
   min-height: 70px; // Ensure minimum visibility

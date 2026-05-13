@@ -602,12 +602,20 @@ export class SummaryGenerator {
       
       const operatorName = result.metadata?.operatorId || 'Unknown';
       
-      // Pass the complete result structure to LLM
-      // Let LLM understand and summarize it naturally
+      // Extract actual data from different result structures
+      let actualData: any;
+      if (result.data.data) {
+        // AnalyticalResult structure: { success, data: { type, value, ... }, metadata }
+        actualData = result.data.data;
+      } else {
+        // NativeData structure: { id, type, reference, metadata }
+        actualData = result.data;
+      }
+      
       const resultData = {
         operator: operatorName,
-        operation: result.metadata?.parameters?.operation || 'unknown',
-        data: result.data.metadata?.result || result.data.metadata
+        operation: actualData.operation || result.metadata?.parameters?.operation || 'unknown',
+        data: actualData
       };
       
       details.push(JSON.stringify(resultData, null, 2));

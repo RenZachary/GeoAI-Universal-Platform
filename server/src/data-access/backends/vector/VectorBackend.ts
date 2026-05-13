@@ -122,6 +122,16 @@ export class VectorBackend implements DataBackend {
     const result = await this.aggregateOp.execute(geojson, aggFunc, field, returnFeature);
     const outputPath = await this.saveGeoJSON(result);
     
+    // Extract scalar value for non-feature results
+    let scalarValue: number | undefined;
+    if (!returnFeature && result.features && result.features.length > 0) {
+      const props = result.features[0].properties;
+      if (props) {
+        // Try common property names for aggregation results
+        scalarValue = props.count ?? props.sum ?? props.avg ?? props.min ?? props.max ?? props.value;
+      }
+    }
+    
     return {
       id: generateId(),
       type: 'geojson',
@@ -129,7 +139,8 @@ export class VectorBackend implements DataBackend {
       metadata: {
         result: outputPath,
         description: `Aggregation ${aggFunc} on field ${field}`,
-        featureCount: returnFeature ? 1 : 0
+        featureCount: returnFeature ? 1 : 0,
+        value: scalarValue  // Add scalar value for aggregation results
       },
       createdAt: new Date()
     };

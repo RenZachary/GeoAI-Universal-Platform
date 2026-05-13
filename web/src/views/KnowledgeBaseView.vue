@@ -224,7 +224,7 @@
     <el-dialog
       v-model="showSearchDialog"
       :title="$t('kb.searchResults')"
-      width="70%"
+      width="90%"
       top="5vh"
     >
       <div v-if="kbStore.searchResults" class="search-results">

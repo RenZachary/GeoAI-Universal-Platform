@@ -12,7 +12,7 @@ import type Database from 'better-sqlite3';
 const AggregationInputSchema = z.object({
   dataSourceId: z.string().describe('ID of the data source to aggregate'),
   operation: z.enum(['MAX', 'MIN', 'AVG', 'SUM', 'COUNT', 'TOP_N']).describe('Aggregation operation'),
-  field: z.string().describe('Field name to aggregate'),
+  field: z.string().optional().describe('Field name to aggregate (optional for COUNT operation)'),
   topN: z.number().min(1).optional().describe('Number of top features (for TOP_N)')
 });
 
@@ -83,11 +83,14 @@ export class AggregationOperator extends SpatialOperator {
     // Determine if we should return features (for TOP_N operation)
     const shouldReturnFeatures = params.operation === 'TOP_N';
     
+    // For COUNT operation, field is optional - use '*' if not provided
+    const fieldName = params.field || '*';
+    
     const result = await dataAccess.aggregate(
       dataSource.type,
       dataSource.reference,
       params.operation,
-      params.field,
+      fieldName,
       shouldReturnFeatures
     );
     
@@ -99,12 +102,6 @@ export class AggregationOperator extends SpatialOperator {
       { operation: params.operation, field: params.field }
     );
     
-    console.log('[AggregationOperator] Aggregation completed:', {
-      operation: params.operation,
-      field: params.field,
-      hasFeatures: !!persistedResult.metadata?.features
-    });
-    
     // Return analytical result structure
     const isTopN = params.operation === 'TOP_N';
     
@@ -115,12 +112,12 @@ export class AggregationOperator extends SpatialOperator {
         features: persistedResult.metadata?.features || [],
         count: persistedResult.metadata?.featureCount || 0,
         operation: params.operation,
-        field: params.field
+        field: fieldName
       } : {
         type: 'scalar' as const,
         value: persistedResult.metadata?.value || 0,
         operation: params.operation,
-        field: params.field
+        field: fieldName
       },
       metadata: {
         operatorId: this.operatorId,
