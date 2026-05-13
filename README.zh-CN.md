@@ -29,7 +29,8 @@
 🎯 **开箱即用** - 无需复杂配置，立即开始空间分析  
 🚀 **MVT + WMS 可视化** - 原生支持大数据量渲染，动态瓦片服务  
 ✨ **自然语言交互** - 用日常语言描述任务，无需 GIS 专业知识  
-🤖 **AI 驱动工作流** - 基于 LangGraph 的智能任务编排  
+🤖 **AI 驱动工作流** - 基于 LangGraph 的智能任务编排与意图分类  
+📚 **知识库集成** - 基于RAG的文档检索，支持政策和领域知识查询  
 🔌 **可扩展插件** - 支持自定义插件开发  
 📊 **多格式支持** - Shapefile、GeoJSON、PostGIS、GeoTIFF  
 
@@ -71,6 +72,8 @@ GeoAI-UP 自动：
 ### 智能 AI 助手
 - **目标拆分**：将复杂请求分解为可管理的子任务
 - **任务规划**：使用 LangGraph 状态机生成可执行工作流
+- **意图分类**：根据查询类型智能路由（GIS分析、知识查询、混合查询或普通对话）
+- **知识库集成**：基于RAG的文档检索，支持政策、法规和领域知识查询
 - **上下文感知**：理解数据 schema 和可用插件
 - **对话记忆**：在多次交互中保持上下文
 - **流式输出**：实时逐 token 响应生成
@@ -284,6 +287,7 @@ geoai-up/
 完整文档位于 `docs/` 目录：
 
 - **[架构设计](docs/architecture/OVERALL-DESIGN.md)** - 系统架构和设计决策
+- **[AI知识库集成](docs/architecture/AI-KNOWLEDGE-BASE-INTEGRATION.md)** - 基于RAG的知识检索和意图路由
 - **[API 规范](docs/architecture/API-SPECIFICATION.md)** - 完整 API 参考
 - **[插件系统](docs/architecture/PLUGIN-SYSTEM-DESIGN.md)** - 插件开发指南
 - **[实现指南](docs/implementation/)** - 分步功能实现说明

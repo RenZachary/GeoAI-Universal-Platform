@@ -30,7 +30,8 @@ For any issues, please submit an [Issue](https://gitee.com/rzcgis/geo-ai-univers
 🎯 **Out-of-the-Box** - No complex configuration, start spatial analysis immediately  
 🚀 **MVT + WMS Visualization** - Native support for big data rendering with dynamic tile services  
 ✨ **Natural Language Interface** - Describe tasks in everyday language, no GIS expertise required  
-🤖 **AI-Powered Workflows** - LangGraph-based intelligent task orchestration  
+🤖 **AI-Powered Workflows** - LangGraph-based intelligent task orchestration with intent classification  
+📚 **Knowledge Base Integration** - RAG-powered document retrieval for policy and domain knowledge  
 🔌 **Extensible Plugins** - Support for custom plugin development  
 📊 **Multi-Format Support** - Shapefile, GeoJSON, PostGIS, GeoTIFF  
 
@@ -72,6 +73,8 @@ GeoAI-UP:
 ### Intelligent AI Assistant
 - **Goal Splitting**: Breaks complex requests into manageable sub-tasks
 - **Task Planning**: Generates executable workflows using LangGraph state machines
+- **Intent Classification**: Smart routing based on query type (GIS analysis, knowledge query, hybrid, or general chat)
+- **Knowledge Base Integration**: RAG-powered document retrieval for policy, regulation, and domain knowledge queries
 - **Context Awareness**: Understands data schemas and available plugins
 - **Conversational Memory**: Maintains context across multiple interactions
 - **Streaming Output**: Real-time token-by-token response generation
@@ -288,6 +291,7 @@ geoai-up/
 Comprehensive documentation is available in the `docs/` directory:
 
 - **[Architecture Design](docs/architecture/OVERALL-DESIGN.md)** - System architecture and design decisions
+- **[AI Knowledge Base Integration](docs/architecture/AI-KNOWLEDGE-BASE-INTEGRATION.md)** - RAG-based knowledge retrieval and intent routing
 - **[API Specification](docs/architecture/API-SPECIFICATION.md)** - Complete API reference
 - **[Plugin System](docs/architecture/PLUGIN-SYSTEM-DESIGN.md)** - Plugin development guide
 - **[Implementation Guides](docs/implementation/)** - Step-by-step feature implementations
