@@ -32,7 +32,6 @@
               :filtered-data-sources="filteredDataSources"
               :filtered-tools="filteredTools"
               @send-message="handleSendMessage"
-              @quick-action="handleQuickAction"
               @editor-input="handleEditorInput"
               @editor-keydown="handleEditorKeydown"
               @editor-paste="handlePaste"
@@ -217,16 +216,6 @@ async function handleSendMessage() {
   setTimeout(() => {
     chatPanelRef.value?.scrollToBottom()
   }, 100)
-}
-
-function handleQuickAction(action: string) {
-  const templates: Record<string, string> = {
-    buffer: 'Create a buffer zone around ',
-    overlay: 'Perform overlay analysis on ',
-    statistics: 'Calculate statistics for '
-  }
-  
-  inputMessage.value = templates[action] || ''
 }
 
 function handleEditorInput(event: Event) {

@@ -11,7 +11,6 @@
       ref="messagesContainerRef"
       :messages="messages"
       :is-streaming="isStreaming"
-      @quick-action="$emit('quick-action', $event)"
     />
 
     <!-- Input Area -->
@@ -87,7 +86,6 @@ defineProps<Props>()
 
 const emit = defineEmits<{
   'send-message': []
-  'quick-action': [action: string]
   'editor-input': [event: Event]
   'editor-keydown': [event: KeyboardEvent]
   'editor-paste': [event: ClipboardEvent]
