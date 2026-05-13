@@ -244,14 +244,8 @@ export class SummaryGenerator {
         
         let answer = fullResponse;
         
-        // Add citations if available
-        if (state.knowledgeContext.retrievedChunks.length > 0) {
-          answer += '\n\n**Sources:**\n';
-          state.knowledgeContext.retrievedChunks.slice(0, 3).forEach((chunk, idx) => {
-            const docName = chunk.metadata.documentName || 'Document';
-            answer += `- ${docName} (Relevance: ${(chunk.score * 100).toFixed(0)}%)\n`;
-          });
-        }
+        // Note: Sources are already included by LLM based on prompt template
+        // No need to append additional sources here to avoid duplication
         
         return answer;
       } else {
@@ -259,14 +253,8 @@ export class SummaryGenerator {
         const response = await adapter.invoke(prompt);
         let answer = typeof response === 'string' ? response : String(response.content || response);
         
-        // Add citations if available
-        if (state.knowledgeContext.retrievedChunks.length > 0) {
-          answer += '\n\n**Sources:**\n';
-          state.knowledgeContext.retrievedChunks.slice(0, 3).forEach((chunk, idx) => {
-            const docName = chunk.metadata.documentName || 'Document';
-            answer += `- ${docName} (Relevance: ${(chunk.score * 100).toFixed(0)}%)\n`;
-          });
-        }
+        // Note: Sources are already included by LLM based on prompt template
+        // No need to append additional sources here to avoid duplication
         
         return answer;
       }
