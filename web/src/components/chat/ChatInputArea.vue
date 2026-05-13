@@ -22,7 +22,7 @@
         class="autocomplete-item"
         :class="{ active: index === activeSuggestionIndex }" 
         @mousedown.prevent="$emit('select-datasource', ds)"
-        @mouseenter="activeSuggestionIndex = index"
+        @mouseenter="$emit('update:activeSuggestionIndex', index)"
       >
         <span class="suggestion-name">{{ ds.name }}</span>
         <el-tag size="small" type="info">{{ ds.type }}</el-tag>
@@ -40,7 +40,7 @@
         class="autocomplete-item"
         :class="{ active: index === activeSuggestionIndex }" 
         @mousedown.prevent="$emit('select-tool', tool)"
-        @mouseenter="activeSuggestionIndex = index"
+        @mouseenter="$emit('update:activeSuggestionIndex', index)"
       >
         <el-icon>
           <Tools />

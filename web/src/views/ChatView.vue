@@ -219,7 +219,8 @@ function handleQuickAction(action: string) {
 
 function handleEditorInput(event: Event) {
   const target = event.target as HTMLElement
-  inputMessage.value = target.innerText || ''
+  // Use conversion function to preserve mention formats
+  inputMessage.value = convertEditorContentToMessageFormat(target)
 }
 
 function handleEditorKeydown(event: KeyboardEvent) {
@@ -233,13 +234,10 @@ function handleEditorKeydown(event: KeyboardEvent) {
       showAutocomplete.value = true
       activeSuggestionIndex.value = 0
     }
-  } else if (event.key === 'Enter' && !event.shiftKey) {
-    event.preventDefault()
-    handleSendMessage()
   } else if (event.key === 'Escape') {
     showAutocomplete.value = false
   } else if (showAutocomplete.value) {
-    // Handle arrow keys for autocomplete navigation
+    // When autocomplete is showing, handle navigation and selection
     if (event.key === 'ArrowDown') {
       event.preventDefault()
       const maxIndex = autocompleteType.value === 'datasource' 
@@ -257,6 +255,10 @@ function handleEditorKeydown(event: KeyboardEvent) {
         selectTool(filteredTools.value[activeSuggestionIndex.value])
       }
     }
+  } else if (event.key === 'Enter' && !event.shiftKey) {
+    // Only send message when autocomplete is NOT showing
+    event.preventDefault()
+    handleSendMessage()
   }
 }
 
@@ -266,69 +268,143 @@ function handlePaste(event: ClipboardEvent) {
   document.execCommand('insertText', false, text)
 }
 
+/**
+ * Convert editor HTML content to special format for persistence
+ * Converts <span class="datasource-mention" data-datasource-id="ID">@Name</span>
+ * to @[datasourceId:ID](Name)
+ */
+function convertEditorContentToMessageFormat(editor: HTMLElement): string {
+  // Clone the editor to avoid modifying the DOM
+  const clone = editor.cloneNode(true) as HTMLElement
+  
+  // Find all datasource mentions and convert them
+  const datasourceSpans = clone.querySelectorAll('.datasource-mention')
+  
+  datasourceSpans.forEach(span => {
+    const datasourceId = span.getAttribute('data-datasource-id')
+    const text = span.textContent || ''
+    // Extract name from @Name format
+    const name = text.startsWith('@') ? text.substring(1) : text
+    
+    if (datasourceId) {
+      // Replace span with special format
+      const replacement = `@[datasourceId:${datasourceId}](${name})`
+      span.replaceWith(document.createTextNode(replacement))
+    }
+  })
+  
+  // Find all tool highlights and convert them
+  const toolSpans = clone.querySelectorAll('.tool-highlight')
+  toolSpans.forEach(span => {
+    const toolId = span.getAttribute('data-tool-id')
+    const text = span.textContent || ''
+    // Extract tool name from /Name format
+    const name = text.startsWith('/') ? text.substring(1) : text
+    
+    if (toolId) {
+      // Replace span with special format including ID
+      const replacement = `/[tool:${toolId}]`
+      span.replaceWith(document.createTextNode(replacement))
+    } else {
+      // Fallback: use name if ID not available
+      const replacement = `/[tool:${name}]`
+      span.replaceWith(document.createTextNode(replacement))
+    }
+  })
+  
+  return clone.innerText || ''
+}
+
 function selectDataSource(ds: any) {
   const editor = document.querySelector('[contenteditable="true"]') as HTMLElement
   if (!editor || mentionStartPos.value === -1) return
 
   try {
-    const selection = window.getSelection()
-    if (!selection || selection.rangeCount === 0) return
-
-    const range = selection.getRangeAt(0)
-    const replaceRange = document.createRange()
+    // Focus the editor first to ensure we have a valid selection
+    editor.focus()
     
-    let currentNode: Node | null = range.startContainer
-    let currentOffset = range.startOffset
-    let charsToWalkBack = range.startOffset - mentionStartPos.value - 1
-
-    while (charsToWalkBack > 0 && currentNode) {
-      if (currentNode.nodeType === Node.TEXT_NODE) {
-        const textNode = currentNode as Text
-        if (currentOffset >= charsToWalkBack) {
-          replaceRange.setStart(currentNode, currentOffset - charsToWalkBack)
-          charsToWalkBack = 0
-        } else {
-          charsToWalkBack -= currentOffset
-          const prevSibling: Node | null = currentNode.previousSibling
-          currentNode = prevSibling
-          currentOffset = currentNode ? (currentNode.nodeType === Node.TEXT_NODE ? (currentNode as Text).length : 0) : 0
-        }
-      } else {
-        const prevSibling: Node | null = currentNode.previousSibling
-        currentNode = prevSibling
-        currentOffset = currentNode ? (currentNode.nodeType === Node.TEXT_NODE ? (currentNode as Text).length : 0) : 0
-      }
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0) {
+      console.warn('[ChatView] No valid selection')
+      return
     }
 
-    replaceRange.setEnd(range.startContainer, range.startOffset)
-    replaceRange.deleteContents()
-
+    // Get current cursor position
+    const range = selection.getRangeAt(0)
+    
+    // Create a new range to delete from @ symbol to current position
+    const deleteRange = document.createRange()
+    
+    // Find the text node containing the @ symbol
+    let startNode: Node | null = range.startContainer
+    let startOffset = range.startOffset
+    
+    // Walk back to find the @ character
+    let charsToWalkBack = range.startOffset - mentionStartPos.value
+    
+    while (charsToWalkBack > 0 && startNode) {
+      if (startNode.nodeType === Node.TEXT_NODE) {
+        const textLength = (startNode as Text).length
+        if (startOffset >= charsToWalkBack) {
+          // Found the position
+          deleteRange.setStart(startNode, startOffset - charsToWalkBack)
+          charsToWalkBack = 0
+        } else {
+          charsToWalkBack -= startOffset
+          startNode = startNode.previousSibling
+          startOffset = startNode ? (startNode.nodeType === Node.TEXT_NODE ? (startNode as Text).length : 0) : 0
+        }
+      } else {
+        startNode = startNode.previousSibling
+        startOffset = startNode ? (startNode.nodeType === Node.TEXT_NODE ? (startNode as Text).length : 0) : 0
+      }
+    }
+    
+    // Set end position
+    deleteRange.setEnd(range.startContainer, range.startOffset)
+    
+    // Delete the @ symbol and any typed characters
+    deleteRange.deleteContents()
+    
+    // Create the mention span
     const mentionSpan = document.createElement('span')
     mentionSpan.className = 'datasource-mention'
     mentionSpan.textContent = `@${ds.name}`
     mentionSpan.dataset.datasourceId = ds.id
-
-    replaceRange.collapse(true)
-    replaceRange.insertNode(mentionSpan)
-
+    mentionSpan.contentEditable = 'false'  // Prevent text from being inserted into the span
+    
+    // Insert the span at the current cursor position
+    const currentRange = selection.getRangeAt(0)
+    currentRange.insertNode(mentionSpan)
+    
+    // Add a space after the mention
     const spaceNode = document.createTextNode(' ')
     mentionSpan.parentNode?.insertBefore(spaceNode, mentionSpan.nextSibling)
-
+    
+    // Move cursor after the space
     const newRange = document.createRange()
     newRange.setStartAfter(spaceNode)
     newRange.collapse(true)
     selection.removeAllRanges()
     selection.addRange(newRange)
-
-    inputMessage.value = editor.innerText || ''
+    
+    // Update the input message with special format for persistence
+    inputMessage.value = convertEditorContentToMessageFormat(editor)
+    
     showAutocomplete.value = false
     mentionStartPos.value = -1
-    editor.focus()
   } catch (error) {
     console.error('[ChatView] Error selecting datasource:', error)
-    const textToInsert = `@${ds.name} `
-    document.execCommand('insertText', false, textToInsert)
-    inputMessage.value = editor?.innerText || ''
+    // Fallback: simple text insertion
+    const editor = document.querySelector('[contenteditable="true"]') as HTMLElement
+    if (editor) {
+      editor.focus()
+      // Try to delete the @ symbol first
+      document.execCommand('delete', false)
+      // Insert the mention as plain text
+      document.execCommand('insertText', false, `@${ds.name} `)
+      inputMessage.value = editor.innerText || ''
+    }
     showAutocomplete.value = false
     mentionStartPos.value = -1
   }
@@ -339,63 +415,87 @@ function selectTool(tool: any) {
   if (!editor || mentionStartPos.value === -1) return
 
   try {
-    const selection = window.getSelection()
-    if (!selection || selection.rangeCount === 0) return
-
-    const range = selection.getRangeAt(0)
-    const replaceRange = document.createRange()
+    // Focus the editor first to ensure we have a valid selection
+    editor.focus()
     
-    let currentNode: Node | null = range.startContainer
-    let currentOffset = range.startOffset
-    let charsToWalkBack = range.startOffset - mentionStartPos.value - 1
-
-    while (charsToWalkBack > 0 && currentNode) {
-      if (currentNode.nodeType === Node.TEXT_NODE) {
-        const textNode = currentNode as Text
-        if (currentOffset >= charsToWalkBack) {
-          replaceRange.setStart(currentNode, currentOffset - charsToWalkBack)
-          charsToWalkBack = 0
-        } else {
-          charsToWalkBack -= currentOffset
-          const prevSibling: Node | null = currentNode.previousSibling
-          currentNode = prevSibling
-          currentOffset = currentNode ? (currentNode.nodeType === Node.TEXT_NODE ? (currentNode as Text).length : 0) : 0
-        }
-      } else {
-        const prevSibling: Node | null = currentNode.previousSibling
-        currentNode = prevSibling
-        currentOffset = currentNode ? (currentNode.nodeType === Node.TEXT_NODE ? (currentNode as Text).length : 0) : 0
-      }
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0) {
+      console.warn('[ChatView] No valid selection')
+      return
     }
 
-    replaceRange.setEnd(range.startContainer, range.startOffset)
-    replaceRange.deleteContents()
-
+    // Get current cursor position
+    const range = selection.getRangeAt(0)
+    
+    // Create a new range to delete from / symbol to current position
+    const deleteRange = document.createRange()
+    
+    // Find the text node containing the / symbol
+    let startNode: Node | null = range.startContainer
+    let startOffset = range.startOffset
+    
+    // Walk back to find the / character
+    let charsToWalkBack = range.startOffset - mentionStartPos.value
+    
+    while (charsToWalkBack > 0 && startNode) {
+      if (startNode.nodeType === Node.TEXT_NODE) {
+        if (startOffset >= charsToWalkBack) {
+          deleteRange.setStart(startNode, startOffset - charsToWalkBack)
+          charsToWalkBack = 0
+        } else {
+          charsToWalkBack -= startOffset
+          startNode = startNode.previousSibling
+          startOffset = startNode ? (startNode.nodeType === Node.TEXT_NODE ? (startNode as Text).length : 0) : 0
+        }
+      } else {
+        startNode = startNode.previousSibling
+        startOffset = startNode ? (startNode.nodeType === Node.TEXT_NODE ? (startNode as Text).length : 0) : 0
+      }
+    }
+    
+    // Set end position
+    deleteRange.setEnd(range.startContainer, range.startOffset)
+    
+    // Delete the / symbol and any typed characters
+    deleteRange.deleteContents()
+    
+    // Create the tool span
     const toolSpan = document.createElement('span')
     toolSpan.className = 'tool-highlight'
     toolSpan.textContent = `/${tool.name}`
-
-    replaceRange.collapse(true)
-    replaceRange.insertNode(toolSpan)
-
+    toolSpan.dataset.toolId = tool.id  // Store tool ID for persistence
+    toolSpan.contentEditable = 'false'  // Prevent text from being inserted into the span
+    
+    // Insert the span at the current cursor position
+    const currentRange = selection.getRangeAt(0)
+    currentRange.insertNode(toolSpan)
+    
+    // Add a space after the tool mention
     const spaceNode = document.createTextNode(' ')
     toolSpan.parentNode?.insertBefore(spaceNode, toolSpan.nextSibling)
-
+    
+    // Move cursor after the space
     const newRange = document.createRange()
     newRange.setStartAfter(spaceNode)
     newRange.collapse(true)
     selection.removeAllRanges()
     selection.addRange(newRange)
-
-    inputMessage.value = editor.innerText || ''
+    
+    // Update the input message with special format for persistence
+    inputMessage.value = convertEditorContentToMessageFormat(editor)
+    
     showAutocomplete.value = false
     mentionStartPos.value = -1
-    editor.focus()
   } catch (error) {
     console.error('[ChatView] Error selecting tool:', error)
-    const textToInsert = `/${tool.name} `
-    document.execCommand('insertText', false, textToInsert)
-    inputMessage.value = editor?.innerText || ''
+    // Fallback: simple text insertion
+    const editor = document.querySelector('[contenteditable="true"]') as HTMLElement
+    if (editor) {
+      editor.focus()
+      document.execCommand('delete', false)
+      document.execCommand('insertText', false, `/${tool.name} `)
+      inputMessage.value = editor.innerText || ''
+    }
     showAutocomplete.value = false
     mentionStartPos.value = -1
   }
@@ -421,5 +521,26 @@ function selectTool(tool: any) {
 .map-panel {
   height: 100%;
   background: var(--el-bg-color);
+}
+
+// Mention styles for contenteditable editor
+:deep(.datasource-mention) {
+  color: var(--el-color-primary);
+  font-weight: 500;
+  background: rgba(64, 158, 255, 0.1);
+  padding: 2px 4px;
+  border-radius: 3px;
+  cursor: default;
+  user-select: none;
+}
+
+:deep(.tool-highlight) {
+  color: var(--el-color-success);
+  font-weight: 500;
+  background: rgba(103, 194, 58, 0.1);
+  padding: 2px 4px;
+  border-radius: 3px;
+  cursor: default;
+  user-select: none;
 }
 </style>
