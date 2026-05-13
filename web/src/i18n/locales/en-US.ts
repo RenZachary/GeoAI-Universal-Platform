@@ -27,6 +27,8 @@ export default {
     newChat: 'New Chat',
     conversations: 'Conversations',
     noMessages: 'Start a conversation by typing a message below',
+    welcomeTitle: 'Welcome to GeoAI Universal Platform',
+    welcomeDescription: 'Ask me anything about geospatial analysis! I can help you with buffer analysis, overlay operations, statistical calculations, map visualization, and more. Try asking: "Calculate 500m buffer for @RiverName" or "Show statistics for @Dataset"',
     quickActions: 'Quick Actions',
     showDataSources: 'Show Data Sources',
     hideDataSources: 'Hide Data Sources',

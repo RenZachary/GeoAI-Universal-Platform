@@ -4,14 +4,8 @@
       <el-icon :size="64" color="#409eff">
         <ChatDotRound />
       </el-icon>
-      <p>{{ $t('chat.noMessages') }}</p>
-
-      <!-- Quick Actions -->
-      <div class="quick-actions">
-        <el-button @click="$emit('quick-action', 'buffer')">Buffer Analysis</el-button>
-        <el-button @click="$emit('quick-action', 'overlay')">Overlay Analysis</el-button>
-        <el-button @click="$emit('quick-action', 'statistics')">Statistics</el-button>
-      </div>
+      <p class="welcome-title">{{ $t('chat.welcomeTitle') }}</p>
+      <p class="welcome-description">{{ $t('chat.welcomeDescription') }}</p>
     </div>
 
     <MessageBubble 
@@ -42,10 +36,6 @@ interface Props {
 }
 
 defineProps<Props>()
-
-const emit = defineEmits<{
-  'quick-action': [action: string]
-}>()
 
 const containerRef = ref<HTMLElement>()
 
@@ -80,18 +70,23 @@ defineExpose({
   justify-content: center;
   gap: 16px;
   color: var(--el-text-color-secondary);
-  flex: 1 1 auto; // Changed from flex: 1 to allow shrinking
+  flex: 1 1 auto;
   min-height: 0;
+  text-align: center;
+  padding: 0 20px;
 
-  p {
-    font-size: 16px;
+  .welcome-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--el-text-color-primary);
     margin: 0;
   }
-}
 
-.quick-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 24px;
+  .welcome-description {
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0;
+    max-width: 500px;
+  }
 }
 </style>

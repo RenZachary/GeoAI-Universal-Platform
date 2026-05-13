@@ -27,6 +27,8 @@ export default {
     newChat: '新对话',
     conversations: '对话历史',
     noMessages: '在下方输入消息开始对话',
+    welcomeTitle: '欢迎使用 GeoAI 通用平台',
+    welcomeDescription: '您可以问我任何关于空间分析的问题！我可以帮助您进行缓冲区分析、叠加分析、统计计算、地图可视化等。试试这样问："计算@河流名称 500米缓冲区" 或 "显示@数据集的统计信息"',
     quickActions: '快捷操作',
     showDataSources: '显示数据源',
     hideDataSources: '隐藏数据源',
