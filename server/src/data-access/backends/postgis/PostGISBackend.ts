@@ -128,21 +128,23 @@ export class PostGISBackend implements DataBackend {
   private async getPool(): Promise<Pool> {
     if (!this.pool) {
       this.pool = await PostGISPoolManager.getInstance().getPool(this.config);
+      if (!this.pool) throw new Error('Failed to get pool');
       // Initialize operations
-      this.bufferOp = new PostGISBufferOperation(this.pool!, this.schema);
-      this.overlayOp = new PostGISOverlayOperation(this.pool!, this.schema);
-      this.filterOp = new PostGISFilterOperation(this.pool!, this.schema);
-      this.aggOp = new PostGISAggregationOperation(this.pool!, this.schema);
-      this.joinOp = new PostGISSpatialJoinOperation(this.pool!, this.schema);
-      this.statOp = new PostGISStatisticalOperation(this.pool!, this.schema);
-      this.proximityOp = new PostGISProximityOperation(this.pool!, this.schema);
+      this.bufferOp = new PostGISBufferOperation(this.pool, this.schema);
+      this.overlayOp = new PostGISOverlayOperation(this.pool, this.schema);
+      this.filterOp = new PostGISFilterOperation(this.pool, this.schema);
+      this.aggOp = new PostGISAggregationOperation(this.pool, this.schema);
+      this.joinOp = new PostGISSpatialJoinOperation(this.pool, this.schema);
+      this.statOp = new PostGISStatisticalOperation(this.pool, this.schema);
+      this.proximityOp = new PostGISProximityOperation(this.pool, this.schema);
     }
-    return this.pool!;
+    return this.pool;
   }
   
   async buffer(reference: string, distance: number, options?: BufferOptions): Promise<NativeData> {
     await this.getPool();
-    const resultTable = await this.bufferOp!.execute(reference, distance, options);
+    if (!this.bufferOp) throw new Error('Buffer operation not initialized');
+    const resultTable = await this.bufferOp.execute(reference, distance, options);
     return this.buildNativeData(resultTable, `Buffer on ${reference}`);
   }
   
@@ -152,13 +154,15 @@ export class PostGISBackend implements DataBackend {
     operation: 'intersect' | 'union' | 'difference' | 'symmetric_difference'
   ): Promise<NativeData> {
     await this.getPool();
-    const resultTable = await this.overlayOp!.execute(reference1, reference2, operation);
+    if (!this.overlayOp) throw new Error('Overlay operation not initialized');
+    const resultTable = await this.overlayOp.execute(reference1, reference2, operation);
     return this.buildNativeData(resultTable, `Overlay ${operation}`);
   }
   
   async filter(reference: string, filterCondition: FilterCondition): Promise<NativeData> {
     await this.getPool();
-    const resultTable = await this.filterOp!.execute(reference, filterCondition);
+    if (!this.filterOp) throw new Error('Filter operation not initialized');
+    const resultTable = await this.filterOp.execute(reference, filterCondition);
     return this.buildNativeData(resultTable, `Filter applied`);
   }
   
@@ -169,7 +173,8 @@ export class PostGISBackend implements DataBackend {
     returnFeature?: boolean
   ): Promise<NativeData> {
     await this.getPool();
-    const { resultTable, value } = await this.aggOp!.execute(reference, aggFunc, field, returnFeature);
+    if (!this.aggOp) throw new Error('Aggregation operation not initialized');
+    const { resultTable, value } = await this.aggOp.execute(reference, aggFunc, field, returnFeature);
     return this.buildNativeData(resultTable, `Aggregation ${aggFunc} on ${field}: ${value}`);
   }
   
@@ -180,7 +185,8 @@ export class PostGISBackend implements DataBackend {
     joinType?: string
   ): Promise<NativeData> {
     await this.getPool();
-    const resultTable = await this.joinOp!.execute(targetReference, joinReference, operation, joinType);
+    if (!this.joinOp) throw new Error('Spatial join operation not initialized');
+    const resultTable = await this.joinOp.execute(targetReference, joinReference, operation, joinType);
     return this.buildNativeData(resultTable, `Spatial join (${operation})`);
   }
   async choropleth(): Promise<NativeData> { throw new Error('Choropleth is visualization concern'); }

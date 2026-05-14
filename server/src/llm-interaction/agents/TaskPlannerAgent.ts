@@ -13,7 +13,6 @@ import { DataSourceRepository } from '../../data-access';
 import { SQLiteManagerInstance } from '../../storage/';
 import { ParallelTaskAnalyzer } from '../analyzers/ParallelTaskAnalyzer';
 import { DataSourceService } from '../../services/DataSourceService';
-import { VirtualDataSourceManagerInstance } from '../../data-access/managers/VirtualDataSourceManager';
 
 export class TaskPlannerAgent {
   private llmConfig: LLMConfig;
