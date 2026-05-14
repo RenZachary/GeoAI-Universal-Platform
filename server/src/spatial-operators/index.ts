@@ -41,7 +41,6 @@ import { SpatialJoinOperator } from './operators/analysis/SpatialJoinOperator';
 import { ProximityOperator } from './operators/analysis/ProximityOperator';
 import { DataSourceQueryOperator } from './operators/query/DataSourceQueryOperator';
 import { DataSourceMetadataOperator } from './operators/query/DataSourceMetadataOperator';
-import { GeneralQAOperator } from './operators/query/GeneralQAOperator';
 import { ChoroplethOperator } from './operators/visualization/ChoroplethOperator';
 import { HeatmapOperator } from './operators/visualization/HeatmapOperator';
 import { CategoricalOperator } from './operators/visualization/CategoricalOperator';
@@ -76,7 +75,6 @@ export function registerAllOperators(db?: any, workspaceBase?: string): void {
     // Query operators
     new DataSourceQueryOperator(db),
     new DataSourceMetadataOperator(db),
-    new GeneralQAOperator(),
     // Visualization operators
     new ChoroplethOperator(db, workspaceBase),
     new HeatmapOperator(db, workspaceBase),

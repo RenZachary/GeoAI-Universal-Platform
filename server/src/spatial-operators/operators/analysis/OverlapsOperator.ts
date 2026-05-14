@@ -7,7 +7,7 @@ import { SpatialOperator, type OperatorContext, SpatialOutputSchema } from '../.
 import { DataAccessFacade } from '../../../data-access';
 import { DataSourceRepository } from '../../../data-access/repositories';
 import { ResultPersistenceService } from '../../../services/ResultPersistenceService';
-import * as Database from 'better-sqlite3';
+import type Database from 'better-sqlite3';
 
 const OverlapsInputSchema = z.object({
   dataSourceId: z.string().describe('ID of the data source to filter'),
@@ -38,8 +38,9 @@ export class OverlapsOperator extends SpatialOperator {
     context: OperatorContext
   ): Promise<z.infer<typeof SpatialOutputSchema>> {
     const dataAccess = DataAccessFacade.getInstance(this.workspaceBase);
-    const dataSourceRepo = new DataSourceRepository(this.db!);
-    const resultPersistence = new ResultPersistenceService(this.db!);
+    if(!this.db) throw new Error('Database instance not provided');
+    const dataSourceRepo = new DataSourceRepository(this.db);
+    const resultPersistence = new ResultPersistenceService(this.db);
 
     const dataSource = dataSourceRepo.getById(params.dataSourceId);
     if (!dataSource) throw new Error(`Data source not found: ${params.dataSourceId}`);

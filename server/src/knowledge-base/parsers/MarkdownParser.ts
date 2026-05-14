@@ -4,7 +4,7 @@
  * Reads markdown files and extracts text content.
  */
 
-import fs from 'fs/promises';
+import fs from 'fs';
 import type { ParsedDocument } from '../types';
 import type { DocumentParser } from './DocumentParser';
 import { wrapError } from '../../core';
@@ -15,7 +15,7 @@ export class MarkdownParser implements DocumentParser {
   async parse(filePath: string): Promise<ParsedDocument> {
     try {
       // Read markdown file
-      const content = await fs.readFile(filePath, 'utf-8');
+      const content = fs.readFileSync(filePath, 'utf-8');
 
       // Extract frontmatter if present (YAML between ---)
       const { text, metadata } = this.extractFrontmatter(content);

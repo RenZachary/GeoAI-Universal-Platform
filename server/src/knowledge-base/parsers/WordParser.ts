@@ -4,7 +4,7 @@
  * Uses mammoth library to extract text from Word documents.
  */
 
-import fs from 'fs/promises';
+import fs from 'fs'; 
 import mammoth from 'mammoth';
 import type { ParsedDocument } from '../types';
 import type { DocumentParser } from './DocumentParser';
@@ -16,7 +16,7 @@ export class WordParser implements DocumentParser {
   async parse(filePath: string): Promise<ParsedDocument> {
     try {
       // Read Word file
-      const buffer = await fs.readFile(filePath);
+      const buffer = fs.readFileSync(filePath);
 
       // Extract text using mammoth
       const result = await mammoth.extractRawText({ buffer });

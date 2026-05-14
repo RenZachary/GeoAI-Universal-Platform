@@ -4,7 +4,7 @@
  * Uses pdf-parse library to extract text from PDF files.
  */
 
-import fs from 'fs/promises';
+import fs from 'fs';
 import pdfParse from 'pdf-parse';
 import type { ParsedDocument } from '../types';
 import type { DocumentParser } from './DocumentParser';
@@ -16,7 +16,7 @@ export class PdfParser implements DocumentParser {
   async parse(filePath: string): Promise<ParsedDocument> {
     try {
       // Read PDF file
-      const dataBuffer = await fs.readFile(filePath);
+      const dataBuffer = fs.readFileSync(filePath);
 
       // Parse PDF
       const result = await pdfParse(dataBuffer);

@@ -11,7 +11,7 @@ import type { GeoAIStateType } from '../GeoAIGraph';
 import type { SpatialContext, DrawnGeometry } from '../../types/SpatialContext';
 import { VirtualDataSourceManagerInstance } from '../../../data-access/managers/VirtualDataSourceManager';
 import path from 'path';
-import fs from 'fs/promises';
+import fs from 'fs';
 import type { FeatureCollection } from '../../../core';
 import { DataAccessFacade } from '../../../data-access';
 
@@ -169,10 +169,10 @@ export class ContextExtractorNode {
         // Create temporary GeoJSON file
 
         const tempDir = path.join(this.workspaceBase, 'temp');
-        await fs.mkdir(tempDir, { recursive: true });
+        fs.mkdirSync(tempDir, { recursive: true });
         const fileName = `${type}_${conversationId}.geojson`;
         const filePath = path.join(tempDir, fileName);
-        await fs.writeFile(filePath, JSON.stringify(features));
+        fs.writeFileSync(filePath, JSON.stringify(features));
         const metadata = await DataAccessFacade.getInstance().getMetadata('geojson', filePath);
         // Register to VirtualDataSourceManager
         VirtualDataSourceManagerInstance.register({

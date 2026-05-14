@@ -5,7 +5,7 @@
  * Parse → Chunk → Embed → Store (LanceDB + SQLite)
  */
 
-import fs from 'fs/promises';
+import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { ParserRegistry, PdfParser, WordParser, MarkdownParser } from '../parsers';
@@ -73,7 +73,6 @@ export class DocumentIngestionService {
     filePath: string,
     documentName?: string
   ): Promise<IngestionResult> {
-    const startTime = Date.now();
     const docId = uuidv4();
     
     try {
@@ -88,7 +87,7 @@ export class DocumentIngestionService {
       const name = documentName || path.basename(filePath, ext);
 
       // Step 3: Create database record
-      const fileSize = (await fs.stat(filePath)).size;
+      const fileSize = (fs.statSync(filePath)).size;
       const doc = this.repository.create(name, docType, filePath, fileSize);
       
       console.log(`[DocumentIngestionService] Created document record: ${doc.id}`);
@@ -153,8 +152,6 @@ export class DocumentIngestionService {
         });
       }
 
-      const duration = Date.now() - startTime;
-
       console.log(`[DocumentIngestionService] ✅ Ingestion complete: ${doc.id}`);
 
       return {
@@ -163,9 +160,7 @@ export class DocumentIngestionService {
         status: 'ready'
       };
 
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      
+    } catch (error) {      
       // Update status to error
       try {
         this.repository.updateStatus(docId, 'error');
@@ -242,7 +237,7 @@ export class DocumentIngestionService {
   private async validateFile(filePath: string): Promise<void> {
     // Check file exists
     try {
-      await fs.access(filePath);
+      fs.accessSync(filePath);
     } catch {
       throw wrapError(new Error(`File not found: ${filePath}`), 'File validation failed');
     }
@@ -258,7 +253,7 @@ export class DocumentIngestionService {
     }
 
     // Check file size
-    const stats = await fs.stat(filePath);
+    const stats = fs.statSync(filePath);
     if (stats.size > KB_CONFIG.MAX_FILE_SIZE) {
       throw wrapError(
         new Error(`File too large: ${(stats.size / 1024 / 1024).toFixed(2)}MB (max: ${KB_CONFIG.MAX_FILE_SIZE / 1024 / 1024}MB)`),
