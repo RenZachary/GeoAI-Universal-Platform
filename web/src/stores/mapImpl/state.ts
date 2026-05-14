@@ -13,7 +13,7 @@ export interface SelectedFeature {
 
 export interface DrawnGeometry {
   id: string
-  type: 'polygon' | 'circle' | 'line'
+  type: 'polygon' | 'circle' | 'line' | 'rectangle'
   geometry: GeoJSON.Geometry
   properties?: Record<string, any>
   createdAt: Date
