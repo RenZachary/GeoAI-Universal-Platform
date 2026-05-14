@@ -450,4 +450,131 @@ export class PostGISBackend implements DataBackend {
     const resultTable = await this.proximityOp.filterByDistance(reference, centerReference, distance, options);
     return this.buildNativeData(resultTable, `Features within ${distance} ${options?.unit || 'meters'}`);
   }
+  
+  // ========== Spatial Metric Operations ==========
+  
+  async calculateAreaStats(
+    reference: string,
+    options?: {
+      unit?: 'square_meters' | 'square_kilometers' | 'hectares';
+    }
+  ): Promise<{ min: number; max: number; mean: number; sum: number; count: number }> {
+    const pool = await this.getPool();
+    const unit = options?.unit || 'square_meters';
+    
+    // Parse table reference
+    let sourceSchema: string;
+    let sourceTable: string;
+    
+    if (reference.includes('.')) {
+      const parts = reference.split('.');
+      sourceSchema = parts[0];
+      sourceTable = parts[1];
+    } else {
+      sourceSchema = this.schema;
+      sourceTable = reference;
+    }
+    
+    // Build SQL query for area calculation
+    // ST_Area returns square meters for geometry in projected CRS
+    let areaExpression = 'ST_Area(geom)';
+    
+    if (unit === 'square_kilometers') {
+      areaExpression = 'ST_Area(geom) / 1000000.0';
+    } else if (unit === 'hectares') {
+      areaExpression = 'ST_Area(geom) / 10000.0';
+    }
+    
+    try {
+      const result = await pool.query(`
+        SELECT 
+          MIN(${areaExpression}) as min,
+          MAX(${areaExpression}) as max,
+          AVG(${areaExpression}) as mean,
+          SUM(${areaExpression}) as sum,
+          COUNT(*) as count
+        FROM ${sourceSchema}.${sourceTable}
+        WHERE geom IS NOT NULL AND ST_GeometryType(geom) IN ('ST_Polygon', 'ST_MultiPolygon')
+      `);
+      
+      const row = result.rows[0];
+      
+      return {
+        min: parseFloat(row.min) || 0,
+        max: parseFloat(row.max) || 0,
+        mean: parseFloat(row.mean) || 0,
+        sum: parseFloat(row.sum) || 0,
+        count: parseInt(row.count) || 0
+      };
+    } catch (error) {
+      console.error('[PostGISBackend] Failed to calculate area stats:', error);
+      throw error;
+    }
+  }
+  
+  async calculatePerimeterStats(
+    reference: string,
+    options?: {
+      unit?: 'meters' | 'kilometers' | 'feet' | 'miles';
+    }
+  ): Promise<{ min: number; max: number; mean: number; sum: number; count: number }> {
+    const pool = await this.getPool();
+    const unit = options?.unit || 'meters';
+    
+    // Parse table reference
+    let sourceSchema: string;
+    let sourceTable: string;
+    
+    if (reference.includes('.')) {
+      const parts = reference.split('.');
+      sourceSchema = parts[0];
+      sourceTable = parts[1];
+    } else {
+      sourceSchema = this.schema;
+      sourceTable = reference;
+    }
+    
+    // Build SQL query for perimeter/length calculation
+    // ST_Length for lines, ST_Perimeter for polygons
+    let lengthExpression = `CASE 
+      WHEN ST_GeometryType(geom) IN ('ST_Polygon', 'ST_MultiPolygon') THEN ST_Perimeter(geom)
+      ELSE ST_Length(geom)
+    END`;
+    
+    // Convert to requested unit (PostGIS returns meters for projected CRS)
+    if (unit === 'kilometers') {
+      lengthExpression = `(${lengthExpression}) / 1000.0`;
+    } else if (unit === 'feet') {
+      lengthExpression = `(${lengthExpression}) * 3.28084`;
+    } else if (unit === 'miles') {
+      lengthExpression = `(${lengthExpression}) * 0.000621371`;
+    }
+    
+    try {
+      const result = await pool.query(`
+        SELECT 
+          MIN(${lengthExpression}) as min,
+          MAX(${lengthExpression}) as max,
+          AVG(${lengthExpression}) as mean,
+          SUM(${lengthExpression}) as sum,
+          COUNT(*) as count
+        FROM ${sourceSchema}.${sourceTable}
+        WHERE geom IS NOT NULL AND 
+              ST_GeometryType(geom) IN ('ST_Polygon', 'ST_MultiPolygon', 'ST_LineString', 'ST_MultiLineString')
+      `);
+      
+      const row = result.rows[0];
+      
+      return {
+        min: parseFloat(row.min) || 0,
+        max: parseFloat(row.max) || 0,
+        mean: parseFloat(row.mean) || 0,
+        sum: parseFloat(row.sum) || 0,
+        count: parseInt(row.count) || 0
+      };
+    } catch (error) {
+      console.error('[PostGISBackend] Failed to calculate perimeter stats:', error);
+      throw error;
+    }
+  }
 }

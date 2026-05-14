@@ -526,4 +526,103 @@ export class VectorBackend implements DataBackend {
       createdAt: new Date()
     };
   }
+  
+  // ========== Spatial Metric Operations ==========
+  
+  async calculateAreaStats(
+    reference: string,
+    options?: {
+      unit?: 'square_meters' | 'square_kilometers' | 'hectares';
+    }
+  ): Promise<{ min: number; max: number; mean: number; sum: number; count: number }> {
+    const geojson = await this.loadGeoJSON(reference);
+    const unit = options?.unit || 'square_meters';
+    
+    const areas: number[] = [];
+    
+    for (const feature of geojson.features) {
+      if (feature.geometry?.type === 'Polygon' || feature.geometry?.type === 'MultiPolygon') {
+        try {
+          // Turf.js area returns square meters by default
+          const areaSqMeters = (turf as any).area(feature);
+          
+          // Convert to requested unit
+          let areaValue = areaSqMeters;
+          if (unit === 'square_kilometers') {
+            areaValue = areaSqMeters / 1000000;
+          } else if (unit === 'hectares') {
+            areaValue = areaSqMeters / 10000;
+          }
+          
+          if (areaValue > 0) {
+            areas.push(areaValue);
+          }
+        } catch (error) {
+          console.warn('[VectorBackend] Failed to calculate area for feature:', error);
+        }
+      }
+    }
+    
+    if (areas.length === 0) {
+      return { min: 0, max: 0, mean: 0, sum: 0, count: 0 };
+    }
+    
+    const sum = areas.reduce((acc, val) => acc + val, 0);
+    const min = Math.min(...areas);
+    const max = Math.max(...areas);
+    const mean = sum / areas.length;
+    
+    return { min, max, mean, sum, count: areas.length };
+  }
+  
+  async calculatePerimeterStats(
+    reference: string,
+    options?: {
+      unit?: 'meters' | 'kilometers' | 'feet' | 'miles';
+    }
+  ): Promise<{ min: number; max: number; mean: number; sum: number; count: number }> {
+    const geojson = await this.loadGeoJSON(reference);
+    const unit = options?.unit || 'meters';
+    
+    const perimeters: number[] = [];
+    
+    for (const feature of geojson.features) {
+      const geomType = feature.geometry?.type;
+      
+      if (geomType === 'Polygon' || geomType === 'MultiPolygon' || 
+          geomType === 'LineString' || geomType === 'MultiLineString') {
+        try {
+          // Calculate length using turf.length (returns kilometers)
+          const lengthKm = (turf as any).length(feature);
+          
+          // Convert to requested unit
+          let lengthValue = lengthKm * 1000; // Default to meters
+          if (unit === 'kilometers') {
+            lengthValue = lengthKm;
+          } else if (unit === 'feet') {
+            lengthValue = lengthKm * 3280.84;
+          } else if (unit === 'miles') {
+            lengthValue = lengthKm * 0.621371;
+          }
+          
+          if (lengthValue > 0) {
+            perimeters.push(lengthValue);
+          }
+        } catch (error) {
+          console.warn('[VectorBackend] Failed to calculate perimeter for feature:', error);
+        }
+      }
+    }
+    
+    if (perimeters.length === 0) {
+      return { min: 0, max: 0, mean: 0, sum: 0, count: 0 };
+    }
+    
+    const sum = perimeters.reduce((acc, val) => acc + val, 0);
+    const min = Math.min(...perimeters);
+    const max = Math.max(...perimeters);
+    const mean = sum / perimeters.length;
+    
+    return { min, max, mean, sum, count: perimeters.length };
+  }
 }

@@ -222,6 +222,42 @@ export interface DataBackend {
       unit?: 'meters' | 'kilometers' | 'feet' | 'miles' | 'degrees';
     }
   ): Promise<NativeData>;
+  
+  // ========== Spatial Metric Operations ==========
+  
+  /**
+   * Calculate area statistics for polygon features
+   * Returns statistical summary (min, max, mean, sum, count) of areas
+   */
+  calculateAreaStats(
+    reference: string,
+    options?: {
+      unit?: 'square_meters' | 'square_kilometers' | 'hectares';
+    }
+  ): Promise<{
+    min: number;
+    max: number;
+    mean: number;
+    sum: number;
+    count: number;
+  }>;
+  
+  /**
+   * Calculate perimeter/length statistics for polygon or line features
+   * Returns statistical summary (min, max, mean, sum, count) of perimeters/lengths
+   */
+  calculatePerimeterStats(
+    reference: string,
+    options?: {
+      unit?: 'meters' | 'kilometers' | 'feet' | 'miles';
+    }
+  ): Promise<{
+    min: number;
+    max: number;
+    mean: number;
+    sum: number;
+    count: number;
+  }>;
 }
 
 /**
@@ -353,5 +389,20 @@ export abstract class BaseBackend implements DataBackend {
     _options?: any
   ): Promise<NativeData> {
     throw new Error(`filterByDistance not supported by ${this.backendType} backend`);
+  }
+  
+  // Default implementations for spatial metric operations
+  async calculateAreaStats(
+    _reference: string,
+    _options?: any
+  ): Promise<{ min: number; max: number; mean: number; sum: number; count: number }> {
+    throw new Error(`calculateAreaStats not supported by ${this.backendType} backend`);
+  }
+  
+  async calculatePerimeterStats(
+    _reference: string,
+    _options?: any
+  ): Promise<{ min: number; max: number; mean: number; sum: number; count: number }> {
+    throw new Error(`calculatePerimeterStats not supported by ${this.backendType} backend`);
   }
 }

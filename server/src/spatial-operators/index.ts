@@ -35,7 +35,8 @@ import { DistanceLessThanOperator } from './operators/analysis/DistanceLessThanO
 import { DistanceGreaterThanOperator } from './operators/analysis/DistanceGreaterThanOperator';
 import { NearestNeighborOperator } from './operators/analysis/NearestNeighborOperator';
 import { AggregationOperator } from './operators/analysis/AggregationOperator';
-import { StatisticsCalculatorOperator } from './operators/analysis/StatisticsCalculatorOperator';
+import { AttributeStatisticsOperator } from './operators/analysis/AttributeStatisticsOperator';
+import { SpatialStatisticsOperator } from './operators/analysis/SpatialStatisticsOperator';
 import { SpatialJoinOperator } from './operators/analysis/SpatialJoinOperator';
 import { ProximityOperator } from './operators/analysis/ProximityOperator';
 import { DataSourceQueryOperator } from './operators/query/DataSourceQueryOperator';
@@ -68,7 +69,8 @@ export function registerAllOperators(db?: any, workspaceBase?: string): void {
     new NearestNeighborOperator(db, workspaceBase),
     // Analysis operators
     new AggregationOperator(db, workspaceBase),
-    new StatisticsCalculatorOperator(db, workspaceBase),
+    new AttributeStatisticsOperator(db, workspaceBase),
+    new SpatialStatisticsOperator(db, workspaceBase),
     new SpatialJoinOperator(db, workspaceBase),
     new ProximityOperator(db),
     // Query operators

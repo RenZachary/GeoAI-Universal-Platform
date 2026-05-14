@@ -1,5 +1,9 @@
 /**
- * StatisticsCalculatorOperator - Calculates statistical summaries
+ * AttributeStatisticsOperator - Calculates statistical summaries for data attributes
+ * 
+ * Provides descriptive statistics (mean, median, std_dev, variance, min, max, sum, count)
+ * for numeric fields in vector datasets. Works with both file-based (GeoJSON/Shapefile)
+ * and PostGIS data sources through the DataAccessFacade.
  */
 
 import { z } from 'zod';
@@ -8,32 +12,49 @@ import { DataAccessFacade } from '../../../data-access';
 import { DataSourceRepository } from '../../../data-access/repositories';
 import type Database from 'better-sqlite3';
 
-const StatisticsInputSchema = z.object({
-  dataSourceId: z.string().describe('ID of the data source'),
-  fieldName: z.string().describe('Field name to calculate statistics for'),
-  statistics: z.array(z.enum(['mean', 'median', 'std_dev', 'variance', 'min', 'max', 'sum', 'count']))
+// ========== Input Schema ==========
+
+const StatisticType = z.enum([
+  'mean',
+  'median',
+  'std_dev',
+  'variance',
+  'min',
+  'max',
+  'sum',
+  'count'
+]);
+
+export const AttributeStatisticsInputSchema = z.object({
+  dataSourceId: z.string().describe('ID of the data source to analyze'),
+  fieldName: z.string().describe('Field name to calculate statistics for (must be numeric)'),
+  statistics: z.array(StatisticType)
     .default(['mean', 'median', 'std_dev', 'min', 'max'])
-    .describe('Statistics to calculate')
+    .describe('List of statistics to calculate')
 });
 
-// Output schema uses AnalyticalOutputSchema - Statistics returns analytical results, not spatial data
-const StatisticsOutputSchema = AnalyticalOutputSchema.extend({
+// ========== Output Schema ==========
+
+export const AttributeStatisticsOutputSchema = AnalyticalOutputSchema.extend({
   data: z.object({
-    statistics: z.record(z.string(), z.number()).describe('Calculated statistics (mean, median, etc.)'),
-    count: z.number().describe('Feature count'),
-    fieldName: z.string().describe('Field that was analyzed')
+    statistics: z.record(StatisticType, z.number()).describe('Calculated statistics keyed by statistic type'),
+    count: z.number().describe('Total number of features analyzed'),
+    fieldName: z.string().describe('Field that was analyzed'),
+    dataSourceId: z.string().describe('Source data source ID')
   })
 });
 
-export class StatisticsCalculatorOperator extends SpatialOperator {
-  readonly operatorId = 'statistics_calculator';
-  readonly name = 'Statistics Calculator';
-  readonly description = 'Calculate statistical summaries (mean, median, std dev, etc.) for data attributes';
+// ========== Operator Implementation ==========
+
+export class AttributeStatisticsOperator extends SpatialOperator {
+  readonly operatorId = 'attribute_statistics';
+  readonly name = 'Attribute Statistics Calculator';
+  readonly description = 'Calculate descriptive statistics (mean, median, standard deviation, variance, min, max, sum, count) for numeric fields in vector datasets. ';
   readonly category = 'analysis' as const;
   readonly returnType = 'analytical' as const; // Returns statistics, not spatial data
   
-  readonly inputSchema = StatisticsInputSchema;
-  readonly outputSchema = StatisticsOutputSchema;
+  readonly inputSchema = AttributeStatisticsInputSchema;
+  readonly outputSchema = AttributeStatisticsOutputSchema;
   
   private db?: Database.Database;
   private workspaceBase?: string;
@@ -45,9 +66,9 @@ export class StatisticsCalculatorOperator extends SpatialOperator {
   }
   
   protected async executeCore(
-    params: z.infer<typeof StatisticsInputSchema>,
-    context: OperatorContext
-  ): Promise<z.infer<typeof StatisticsOutputSchema>> {
+    params: z.infer<typeof AttributeStatisticsInputSchema>,
+    _context: OperatorContext
+  ): Promise<z.infer<typeof AttributeStatisticsOutputSchema>> {
     if (!this.db) {
       throw new Error('Database connection not available');
     }
@@ -90,7 +111,7 @@ export class StatisticsCalculatorOperator extends SpatialOperator {
           count = value || 0;
         }
       } catch (error) {
-        console.warn(`[StatisticsCalculatorOperator] Failed to calculate ${stat}:`, error);
+        console.warn(`[AttributeStatisticsOperator] Failed to calculate ${stat}:`, error);
         // Continue with other statistics even if one fails
       }
     }
@@ -107,7 +128,7 @@ export class StatisticsCalculatorOperator extends SpatialOperator {
         );
         count = this.extractStatValue(countData, 'count') || 0;
       } catch (error) {
-        console.warn('[StatisticsCalculatorOperator] Failed to get count:', error);
+        console.warn('[AttributeStatisticsOperator] Failed to get count:', error);
       }
     }
     
@@ -117,7 +138,8 @@ export class StatisticsCalculatorOperator extends SpatialOperator {
       data: {
         statistics: result,
         count: count,
-        fieldName: params.fieldName
+        fieldName: params.fieldName,
+        dataSourceId: params.dataSourceId
       },
       metadata: {
         operatorId: this.operatorId,
@@ -174,7 +196,7 @@ export class StatisticsCalculatorOperator extends SpatialOperator {
       
       return typeof value === 'number' ? value : null;
     } catch (error) {
-      console.warn(`[StatisticsCalculatorOperator] Failed to extract ${stat} value:`, error);
+      console.warn(`[AttributeStatisticsOperator] Failed to extract ${stat} value:`, error);
       return null;
     }
   }

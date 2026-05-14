@@ -131,4 +131,13 @@ export class RasterBackend implements DataBackend {
   async filterByDistance(): Promise<any> {
     throw new Error('filterByDistance not supported for raster data');
   }
+  
+  // Spatial metric operations not applicable for raster data
+  async calculateAreaStats(): Promise<{ min: number; max: number; mean: number; sum: number; count: number }> {
+    throw new Error('calculateAreaStats not applicable for raster data');
+  }
+  
+  async calculatePerimeterStats(): Promise<{ min: number; max: number; mean: number; sum: number; count: number }> {
+    throw new Error('calculatePerimeterStats not applicable for raster data');
+  }
 }

@@ -326,4 +326,34 @@ export class DataAccessFacade {
     const backend = this.getBackend(dataSourceType, reference);
     return backend.filterByDistance(reference, centerReference, distance, options);
   }
+  
+  // ========== Spatial Metric Operations ==========
+  
+  /**
+   * Calculate area statistics for polygon features
+   */
+  async calculateAreaStats(
+    dataSourceType: string,
+    reference: string,
+    options?: {
+      unit?: 'square_meters' | 'square_kilometers' | 'hectares';
+    }
+  ): Promise<{ min: number; max: number; mean: number; sum: number; count: number }> {
+    const backend = this.getBackend(dataSourceType, reference);
+    return backend.calculateAreaStats(reference, options);
+  }
+  
+  /**
+   * Calculate perimeter/length statistics for polygon or line features
+   */
+  async calculatePerimeterStats(
+    dataSourceType: string,
+    reference: string,
+    options?: {
+      unit?: 'meters' | 'kilometers' | 'feet' | 'miles';
+    }
+  ): Promise<{ min: number; max: number; mean: number; sum: number; count: number }> {
+    const backend = this.getBackend(dataSourceType, reference);
+    return backend.calculatePerimeterStats(reference, options);
+  }
 }
