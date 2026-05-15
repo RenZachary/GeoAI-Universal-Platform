@@ -291,7 +291,7 @@ export default {
     connectionSuccess: 'Connection successful',
     connectionFailed: 'Connection failed',
     version: 'Version',
-    description: 'Geographic Information AI Assistant Platform',
+    description: 'Geographic information application agent',
     llmWarning: 'Configure your LLM provider to enable AI features',
     saveConfiguration: 'Save Configuration',
     selectProvider: 'Select provider',

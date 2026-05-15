@@ -291,7 +291,7 @@ export default {
     connectionSuccess: '连接成功',
     connectionFailed: '连接失败',
     version: '版本',
-    description: '地理信息人工智能助手平台',
+    description: '地理信息应用智能体',
     llmWarning: '配置大模型提供商以启用AI功能',
     saveConfiguration: '保存配置',
     selectProvider: '选择提供商',
