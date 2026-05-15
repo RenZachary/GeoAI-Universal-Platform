@@ -186,17 +186,26 @@ export class SummaryGenerator {
   
   /**
    * Generate answer from knowledge context (RAG)
+   * Now supports fallback to general knowledge when KB context is insufficient
    */
   private async generateKnowledgeAnswer(
     state: GeoAIStateType,
     language: string,
     onToken?: (token: string) => void
   ): Promise<string> {
-    if (!this.llmConfig || !state.knowledgeContext) {
+    if (!this.llmConfig) {
       return 'I could not find relevant information in the knowledge base.';
     }
     
-    const { query, contextString } = state.knowledgeContext;
+    const query = state.userInput;
+    const contextString = state.knowledgeContext?.contextString || '';
+    
+    // Log whether we have KB context
+    if (!state.knowledgeContext || !contextString) {
+      console.log('[Summary Generator] No KB context available, will use general knowledge');
+    } else {
+      console.log(`[Summary Generator] Using KB context (${contextString.length} chars)`);
+    }
     
     try {
       // Load knowledge answer template
