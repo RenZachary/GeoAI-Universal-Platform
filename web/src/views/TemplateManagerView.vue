@@ -93,7 +93,6 @@
             v-model="templateForm.content" 
             type="textarea"
             :rows="15"
-            :placeholder="$t('templates.enterContent')"
             class="template-editor"
           />
           <div class="editor-help">

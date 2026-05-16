@@ -12,7 +12,6 @@
 
 import type { GeoAIStateType } from '../GeoAIGraph';
 import type { IntentClassification, IntentType } from '../../../knowledge-base/types';
-import { INTENT_CONFIG } from '../../../knowledge-base/config';
 import { LLMAdapterFactory } from '../../adapters/LLMAdapterFactory';
 import type { LLMConfig } from '../../adapters/LLMAdapterFactory';
 import { PromptManager } from '../../managers/PromptManager';
