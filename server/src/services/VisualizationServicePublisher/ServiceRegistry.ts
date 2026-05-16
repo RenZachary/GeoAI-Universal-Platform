@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import type { VisualizationServiceInfo, ServiceRegistry, ServiceType } from './interface';
+import type { VisualizationServiceInfo, ServiceRegistry, ServiceType } from './types';
 
 export class InMemoryServiceRegistry implements ServiceRegistry {
   private services: Map<string, VisualizationServiceInfo> = new Map();

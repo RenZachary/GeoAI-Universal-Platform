@@ -4,7 +4,7 @@ import { VisualizationServicePublisher } from '../VisualizationServicePublisher'
 import { PublishingRepository } from './Repository';
 import { MVTDataSourcePublisher } from './MVTDataSourcePublisher';
 import { WMSDataSourcePublisher } from './WMSDataSourcePublisher';
-import type { PublishedServiceInfo, ServiceUrlResult } from './interface';
+import type { PublishedServiceInfo, ServiceUrlResult } from './types';
 import path from 'path';
 import fs from 'fs';
 

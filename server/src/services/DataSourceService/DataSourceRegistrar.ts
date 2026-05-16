@@ -1,6 +1,6 @@
 import type { DataSourceRepository } from '../../data-access/repositories';
 import type { PostGISConnectionConfig } from '../../core';
-import type { TableInfo, RegisteredDataSource } from './interface';
+import type { TableInfo, RegisteredDataSource } from './types';
 
 export class DataSourceRegistrar {
   constructor(private dataSourceRepo: DataSourceRepository) {}

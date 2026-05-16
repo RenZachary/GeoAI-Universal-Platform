@@ -4,7 +4,7 @@ import { FileUploadValidator } from './Validator';
 import { MetadataExtractor } from './MetadataExtractor';
 import { FileCleanupManager } from './FileCleanupManager';
 import { FilenameDecoder } from './FilenameDecoder';
-import type { UploadedFile, UploadResult } from './interface';
+import type { UploadedFile, UploadResult } from './types';
 import path from 'path';
 import fs from 'fs';
 

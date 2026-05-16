@@ -5,7 +5,7 @@ import type {
   VisualizationServiceInfo, 
   ServicePublishResult, 
   ServiceType 
-} from './interface';
+} from './types';
 import type { MVTSource, MVTTileOptions } from '../../publishers/base/MVTPublisherTypes';
 import type { WMSLayerOptions } from '../../publishers/base/WMSStategies/WMSPublisherTypes';
 import type { NativeData } from '../../core';

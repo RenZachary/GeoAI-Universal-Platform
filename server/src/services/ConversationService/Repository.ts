@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import type { ConversationSummary, ChatMessage } from './interface';
+import type { ConversationSummary, ChatMessage } from './types';
 import { DEFAULT_CONVERSATION_TITLE } from './constant';
 import { ConversationValidator } from './Validator';
 

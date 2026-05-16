@@ -5,4 +5,4 @@ export type {
   VisualizationServiceInfo, 
   ServicePublishResult,
   ServiceRegistry
-} from './interface';
+} from './types';

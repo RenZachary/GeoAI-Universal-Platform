@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import { ConversationRepository } from './Repository';
-import type { ConversationSummary, ChatMessage } from './interface';
+import type { ConversationSummary, ChatMessage } from './types';
 
 export class ConversationService {
   private repository: ConversationRepository;

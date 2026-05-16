@@ -9,7 +9,7 @@ import { PostGISConnector } from './PostGISConnector';
 import { TableDiscoverer } from './TableDiscoverer';
 import { DataSourceRegistrar } from './DataSourceRegistrar';
 import { BboxCalculator } from './BboxCalculator';
-import type { ConnectionInfo, RegisteredDataSource } from './interface';
+import type { ConnectionInfo, RegisteredDataSource } from './types';
 
 export class DataSourceService {
   private dataSourceRepo: DataSourceRepository;

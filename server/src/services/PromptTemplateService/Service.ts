@@ -6,7 +6,7 @@ import type {
   CreateTemplateInput, 
   UpdateTemplateInput,
   TemplateListOptions 
-} from './interface';
+} from './types';
 import { DEFAULT_LANGUAGE } from './constant';
 import path from 'path';
 import fs from 'fs';

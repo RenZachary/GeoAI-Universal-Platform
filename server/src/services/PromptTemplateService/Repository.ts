@@ -1,4 +1,4 @@
-import type { PromptTemplateSummary, PromptTemplateRecord } from './interface';
+import type { PromptTemplateSummary, PromptTemplateRecord } from './types';
 import { DEFAULT_VERSION } from './constant';
 import fs from 'fs';
 import path from 'path';

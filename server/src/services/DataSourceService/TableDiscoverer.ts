@@ -1,5 +1,5 @@
 import type { PostGISConnectionConfig } from '../../core';
-import type { TableInfo, UnifiedFieldInfo } from './interface';
+import type { TableInfo, UnifiedFieldInfo } from './types';
 import { POSTGIS_TEMP_SCHEMA } from './constant';
 import { PostGISConnector } from './PostGISConnector';
 

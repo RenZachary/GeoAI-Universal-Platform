@@ -6,4 +6,4 @@ export type {
   CreateTemplateInput, 
   UpdateTemplateInput,
   TemplateListOptions 
-} from './interface';
+} from './types';

@@ -1,5 +1,5 @@
 import { ValidationError, TemplateConflictError } from './errors';
-import type { CreateTemplateInput } from './interface';
+import type { CreateTemplateInput } from './types';
 import fs from 'fs';
 
 export class PromptTemplateValidator {
