@@ -17,6 +17,7 @@ import { SQLiteManagerInstance } from '..';
 export async function scanAndRegisterDataFiles(
   workspaceBase: string
 ): Promise<void> {
+  deleteUnExistFilesInDb(workspaceBase);
   const dataDir = path.join(workspaceBase, 'data', 'local');
   
   if (!fs.existsSync(dataDir)) {
@@ -113,7 +114,19 @@ export async function scanAndRegisterDataFiles(
   
   console.log(`  Registration complete: ${registeredCount} new, ${skippedCount} already registered`);
 }
-
+function deleteUnExistFilesInDb(workspaceBase: string): void {
+  const dataDir = path.join(workspaceBase, 'data', 'local');
+  const dataSourceRepo = new DataSourceRepository(SQLiteManagerInstance.getDatabase());
+  const existingSources = dataSourceRepo.listAll();
+  existingSources.forEach(source => {
+    if(source.type === 'postgis') return;
+    const fullPath = path.join(dataDir, source.reference);
+    if (!fs.existsSync(fullPath)) {
+      console.log(`  Deleting unexist file in db: ${fullPath}`);
+      dataSourceRepo.delete(source.id);
+    }
+  });
+}
 /**
  * Detect file type from filename extension
  */

@@ -4,12 +4,13 @@ Classify the user query into one of these intent categories to enable intelligen
 ## Intent Categories
 
 ### 1. GIS_ANALYSIS
-**Definition**: Queries that require spatial operations, geometric computations, or map-based visualization.
+**Definition**: Queries that require spatial operations, geometric computations, or map-based visualization, or data information.
 
 **Classification Principles**:
 - **Action Verbs**: If the query contains verbs like calculate, compute, create, generate, show, display, render, visualize, measure, count, or find, it is likely an analysis task.
 - **Spatial Terms**: Presence of terms related to geometry (buffer, intersect, overlay, distance, area) indicates spatial processing.
 - **Visualization Requests**: Any request to "show on map", "display in [color]", or "visualize" MUST be classified as GIS_ANALYSIS.
+- if user asked datasets information, IT MUST BE 'GIS_ANALYSIS'
 
 ### 2. KNOWLEDGE_QUERY
 **Definition**: Queries asking about policies, regulations, standards, definitions, or document content.

@@ -271,7 +271,6 @@
     <el-dialog
       v-model="showMetadataDialog"
       :title="selectedDataSource?.name || 'Metadata'"
-      width="700px"
     >
       <div v-if="selectedDataSource" class="metadata-content">
         <el-descriptions :column="2" border>
