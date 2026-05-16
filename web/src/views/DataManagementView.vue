@@ -362,6 +362,7 @@ const selectedDataSource = ref<any>(null)
 const selectedFiles = ref<File[]>([])
 const isUploading = ref(false)
 const isConnecting = ref(false)
+const uploadRef = ref<any>(null)
 const postgisConnections = ref<Array<{
   id: string
   name: string
@@ -426,6 +427,11 @@ async function handleUploadFiles() {
     await dataSourceStore.uploadMultipleFiles(selectedFiles.value)
     ElMessage.success(t('data.uploadSuccess'))
     
+    // Clear upload component file list
+    if (uploadRef.value) {
+      uploadRef.value.clearFiles()
+    }
+    
     // Reset
     selectedFiles.value = []
     showUploadDialog.value = false
@@ -438,6 +444,11 @@ async function handleUploadFiles() {
 }
 
 function handleCancelUpload() {
+  // Clear upload component file list
+  if (uploadRef.value) {
+    uploadRef.value.clearFiles()
+  }
+  
   selectedFiles.value = []
   showUploadDialog.value = false
   dataSourceStore.clearCompletedUploads()

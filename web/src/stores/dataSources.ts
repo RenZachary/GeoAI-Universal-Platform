@@ -87,25 +87,53 @@ export const useDataSourceStore = defineStore('dataSources', () => {
   }
   
   async function uploadMultipleFiles(files: File[], onProgress?: (taskId: string, progress: number) => void) {
-    const results: any[] = []
+    console.log('[dataSources] uploadMultipleFiles called with', files.length, 'files')
+    console.log('[dataSources] Files:', files.map(f => f.name))
     
-    for (const file of files) {
-      try {
-        const result = await uploadFile(file, (progress) => {
-          if (onProgress) {
-            const task = uploadTasks.value.find(t => t.fileName === file.name)
-            if (task) {
-              onProgress(task.id, progress)
-            }
+    // Create upload tasks for all files
+    files.forEach(file => {
+      const taskId = `upload-${Date.now()}-${file.name}`
+      uploadTasks.value.push({
+        id: taskId,
+        fileName: file.name,
+        progress: 0,
+        status: 'uploading'
+      })
+    })
+    
+    try {
+      // Use the fileUploadService which handles shapefile batch upload
+      const result = await fileUploadService.uploadMultipleFiles(files, (fileName, progress) => {
+        if (onProgress) {
+          const task = uploadTasks.value.find(t => t.fileName === fileName)
+          if (task) {
+            task.progress = progress.percentage
+            onProgress(task.id, progress.percentage)
           }
-        })
-        results.push(result)
-      } catch (error) {
-        console.error(`Failed to upload ${file.name}:`, error)
-      }
+        }
+      })
+      
+      // Mark all tasks as success
+      uploadTasks.value.forEach(task => {
+        if (files.some(f => f.name === task.fileName)) {
+          task.status = 'success'
+        }
+      })
+      
+      // Reload data sources to include new uploads
+      await loadDataSources()
+      
+      return result
+    } catch (error: any) {
+      // Mark tasks as error
+      uploadTasks.value.forEach(task => {
+        if (files.some(f => f.name === task.fileName)) {
+          task.status = 'error'
+          task.error = error.message || 'Upload failed'
+        }
+      })
+      throw error
     }
-    
-    return results
   }
   
   function clearCompletedUploads() {
