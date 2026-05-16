@@ -18,7 +18,7 @@
 
 **GeoAI-UP** 是一款**开箱即用的 GIS 应用智能体**，将大语言模型（LLM）与先进的空间分析能力深度融合。只需用自然语言描述您的地理空间分析需求，AI 智能体即可自动规划、执行并可视化呈现结果。
 
-![首页](https://foruda.gitee.com/images/1778104634845045889/691faa01_790454.png "首页")
+![首页](https://foruda.gitee.com/images/1778945222899235389/43c86e7c_790454.png "截屏")
 
 > ⚠️ **项目状态**：GeoAI-UP 目前处于**积极开发阶段**。虽然核心功能已可运行，但在架构优化和功能扩展过程中，您可能会遇到不完善之处或已知问题。我们非常欢迎您通过 [Issues](https://gitee.com/rzcgis/geo-ai-universal-platform/issues) 提供反馈和贡献。
 
