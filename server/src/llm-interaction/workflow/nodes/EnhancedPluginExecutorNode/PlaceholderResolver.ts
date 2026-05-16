@@ -8,17 +8,7 @@
  * - textual: Terminal operations, typically not referenced
  */
 
-import type { OperatorReturnType } from '../../spatial-operators/SpatialOperator';
-
-export interface ExecutionResult {
-  id: string;
-  goalId: string;
-  status: 'success' | 'failed';
-  data?: any;
-  error?: string;
-  metadata?: Record<string, any>;
-  returnType?: OperatorReturnType; // NEW: Track return type for smart resolution
-}
+import type { ExecutionResult } from './types';
 
 /**
  * Resolve placeholders in parameters using execution results

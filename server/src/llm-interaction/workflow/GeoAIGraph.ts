@@ -14,7 +14,7 @@ import { TaskPlannerAgent } from '../agents/TaskPlannerAgent';
 import { ConversationBufferMemoryWithSQLite } from '../managers/ConversationMemoryManager';
 import { SummaryGenerator } from './SummaryGenerator';
 import { reportDecisionNode } from './nodes/ReportDecisionNode';
-import { EnhancedExecutorInstance } from './nodes/EnhancedPluginExecutor';
+import { EnhancedExecutorNodeInstance } from './nodes/EnhancedPluginExecutorNode';
 import { getIntentClassifier } from './nodes/IntentClassifierNode';
 import { getKnowledgeRetriever } from './nodes/KnowledgeRetrieverNode';
 import { ContextExtractorNode } from './nodes/ContextExtractorNode';
@@ -332,12 +332,12 @@ export function createGeoAIGraph(
       }
       
       // Use EnhancedPluginExecutor for parallel execution
-      const result = await EnhancedExecutorInstance.executeWithParallelSupport(state);
+      const result = await EnhancedExecutorNodeInstance.executeWithParallelSupport(state);
       
       // Get execution metrics
-      const metrics = EnhancedExecutorInstance.getMetrics();
+      const metrics = EnhancedExecutorNodeInstance.getMetrics();
       if (metrics) {
-        console.log(EnhancedExecutorInstance.generateSummary());
+        console.log(EnhancedExecutorNodeInstance.generateSummary());
       }
       
       // Publish visualization services using unified publisher
