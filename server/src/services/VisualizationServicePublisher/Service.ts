@@ -1,256 +1,34 @@
-/**
- * VisualizationServicePublisher - Unified interface for all visualization services
- * 
- * Provides a single entry point for publishing, managing, and cleaning up
- * visualization services (MVT, WMS, GeoJSON, Reports).
- * 
- * Architecture:
- * - Strategy Pattern: Different publishers for different service types
- * - Singleton: Centralized service registry and lifecycle management
- * - TTL Management: Automatic expiration and cleanup of unused services
- * - Health Monitoring: Track service usage and performance metrics
- */
-
+import { InMemoryServiceRegistry } from './ServiceRegistry';
+import { MVTStrategyPublisher } from '../../publishers/MVTStrategyPublisher';
+import { WMSPublisher } from '../../publishers/WMSPublisher';
+import type { 
+  VisualizationServiceInfo, 
+  ServicePublishResult, 
+  ServiceType 
+} from './interface';
+import type { MVTSource, MVTTileOptions } from '../../publishers/base/MVTPublisherTypes';
+import type { WMSLayerOptions } from '../../publishers/base/WMSStategies/WMSPublisherTypes';
+import type { NativeData } from '../../core';
 import type Database from 'better-sqlite3';
-import { MVTStrategyPublisher } from '../publishers/MVTStrategyPublisher';
-import { WMSPublisher } from '../publishers/WMSPublisher';
-import type { MVTSource, MVTTileOptions } from '../publishers/base/MVTPublisherTypes';
-import type { NativeData } from '../core';
-import type { WMSLayerOptions } from '../publishers/base/WMSStategies/WMSPublisherTypes';
-
-// ============================================================================
-// Type Definitions
-// ============================================================================
-
-export type ServiceType = 'mvt' | 'wms' | 'geojson' | 'report';
-
-/**
- * Visualization Service Info - Platform service lifecycle metadata
- * 
- * Tracks service registration, access patterns, and expiration.
- * NOT to be confused with core ServiceMetadata which is for rendering configuration.
- */
-export interface VisualizationServiceInfo {
-  id: string;
-  type: ServiceType;
-  url: string;
-  createdAt: Date;
-  expiresAt?: Date;
-  ttl?: number; // Time-to-live in milliseconds
-  lastAccessedAt?: Date;
-  accessCount?: number;
-  metadata?: Record<string, any>;
-}
-
-export interface ServicePublishResult {
-  success: boolean;
-  serviceId?: string;
-  url?: string;
-  error?: string;
-  metadata?: VisualizationServiceInfo;
-}
-
-export interface ServiceRegistry {
-  get(serviceId: string): VisualizationServiceInfo | null;
-  list(type?: ServiceType): VisualizationServiceInfo[];
-  register(metadata: VisualizationServiceInfo): void;
-  unregister(serviceId: string): void;
-  updateLastAccessed(serviceId: string): void;
-}
-
-// ============================================================================
-// In-Memory Service Registry with SQLite Persistence
-// ============================================================================
-
-export class InMemoryServiceRegistry implements ServiceRegistry {
-  private services: Map<string, VisualizationServiceInfo> = new Map();
-  private db?: Database.Database;
-
-  constructor(db?: Database.Database) {
-    this.db = db;
-    if (db) {
-      this.initializeDatabase();
-    }
-  }
-
-  private initializeDatabase(): void {
-    if (!this.db) {
-      console.warn('[ServiceRegistry] Database is not initialized');
-      return;
-    }
-    try {
-      this.db.exec(`
-        CREATE TABLE IF NOT EXISTS visualization_services (
-          service_id TEXT PRIMARY KEY,
-          service_type TEXT NOT NULL,
-          url TEXT NOT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          expires_at DATETIME,
-          ttl INTEGER,
-          last_accessed_at DATETIME,
-          access_count INTEGER DEFAULT 0,
-          metadata_json TEXT
-        )
-      `);
-
-      // Load existing services from database
-      this.loadFromDatabase();
-    } catch (error) {
-      console.error('[ServiceRegistry] Failed to initialize database:', error);
-    }
-  }
-
-  private loadFromDatabase(): void {
-    try {
-      if (!this.db) {
-        console.warn('[ServiceRegistry] Database is not initialized');
-        return;
-      }
-      const rows = this.db.prepare('SELECT * FROM visualization_services').all() as any[];
-      for (const row of rows) {
-        const metadata: VisualizationServiceInfo = {
-          id: row.service_id,
-          type: row.service_type,
-          url: row.url,
-          createdAt: new Date(row.created_at),
-          expiresAt: row.expires_at ? new Date(row.expires_at) : undefined,
-          ttl: row.ttl,
-          lastAccessedAt: row.last_accessed_at ? new Date(row.last_accessed_at) : undefined,
-          accessCount: row.access_count || 0,
-          metadata: row.metadata_json ? JSON.parse(row.metadata_json) : undefined
-        };
-        this.services.set(metadata.id, metadata);
-      }
-      console.log(`[ServiceRegistry] Loaded ${this.services.size} services from database`);
-    } catch (error) {
-      console.error('[ServiceRegistry] Failed to load services from database:', error);
-    }
-  }
-
-  get(serviceId: string): VisualizationServiceInfo | null {
-    const service = this.services.get(serviceId);
-    if (service) {
-      // Update access tracking
-      service.lastAccessedAt = new Date();
-      service.accessCount = (service.accessCount || 0) + 1;
-
-      // Persist to database if available
-      if (this.db) {
-        this.persistToDatabase(service);
-      }
-    }
-    return service || null;
-  }
-
-  list(type?: ServiceType): VisualizationServiceInfo[] {
-    const services = Array.from(this.services.values());
-    return type ? services.filter(s => s.type === type) : services;
-  }
-
-  register(metadata: VisualizationServiceInfo): void {
-    this.services.set(metadata.id, metadata);
-
-    // Persist to database if available
-    if (this.db) {
-      this.persistToDatabase(metadata);
-    }
-  }
-
-  unregister(serviceId: string): void {
-    this.services.delete(serviceId);
-
-    // Remove from database if available
-    if (this.db) {
-      try {
-        this.db.prepare('DELETE FROM visualization_services WHERE service_id = ?').run(serviceId);
-      } catch (error) {
-        console.error('[ServiceRegistry] Failed to delete service from database:', error);
-      }
-    }
-  }
-
-  updateLastAccessed(serviceId: string): void {
-    const service = this.services.get(serviceId);
-    if (service) {
-      service.lastAccessedAt = new Date();
-      service.accessCount = (service.accessCount || 0) + 1;
-
-      if (this.db) {
-        this.persistToDatabase(service);
-      }
-    }
-  }
-
-  private persistToDatabase(metadata: VisualizationServiceInfo): void {
-    try {
-      if (!this.db) {
-        console.warn('[ServiceRegistry] Database is not initialized');
-        return;
-      }
-      this.db.prepare(`
-        INSERT OR REPLACE INTO visualization_services 
-        (service_id, service_type, url, created_at, expires_at, ttl, last_accessed_at, access_count, metadata_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        metadata.id,
-        metadata.type,
-        metadata.url,
-        metadata.createdAt.toISOString(),
-        metadata.expiresAt?.toISOString(),
-        metadata.ttl,
-        metadata.lastAccessedAt?.toISOString(),
-        metadata.accessCount,
-        metadata.metadata ? JSON.stringify(metadata.metadata) : null
-      );
-    } catch (error) {
-      console.error('[ServiceRegistry] Failed to persist service to database:', error);
-    }
-  }
-
-  /**
-   * Get expired services for cleanup
-   */
-  getExpiredServices(): VisualizationServiceInfo[] {
-    const now = new Date();
-    return Array.from(this.services.values()).filter(service => {
-      if (service.expiresAt && service.expiresAt < now) {
-        return true;
-      }
-      return false;
-    });
-  }
-
-  /**
-   * Clear all services (for testing)
-   */
-  clear(): void {
-    this.services.clear();
-    if (this.db) {
-      try {
-        this.db.exec('DELETE FROM visualization_services');
-      } catch (error) {
-        console.error('[ServiceRegistry] Failed to clear database:', error);
-      }
-    }
-  }
-}
-
-// ============================================================================
-// Unified Visualization Service Publisher
-// ============================================================================
+import { 
+  DEFAULT_MVT_TTL, 
+  DEFAULT_WMS_TTL, 
+  DEFAULT_GEOJSON_TTL, 
+  DEFAULT_REPORT_TTL,
+  CLEANUP_INTERVAL_MS 
+} from './constant';
 
 export class VisualizationServicePublisher {
   private static instance: VisualizationServicePublisher | null = null;
 
   private registry: InMemoryServiceRegistry;
-  private mvtPublisher: MVTStrategyPublisher;  // Changed to use new strategy-based publisher
+  private mvtPublisher: MVTStrategyPublisher;
   private wmsPublisher: WMSPublisher;
   private workspaceBase: string;
   private db?: Database.Database;
 
   // Cleanup interval (check every 5 minutes)
   private cleanupInterval: NodeJS.Timeout | null = null;
-  private readonly CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 
   private constructor(workspaceBase: string, db?: Database.Database) {
     this.workspaceBase = workspaceBase;
@@ -325,7 +103,7 @@ export class VisualizationServicePublisher {
       }
 
       // Use custom TTL or default to 1 hour
-      const effectiveTtl = ttl || 3600000;
+      const effectiveTtl = ttl || DEFAULT_MVT_TTL;
 
       const metadata: VisualizationServiceInfo = {
         id: result.tilesetId,
@@ -368,7 +146,7 @@ export class VisualizationServicePublisher {
     source: MVTSource,
     options: MVTTileOptions,
     serviceId?: string,
-    ttl?: number  // Optional custom TTL (default: 1 hour)
+    ttl?: number
   ): Promise<ServicePublishResult> {
     try {
       // Convert MVTSource format to NativeData format
@@ -425,8 +203,8 @@ export class VisualizationServicePublisher {
         type: 'wms',
         url: `/api/services/wms/${generatedServiceId}`,
         createdAt: new Date(),
-        ttl: 3600000, // Default 1 hour
-        expiresAt: new Date(Date.now() + 3600000),
+        ttl: DEFAULT_WMS_TTL,
+        expiresAt: new Date(Date.now() + DEFAULT_WMS_TTL),
         metadata: {
           name: options.name,
           title: options.title
@@ -456,7 +234,7 @@ export class VisualizationServicePublisher {
   publishGeoJSON(
     stepId: string,
     geojsonData: any,
-    ttl: number = 3600000
+    ttl: number = DEFAULT_GEOJSON_TTL
   ): ServicePublishResult {
     try {
       const metadata: VisualizationServiceInfo = {
@@ -493,7 +271,7 @@ export class VisualizationServicePublisher {
   publishReport(
     stepId: string,
     reportContent: string,
-    ttl: number = 86400000 // Default 24 hours for reports
+    ttl: number = DEFAULT_REPORT_TTL
   ): ServicePublishResult {
     try {
       const metadata: VisualizationServiceInfo = {
@@ -584,9 +362,9 @@ export class VisualizationServicePublisher {
 
     this.cleanupInterval = setInterval(() => {
       this.performCleanup();
-    }, this.CLEANUP_INTERVAL_MS);
+    }, CLEANUP_INTERVAL_MS);
 
-    console.log(`[VisualizationServicePublisher] Started cleanup timer (interval: ${this.CLEANUP_INTERVAL_MS / 1000}s)`);
+    console.log(`[VisualizationServicePublisher] Started cleanup timer (interval: ${CLEANUP_INTERVAL_MS / 1000}s)`);
   }
 
   /**
