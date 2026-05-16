@@ -96,7 +96,7 @@
             class="template-editor"
           />
           <div class="editor-help">
-            {{ $t('templates.variableSyntax') }}
+            {{ $t('templates.variableSyntax', { syntax: '{' + '{' + 'variable' + '}' + '}', example1: '{' + '{' + 'query' + '}' + '}', example2: '{' + '{' + 'data_source' + '}' + '}' }) }}
           </div>
         </el-form-item>
         
