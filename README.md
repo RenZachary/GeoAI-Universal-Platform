@@ -19,7 +19,7 @@
 
 **GeoAI-UP** is an **out-of-the-box GIS application agent** that combines Large Language Models (LLMs) with advanced spatial analysis capabilities. Simply describe your geospatial analysis needs in natural language, and the AI agent will intelligently plan, execute, and visualize results.
 
-![首页](./screenshot_eng "screenshot")
+![首页](./docs/screenshot_en.png "screenshot")
 
 > ⚠️ **Project Status**: GeoAI-UP is currently under **active development**. While core features are functional, you may encounter incomplete implementations or bugs as we continue to refine the architecture and expand capabilities. We welcome your feedback and contributions via [Issues](https://gitee.com/rzcgis/geo-ai-universal-platform/issues).
 
